@@ -1,4 +1,4 @@
-module RILSeqTool
+module ChimericFragments
 
 using XAM, FASTX, CodecZlib, GFF3, BigWig, DelimitedFiles, BGZFStreams, CSV, XLSX
 using BioAlignments, BioSequences, GenomicFeatures, BioGenerics
