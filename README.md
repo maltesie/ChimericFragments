@@ -1,7 +1,7 @@
-# RILSeq analysis tool
+# Chimeric fragments analysis tool
 
-This is a configurable script for demultiplexing, mapping and analyzing sequencing data from RILSeq 
-experiments. This document serves as an installation guide and manual.
+This is a configurable script for demultiplexing, mapping and analyzing sequencing data from RNA-Seq 
+experiments that produce chimeric reads. This document serves as an installation guide and manual.
 
 ## Dependencies
 
