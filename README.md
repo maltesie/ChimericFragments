@@ -18,7 +18,9 @@ https://github.com/bwa-mem2/bwa-mem2/releases
 https://github.com/samtools/samtools/releases
 
 The default parameters of this script expect samtools and bwa-mem2 installed on the system or set
-in the $PATH variable.
+in the $PATH variable. When running the script for the first time, a number of Julia packages are 
+installed and precompiled. This procedure might take a few minutes, all further executions will
+directly start the analysis.
 
 ## Analysis procedure
 
