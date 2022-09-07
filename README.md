@@ -103,7 +103,7 @@ The example analysis will take a minute and the resulting tables will be located
 example_data/results. Since this toy data only contains a few thousand reads, the tables should 
 show between 2 and 115 interactions across the 6 conditions. 
 
-# Copyright notice and disclaimer
+## Copyright notice and disclaimer
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
