@@ -92,3 +92,13 @@ The script will generate 2 folders called data\_processing and results. In data\
 extracted reads (fastq.gz) and alignments (.bam, .bam.bai) are saved. Also alignment stats are 
 generated (.bam.log). In the results folder, several subfolder are generated and all relevant 
 results are combined in two tables with filenames interactions.xlsx and singles.xlsx
+
+## Example analysis data
+
+To run the analysis on the supplied example data, open a terminal in this folder and run
+
+>julia chimeric_fragments.jl example_data
+
+The example analysis will take a minute and the resulting tables will be located in the folder 
+example_data/results. Since this toy data only contains a few thousand reads, the tables should 
+show between 2 and 115 interactions across the 6 conditions. 
