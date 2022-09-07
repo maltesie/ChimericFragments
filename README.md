@@ -30,7 +30,7 @@ The workflow can be split into a few simple steps:
 3. copy default config.jl into project folder and edit as necessary
 4. run the rilseq.jl script and pass the project folder as an argument
 
-### editing config.jl
+### edit config.jl
 
 IT IS IMPORTANT TO KEEP THE STRUCTURE OF config.jl INTACT. PLEASE ONLY EDIT TEXT BETWEEN "", NUMBERS
 OR EXCHANGE true AND false.
