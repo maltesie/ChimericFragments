@@ -24,11 +24,10 @@ in the $PATH variable.
 
 The workflow can be split into a few simple steps:
 
-1. create project folder
-2. copy 2 RILSeq paired end sequencing files, an annotation file and a reference genome sequence 
-	file into the project folder. 
+1. create a project folder
+2. copy 2 paired end sequencing files, an annotation file and a genome sequence file into it
 3. copy default config.jl into project folder and edit as necessary
-4. run the rilseq.jl script and pass the project folder as an argument
+4. run the chimeric_fragments.jl script and pass the project folder as an argument
 
 ### edit config.jl
 
