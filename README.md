@@ -38,7 +38,7 @@ OR EXCHANGE true AND false.
 All relevant analysis parameter and the dependencies can be set in the config.jl file. Some 
 parameters have to be set, others are optional and affect the analysis outcome.
 
-Necessary parameter:
+### Necessary parameter:
 
 If bwa-mem2 and samtools are installed systemwide, the options bwa\_mem2\_bin and samtools\_bin can be
 left unchanged, otherwise they should point to the executables of bwa-mem2 and samtools.
@@ -54,14 +54,14 @@ corresponding barcode to a sample name and its condition. For every sample, one 
 set, providing a sample name, the condition and the antibarcode, each in quotes ("") and separated by 
 comma as in the default config.jl.
 
-Chimeric fragments parameter:
+### Chimeric fragments parameter:
 
 Here, the way how alignments are processed and chimeric fragments are classified, can be set.
 min\_distance defines the minimum distance between two aligned fragments on the same strand from to
 be classified as chimeric. is\_reverse\_complement has to be set, if the reads come from complementary
 DNA as in the RIL-Seq experiment.
 
-Annotation parameter:
+### Annotation parameter:
 
 The RILSeq analysis requires a complete annotation of the genome, i.e. all regions without an
 annotation are ignored. The analysis can automatically generate a complete annotation, or expects
@@ -69,18 +69,18 @@ the annotation to be supplied by the annotation\_file. This can be set using the
 option in the config.jl file. If set to false, the types of the supplied UTRs and IGRs have to be
 the same as defined by the options fiveutr\_type, threeutr\_type and igr\_type.
 
-Fisher Exact Test parameter:
+### Fisher Exact Test parameter:
 
 include\_read\_identity defines, if the test should take the order of the chimeric pair's placement
 on the read(s) into account and include\_singles the addition of single transcripts of each partner.
 max\_fdr sets the maximum false discovery rate and min\_reads defines a cut off for the output into
 the final tables.
 
-# run rilseq.jl
+# run chimeric_fragments.jl
 
 The script can be executed by passing it to the julia executable. In a terminal, run
 
->julia path/to/rilseq.jl path/to/project_folder
+>julia path/to/chimeric_fragments.jl path/to/project_folder
 
 To rerun the analysis (e.g. with a different set of parameters), remove the results folder from
 the project folder and rerun the above command. 
