@@ -1,0 +1,224 @@
+multi_fun	common_name
+BC-1	metabolism
+BC-1.1	carbon utilization
+BC-1.1.1	carbon compounds
+BC-1.1.2	fatty acids
+BC-1.1.3	amino acids
+BC-1.1.4	amines
+BC-1.1.5	other compounds
+BC-1.2	degradation of macromolecules
+BC-1.2.1	RNA
+BC-1.2.2	DNA
+BC-1.2.3	proteins/peptides/glycopeptides
+BC-1.2.4	polysaccharides
+BC-1.3	energy metabolism, carbon
+BC-1.3.1	glycolysis
+BC-1.3.2	pentose pwy, oxidative branch
+BC-1.3.3	pyruvate dehydrogenase
+BC-1.3.4	TCA cycle
+BC-1.3.5	fermentation
+BC-1.3.6	aerobic respiration
+BC-1.3.7	anaerobic respiration
+BC-1.3.8	ATP proton motive force interconversion
+BC-1.3.9	Entner-Doudoroff
+BC-1.4	energy production/transport
+BC-1.4.1	electron donors
+BC-1.4.2	electron acceptors
+BC-1.4.3	electron carriers
+BC-1.5.1.1	glutamate
+BC-1.5.1.10	glycine
+BC-1.5.1.11	serine
+BC-1.5.1.12	cysteine
+BC-1.5.1.13	phenylalanine
+BC-1.5.1.14	tyrosine
+BC-1.5.1.15	tryptophan
+BC-1.5.1.16	histidine
+BC-1.5.1.17	alanine
+BC-1.5.1.18	isoleucine/valine
+BC-1.5.1.19	leucine
+BC-1.5.1.2	glutamine
+BC-1.5.1.20	chorismate
+BC-1.5.1.21	homoserine
+BC-1.5.1.3	arginine
+BC-1.5.1.4	proline
+BC-1.5.1.5	aspartate
+BC-1.5.1.6	asparagine
+BC-1.5.1.7	lysine
+BC-1.5.1.8	threonine
+BC-1.5.1.9	methionine
+BC-1.5.2	nucleotides
+BC-1.5.2.1	purine biosynthesis
+BC-1.5.2.2	pyrimidine biosynthesis
+BC-1.5.2.3	purine ribonucleotide biosynthesis
+BC-1.5.2.4	pyrimidine ribonucleotide biosynthesis
+BC-1.5.3	cofactors, small molecule carriers
+BC-1.5.3.1	biotin
+BC-1.5.3.10	glutathione
+BC-1.5.3.11	menaquinone, ubiquinone
+BC-1.5.3.12	heme, porphyrine
+BC-1.5.3.13	cobalamin
+BC-1.5.3.14	enterochelin (enterobactin)
+BC-1.5.3.2	folic acid
+BC-1.5.3.3	lipoate
+BC-1.5.3.4	molybdenum
+BC-1.5.3.5	Coenzyme A and its modification
+BC-1.5.3.6	pyridoxal 5'phosphate
+BC-1.5.3.7	nicotinamide adenine dinucleotide
+BC-1.5.3.8	thiamin
+BC-1.5.3.9	riboflavin
+BC-1.5.4	fatty acids and phosphatidic acid
+BC-1.6	biosynthesis of macromolecules (cellular constituents)
+BC-1.6.1	phospholipid
+BC-1.6.10	lipoprotein
+BC-1.6.11	glycoprotein
+BC-1.6.12	flagellum
+BC-1.6.13	fimbri, pili
+BC-1.6.15.1	cytochromes
+BC-1.6.15.2	thioredoxin, glutaredoxin
+BC-1.6.15.3	biotin carboxyl carrier protein
+BC-1.6.15.4	acyl carrier protein
+BC-1.6.2	colanic acid (M antigen)
+BC-1.6.3	lipopolysaccharide
+BC-1.6.3.1	O antigen
+BC-1.6.3.2	core region
+BC-1.6.3.3	lipid A
+BC-1.6.4	enterobacterial common antigen  (surface glycolipid)
+BC-1.6.5	K antigen
+BC-1.6.6	osmoregulated periplasmic glucan
+BC-1.6.7	murein (peptidoglycan)
+BC-1.6.9	cytoplasmic polysaccharides
+BC-1.7	central intermediary metabolism
+BC-1.7.1	unassigned reversible reactions
+BC-1.7.10	sugar nucleotide biosynthesis, conversions
+BC-1.7.12	amino sugar conversions
+BC-1.7.13	amino acid conversion
+BC-1.7.14	polyamine biosynthesis
+BC-1.7.15	2'-deoxyribonucleotide metabolism
+BC-1.7.17	formyl-THF biosynthesis
+BC-1.7.18	betaine biosynthesis
+BC-1.7.19	incorporation of metal ions
+BC-1.7.2	glyoxylate bypass
+BC-1.7.20	S-adenosyl methionine biosynthesis
+BC-1.7.21	glyoxylate degradation
+BC-1.7.22	carnitine metabolism
+BC-1.7.23	methylglyoxal metabolism
+BC-1.7.24	cyanate catabolism
+BC-1.7.25	glycolate metabolism
+BC-1.7.26	allantoin assimilation
+BC-1.7.27	pyridoxal 5'-phosphate salvage
+BC-1.7.28	pyruvate oxidation
+BC-1.7.29	acetate catabolism
+BC-1.7.3	non-oxidative branch, pentose pathway
+BC-1.7.30	threonine catabolism
+BC-1.7.31	aminobutyrate catabolism
+BC-1.7.32	putrescine catabolism
+BC-1.7.33	nucleotide and nucleoside conversions
+BC-1.7.34	murein turnover, recycling
+BC-1.7.6	misc. glycerol metabolism
+BC-1.7.7	galactose metabolism
+BC-1.7.9	misc. glucose metabolism
+BC-1.8	metabolism of other compounds
+BC-1.8.1	phosphorous metabolism
+BC-1.8.2	sulfur metabolism
+BC-1.8.3	nitrogen metabolism
+BC-2	information transfer
+BC-2.1	DNA related
+BC-2.1.1	DNA replication
+BC-2.1.2	DNA restriction/modification
+BC-2.1.3	DNA recombination
+BC-2.1.4	DNA repair
+BC-2.1.5	DNA degradation
+BC-2.2	RNA related
+BC-2.2.2	Transcription related
+BC-2.2.3	RNA modification
+BC-2.2.4	RNA degradation
+BC-2.2.5	tRNA
+BC-2.2.6	rRNA, stable RNA
+BC-2.2.7	antisense RNA
+BC-2.3	protein related
+BC-2.3.1	amino acid -activation
+BC-2.3.2	translation
+BC-2.3.3	posttranslational modification
+BC-2.3.4	chaperoning, repair (refolding)
+BC-2.3.5	export, signal peptide cleavage
+BC-2.3.6	turnover, degradation
+BC-2.3.7	nucleoproteins, basic proteins
+BC-2.3.8	ribosomal proteins
+BC-2.3.9	Non-ribosomal peptide synthetase
+BC-3	regulation
+BC-3.1.1	DNA structure level
+BC-3.1.1.1	bent DNA or supercoiling, inversion
+BC-3.1.1.2	methylation
+BC-3.1.2	transcriptional level
+BC-3.1.2.1	sigma factors, anti-sigmafactors
+BC-3.1.2.2	activator
+BC-3.1.2.3	repressor
+BC-3.1.2.4	complex regulation
+BC-3.1.2.4.2	regulons or multilayer component regulatory systems
+BC-3.1.2.4.3	two component regulatory systems (external signal)
+BC-3.1.2.4.4	quorum sensing
+BC-3.1.2.5	action unknown
+BC-3.1.3	posttranscriptional
+BC-3.1.3.1	translation attenuation and efficiency
+BC-3.1.3.2	covalent modification, demodification, maturation
+BC-3.1.3.3	inhibition / activation of enzymes
+BC-3.1.3.4	proteases, cleavage of compounds
+BC-3.1.3.6	antisense RNA
+BC-3.1.4	unknown
+BC-3.3.1	operon
+BC-3.3.2	regulon
+BC-3.3.3	stimulon
+BC-3.3.4	global
+BC-4	transport
+BC-4.1	Channel-type Transporters
+BC-4.1.A	alpha-type channels
+BC-4.1.B	Beta barrel porins (The Outer Membrane Porin (OMP) Functional Superfamily)
+BC-4.2	Electrochemical potential driven transporters
+BC-4.2.A	Porters (Uni-, Sym- and Antiporters)
+BC-4.2.C	Ion-gradient-driven energizers
+BC-4.3.A.1	The ATP-binding Cassette (ABC) Superfamily + ABC-type Uptake Permeases
+BC-4.3.A.1.a	ABC superfamily ATP binding cytoplasmic component
+BC-4.3.A.1.am	ABC superfamily, ATP binding and membrane component
+BC-4.3.A.1.m	ABC superfamily, membrane component
+BC-4.3.A.1.p	ABC superfamily, periplasmic binding component
+BC-4.3.A.2	The H+- or Na+-translocating F-type, V-type and A-type ATPase (F-ATPase) Su
+BC-4.3.A.3	The P-type ATPase (P-ATPase) Superfamily
+BC-4.3.A.4	The Arsenite-Antimonite (Ars) Efflux Family
+BC-4.3.A.5	The Type II (General) Secretory Pathway (IISP) Family
+BC-4.3.D	Oxidoreduction-driven Active Transporters
+BC-4.4.A	Phosphotransferase Systems (PEP-dependent PTS)
+BC-4.8.A	Accessory Factors Involved in Transport
+BC-4.9.A	Transporters of Unknown Classification
+BC-4.9.B	Putative uncharacterized transport protein
+BC-5	cell processes
+BC-5.1	cell division
+BC-5.10	defense/survival
+BC-5.2	cell cycle physiology
+BC-5.3	motility, chemotaxis, energytaxis (aerotaxis, redoxtaxis etc)
+BC-5.4	genetic exchange, recombination (for future)
+BC-5.5	adaptations
+BC-5.5.1	osmotic pressure
+BC-5.5.2	temperature extremes
+BC-5.5.3	starvation
+BC-5.5.4	pH
+BC-5.5.5	dessication
+BC-5.5.6	other (mechanical, nutritional, oxidative stress)
+BC-5.5.7	Fe aquisition
+BC-5.6	protection
+BC-5.6.1	radiation
+BC-5.6.2	detoxification
+BC-5.6.3	cell killing
+BC-5.6.4	drug resistance/sensitivity
+BC-5.8	SOS response
+BC-6	cell structure
+BC-6.1	membrane
+BC-6.2	murein
+BC-6.3	surface antigens (ECA, O antigen of LPS)
+BC-6.4	flagella
+BC-6.5	pilus
+BC-6.6	ribosomes
+BC-6.7	capsule (M and K antigens)
+BC-8.1	prophage genes and phage related functions
+BC-8.2	plasmid related
+BC-8.3	transposon related
+BC-8.4	colicin related
