@@ -1,6 +1,4 @@
-app = dash()
-
-app.layout = html_div([
+browser_layout = html_div([
     cyto_cytoscape(
         id="cytoscape-two-nodes",
         layout=Dict("name" =>  "preset"),

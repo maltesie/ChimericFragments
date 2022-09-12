@@ -12,7 +12,9 @@ include("annotation.jl")
 include("data.jl")
 include("layout.jl")
 
-function chimeric_browser()
+function chimeric_browser(project_path::String)
+    app = dash()
+    app.layout = browser_layout
     run_server(app, "0.0.0.0", debug=true)
 end
 
