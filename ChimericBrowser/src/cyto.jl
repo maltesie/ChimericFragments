@@ -1,7 +1,4 @@
-using Pkg
-Pkg.activate("/home/abc/Workspace/RNASeqAnalysis/")
-
-using Dash, DashHtmlComponents, DashCoreComponents
+using Dash
 
 DashBase.register_package(
         DashBase.ResourcePkg(
