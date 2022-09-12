@@ -1,11 +1,11 @@
-module ChimericFragments
+module ChimericAnalysis
 
 using XAM, FASTX, CodecZlib, GFF3, BigWig, DelimitedFiles, BGZFStreams, CSV, XLSX
 using BioAlignments, BioSequences, GenomicFeatures, BioGenerics
 using Statistics, HypothesisTests, MultipleTesting, Combinatorics, Random, Distributions, StatsBase
 using ElasticArrays, IterTools, LightGraphs, DataFrames
 
-export chimeric_fragments_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, split_libs, align_mem
+export chimeric_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, split_libs, align_mem
 
 include("types.jl")
 include("preprocess.jl")
