@@ -10,8 +10,8 @@ The following procedure was tested on Ubuntu 22.04 and Arch linux (July 2022).
 The script is written in the Julia programming language and requires Julia (1.7.3+) to be installed 
 on your system. You can download Julia here: https://julialang.org/downloads/
 
-The script also depends on bwa-mem2 (2.2.1+) and samtools (1.16.1+) for sequence alignments .bam file 
-generation. You can find the two tools on github:
+The script also depends on bwa-mem2 (2.2.1+) and samtools (1.16.1+) for sequence alignments and
+.bam file processing. You can find the two tools on github:
 
 https://github.com/bwa-mem2/bwa-mem2/releases
 
