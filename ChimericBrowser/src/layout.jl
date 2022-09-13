@@ -1,5 +1,5 @@
-browser_layout = html_div([
-    cyto_cytoscape(
+cyto_layout = html_div([
+    cytoscape(
         id="cytoscape-two-nodes",
         layout=Dict("name" =>  "preset"),
         style=Dict("width" =>  "100%", "height" =>  "400px"),
@@ -10,3 +10,25 @@ browser_layout = html_div([
         ]
     )
 ])
+
+circos_layout = html_div([
+    circos(
+        id="circos-simple",
+        layout=[
+            Dict(
+                "id"=> "NC_002505",
+                "label"=> "",
+                "color"=> "#009933",
+                "len"=> 2961149
+            ),
+            Dict(
+                "id"=> "NC_002506",
+                "label"=> "",
+                "color"=> "#99cc33",
+                "len"=> 1072315
+            )
+        ]
+    )
+])
+
+browser_layout = html_div([circos_layout, cyto_layout])
