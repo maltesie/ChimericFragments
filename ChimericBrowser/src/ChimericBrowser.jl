@@ -2,9 +2,10 @@ module ChimericBrowser
 
 using Dash
 
-export chimeric_browser, cyto_browser, circos_browser
+export chimeric_browser
 
 const resources_path = realpath(joinpath( @__DIR__, "..", "deps"))
+const assets_path = realpath(joinpath( @__DIR__, "..", "assets"))
 
 include("circos.jl")
 include("cyto.jl")
@@ -12,9 +13,9 @@ include("annotation.jl")
 include("data.jl")
 include("layout.jl")
 
-function chimeric_browser()
-    app = dash()
-    app.layout = browser_layout
+function chimeric_browser(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}})
+    app = dash(assets_folder=assets_path)
+    app.layout = browser_layout(dataset_paths, function_categories, genome_info)
     run_server(app, "0.0.0.0", debug=true)
 end
 

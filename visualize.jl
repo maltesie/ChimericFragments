@@ -11,4 +11,8 @@ Pkg.instantiate()
 
 using ChimericBrowser
 
-chimeric_browser()
+test_datapaths = ["/home/abc/super.csv"]
+test_function_categories = [Dict("label"=>"hallo", "value"=>"hallo")]
+test_genome_info = ["chrom1"=>1000000, "chrom2"=>4000000]
+
+chimeric_browser(test_datapaths, test_function_categories, test_genome_info)

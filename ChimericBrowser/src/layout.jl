@@ -77,7 +77,7 @@ search_layout() = html_div(
                     options=[],
                     multi=true
                 ),
-                html_div(style={"width"=>"10px"}),
+                html_div(style=Dict("width"=>"10px")),
                 html_button(
                     "<-",
                     id="add-selected-btn",
@@ -135,9 +135,8 @@ cytoscape_layout() = html_div(
         cytoscape(
             id="graph",
             elements=[],
-            autoRefreshLayout=True,
-            stylesheet=stylesheet,
-            responsive=True,
+            autoRefreshLayout=true,
+            responsive=true,
             layout=Dict("name"=>"random"),
             minZoom=0.1,
             maxZoom=2.0,
@@ -151,14 +150,16 @@ cytoscape_layout() = html_div(
             ]
         )
     ]
-),
+)
 
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     id="circos-container",
     className="container",
     children=[
         circos(
-            id="circos-simple",
+            id="my-dashbio-circos",
+            enableZoomPan=true,
+            enableDownloadSVG=true,
             config = Dict(
                 "gap"=>0.003,
                 "cornerRadius"=>5,
@@ -183,7 +184,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
                 "config"=>Dict(
                     "opacity"=>0.9,
                     "color"=>Dict("name"=> "color"),
-                    "tooltipContent"=>Dict("name":"nb_ints")
+                    "tooltipContent"=>Dict("name"=>"nb_ints")
                 )
             )]
         )
