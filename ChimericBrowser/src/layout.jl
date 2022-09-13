@@ -33,6 +33,11 @@ positioning_control_layout() = html_div(
     ]
 )
 
+dataset_and_postioning_layout(dataset_paths::Vector{String}) = html_div(
+    className="controls-block horizontal",
+    children=[dataset_control_layout(dataset_paths), positioning_control_layout()]
+)
+
 reads_selection_layout() = html_div(
     className="controls-block",
     children=[
@@ -83,7 +88,7 @@ search_layout() = html_div(
     ]
 )
 
-annotation_control_layout(function_categories::Voctor{Dict{String,String}}) = html_div(
+annotation_control_layout(function_categories::Vector{Dict{String,String}}) = html_div(
     className="controls-block",
     children=[
         html_p("Annotated Functions:"),
@@ -104,6 +109,23 @@ annotation_control_layout(function_categories::Voctor{Dict{String,String}}) = ht
 info_area_layout() = html_div(
     className="controls-block",
     children=[html_p(id="info-output", children=["No interaction selected."])]
+)
+
+control_column_layout(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}) = html_div(
+    id="left-column",
+    children=[
+        headline_layout(),
+        html_div(
+            className="container",
+            children=[
+                dataset_and_postioning_layout(dataset_paths),
+                reads_selection_layout(),
+                search_layout(),
+                annotation_control_layout(function_categories),
+                info_area_layout()
+            ]
+        )
+    ]
 )
 
 cytoscape_layout() = html_div(
@@ -195,4 +217,38 @@ table_layout() = html_div(
     ]
 )
 
-browser_layout = html_div([circos_layout, cyto_layout])
+astab(div_component::Component, tab_id::String) = dcc_tab(
+    id=lowercasefirst(tab_id) * "-tab",
+    className="custom-tab",
+    selected_className="custom-tab--selected",
+    label=uppercasefirst(tab_id),
+    value=lowercasefirst(tab_id),
+    children=[div_component]
+)
+
+tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
+    id="tabs-container",
+    className="container",
+    children=[
+        dcc_tabs(
+            id="data-tabs",
+            value="graph",
+            children=[
+                astab(cytoscape_layout(), "graph"),
+                astab(circos_layout(genome_info), "circos"),
+                astab(table_layout(), "table"),
+            ]
+        )
+    ]
+)
+
+browser_layout(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}}) = html_div(
+    id="root",
+    children=[html_div(
+        id="app-container",
+        children=[
+            control_column_layout(dataset_paths, function_categories),
+            tabs_layout(genome_info)
+        ]
+    )]
+)
