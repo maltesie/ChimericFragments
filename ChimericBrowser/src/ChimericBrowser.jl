@@ -1,7 +1,7 @@
 module ChimericBrowser
 
 using Dash, DataFrames, CSV
-using FASTX.FASTA
+import FASTX.FASTA: FASTAReader, identifier
 
 export chimeric_browser
 
@@ -21,7 +21,7 @@ function chimeric_browser(results_folder::String, genome_file::String)
     app.layout = browser_layout(sort([k for k in keys(interactions_dfs)]), ["test"], genome_info)
 
     update_selection_callback!(app, interactions_dfs)
-    
+
     run_server(app, "0.0.0.0", debug=true)
 end
 

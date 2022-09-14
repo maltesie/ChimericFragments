@@ -16,4 +16,4 @@ Pkg.instantiate()
 
 using ChimericBrowser
 
-chimeric_browser(joinpath(data_path, "results"), genome_file)
+chimeric_browser(joinpath(data_path, "results"), joinpath(data_path, genome_file))
