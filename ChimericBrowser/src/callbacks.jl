@@ -18,7 +18,7 @@ const update_selection_inputs = [
 
 update_selection_callback!(app::Dash.DashApp, interactions_dfs::Dict{String,DataFrame}) =
 callback!(app, update_selection_outputs, update_selection_inputs) do dataset, min_reads, max_interactions, search_strings
-    df = filtered_view(interactions_dfs[dataset], search_strings, min_reads, max_interactions)
+    df = filtered_dfview(interactions_dfs[dataset], isnothing(search_strings) ? String[] : search_strings, min_reads, max_interactions)
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df)
     circos_output = circos_data(df)
