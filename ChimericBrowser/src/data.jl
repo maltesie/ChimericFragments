@@ -29,9 +29,14 @@ function filtered_view(df::DataFrame, search_string::String, min_reads::Int, max
 end
 
 function cytoscape_elements(df::SubDataFrame)
+    edges = [Dict("source"=>row.name1, "target"=>row.name2) for row in df]
+    nodes = [Dict("id"=>n, "label"=>n) for n in unique(vcat(df.name1, df.name2))]
+    return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
 function circos_data(df::SubDataFrame)
+    [Dict("source"=>Dict("id"=>row.ref1, "start"=>row.mean1, "end"=>row.mean1+1500),
+            "target"=>Dict("id"=>row.ref2, "start"=>row.mean2, "end"=>row.mean2+1500)) for row in df]
 end
 
 function functional_annotation(gene_names::Vector{String})

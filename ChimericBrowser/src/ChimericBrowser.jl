@@ -16,6 +16,7 @@ include("callbacks.jl")
 function chimeric_browser(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}})
     app = dash(assets_folder=assets_path)
     app.layout = browser_layout(dataset_paths, function_categories, genome_info)
+    test_callback!(app)
     run_server(app, "0.0.0.0", debug=true)
 end
 
