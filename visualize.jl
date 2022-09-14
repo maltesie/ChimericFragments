@@ -16,4 +16,6 @@ Pkg.instantiate()
 
 using ChimericBrowser
 
+data_path = joinpath(@__DIR__, "example_data")
+genome_file = "genome.fa"
 chimeric_browser(joinpath(data_path, "results"), joinpath(data_path, genome_file))

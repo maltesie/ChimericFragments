@@ -18,36 +18,29 @@ function load_data(results_path::String, genome_file::String)
     return interactions_dfs, singles_dfs, stats_dfs, gene_names, genome_info
 end
 
-function nthindex(a::Vector{Bool}, n::Int)
-    c = 0
-    for i in a
-        c+=i
-        c == n && return i
-    end
-    return length(a)
-end
-
+nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
 function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int)
     filtered_index = zeros(Bool, nrow(df))
-    min_reads_range = 1:findfirst(x->x<min_reads, df.nb_ints)-1
+    first_below_min_reads = findfirst(x->x<min_reads, df.nb_ints)
+    min_reads_range = 1:(isnothing(first_below_min_reads) ? nrow(df) : first_below_min_reads-1)
     search_string_index = isempty(search_strings) ? ones(Bool, length(min_reads_range)) : zeros(Bool, length(min_reads_range))
     for search_string in search_strings
-        search_string_index .|= (df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string)
+        search_string_index .|= ((df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string))
     end
     n = nthindex(search_string_index, max_interactions)
-    filtered_index[1:n] .= search_string_index[1:n]
-    return view(df[filtered_index, !])
+    isnothing(n) || (filtered_index[1:n] .= search_string_index[1:n])
+    return @view df[filtered_index, :]
 end
 
 function cytoscape_elements(df::SubDataFrame)
-    edges = [Dict("source"=>row.name1, "target"=>row.name2) for row in df]
+    edges = [Dict("source"=>row.name1, "target"=>row.name2) for row in eachrow(df)]
     nodes = [Dict("id"=>n, "label"=>n) for n in unique(vcat(df.name1, df.name2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
 function circos_data(df::SubDataFrame)
-    [Dict("source"=>Dict("id"=>row.ref1, "start"=>row.mean1, "end"=>row.mean1+1500),
-            "target"=>Dict("id"=>row.ref2, "start"=>row.mean2, "end"=>row.mean2+1500)) for row in df]
+    [Dict("source"=>Dict("id"=>row.ref1, "start"=>row.meanleft1, "end"=>row.meanleft1+1500),
+            "target"=>Dict("id"=>row.ref2, "start"=>row.meanleft2, "end"=>row.meanleft2+1500)) for row in eachrow(df)]
 end
 
 function table_data(df::SubDataFrame)
