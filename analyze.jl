@@ -18,7 +18,7 @@ isfile(joinpath(data_path, genome_file)) || throw(AssertionError("Cannot find a 
 Pkg.activate(joinpath(@__DIR__, "ChimericAnalysis"))
 Pkg.instantiate()
 
-using ChimericFragments, BioSequences
+using ChimericAnalysis, BioSequences
 
 genome = Genome(joinpath(data_path, genome_file))
 
