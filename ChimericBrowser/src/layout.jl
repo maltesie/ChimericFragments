@@ -3,16 +3,16 @@ headline_layout() = html_div(
     children=[html_h3("ChimericBrowser")]
 )
 
-dataset_control_layout(dataset_paths::Vector{String}) = html_div(
+dataset_control_layout(datasets::Vector{String}) = html_div(
     className="control-element",
     children=[
         html_p("Dataset:"),
         dcc_dropdown(
             id="dropdown-update-dataset",
-            value=dataset_paths[1],
+            value=datasets[1],
             clearable=false,
             options=[
-                Dict("label"=>basename(p)[1:end-4], "value"=>p) for p in dataset_paths
+                Dict("label"=>p, "value"=>p) for p in datasets
             ]
         ),
     ]
@@ -33,9 +33,9 @@ positioning_control_layout() = html_div(
     ]
 )
 
-dataset_and_postioning_layout(dataset_paths::Vector{String}) = html_div(
+dataset_and_postioning_layout(datasets::Vector{String}) = html_div(
     className="controls-block horizontal",
-    children=[dataset_control_layout(dataset_paths), positioning_control_layout()]
+    children=[dataset_control_layout(datasets), positioning_control_layout()]
 )
 
 reads_selection_layout() = html_div(
@@ -111,14 +111,14 @@ info_area_layout() = html_div(
     children=[html_p(id="info-output", children=["No interaction selected."])]
 )
 
-control_column_layout(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}) = html_div(
+control_column_layout(datasets::Vector{String}, function_categories::Vector{Dict{String,String}}) = html_div(
     id="left-column",
     children=[
         headline_layout(),
         html_div(
             className="container",
             children=[
-                dataset_and_postioning_layout(dataset_paths),
+                dataset_and_postioning_layout(datasets),
                 reads_selection_layout(),
                 search_layout(),
                 annotation_control_layout(function_categories),
@@ -243,12 +243,12 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     ]
 )
 
-browser_layout(dataset_paths::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}}) = html_div(
+browser_layout(datasets::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}}) = html_div(
     id="root",
     children=[html_div(
         id="app-container",
         children=[
-            control_column_layout(dataset_paths, function_categories),
+            control_column_layout(datasets, function_categories),
             tabs_layout(genome_info)
         ]
     )]

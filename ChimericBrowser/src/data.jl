@@ -19,10 +19,13 @@ function load_data(results_path::String, genome_file::String)
 end
 
 nthindex(a::Vector{Bool}, n::Int) = n<sum(a) ? sortperm(a; rev=true)[n] : findlast(a) 
-function filtered_view(df::DataFrame, search_string::String, min_reads::Int, max_interactions::Int)
+function filtered_view(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int)
     filtered_index = zeros(Bool, nrow(df))
     min_reads_range = 1:findfirst(x->x<min_reads, df.nb_ints)-1
-    search_string_index = (df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string)
+    search_string_index = zeros(Bool, length(min_reads_range))
+    for search_string in search_strings
+        search_string_index .|= (df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string)
+    end
     n = nthindex(search_string_index, max_interactions)
     filtered_index[1:n] .= search_string_index[1:n]
     return view(df[filtered_index, !])
@@ -37,6 +40,10 @@ end
 function circos_data(df::SubDataFrame)
     [Dict("source"=>Dict("id"=>row.ref1, "start"=>row.mean1, "end"=>row.mean1+1500),
             "target"=>Dict("id"=>row.ref2, "start"=>row.mean2, "end"=>row.mean2+1500)) for row in df]
+end
+
+function table_data(df::SubDataFrame)
+    Dict.(pairs.(eachrow(df[!, ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]])))
 end
 
 function functional_annotation(gene_names::Vector{String})
