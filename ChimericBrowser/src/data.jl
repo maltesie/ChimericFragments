@@ -10,7 +10,7 @@ function load_data(results_path::String, genome_file::String)
     stats_files = [joinpath(stats_path, fname) for fname in readdir(stats_path) if endswith(fname, ".csv")]
     stats_dfs = Dict(basename(fname)[1:end-4]=>DataFrame(CSV.File(fname)) for fname in stats_files)
     genome_info = Pair{String,Int}[]
-    Reader(open(genome_file)) do reader
+    FASTA.Reader(open(genome_file)) do reader
         for record in reader
             push!(genome_info, indentifier(record)=>length(record.sequence))
         end

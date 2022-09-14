@@ -1,7 +1,7 @@
 module ChimericBrowser
 
 using Dash, DataFrames, CSV
-import FASTX.FASTA: Reader, identifier
+import FASTX: FASTA.Reader, identifier
 
 export chimeric_browser
 
