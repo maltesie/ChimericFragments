@@ -15,7 +15,7 @@ isfile(joinpath(data_path, read2_file)) || throw(AssertionError("Cannot find a v
 isfile(joinpath(data_path, annotation_file)) || throw(AssertionError("Cannot find a valid file with the filename $annotation_file. Please edit config.jl."))
 isfile(joinpath(data_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
 
-Pkg.activate(joinpath(@__DIR__, "ChimericFragments"))
+Pkg.activate(joinpath(@__DIR__, "ChimericAnalysis"))
 Pkg.instantiate()
 
 using ChimericFragments, BioSequences
