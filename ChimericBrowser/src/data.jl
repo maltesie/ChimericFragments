@@ -18,11 +18,19 @@ function load_data(results_path::String, genome_file::String)
     return interactions_dfs, singles_dfs, stats_dfs, gene_names, genome_info
 end
 
-nthindex(a::Vector{Bool}, n::Int) = n<sum(a) ? sortperm(a; rev=true)[n] : findlast(a) 
+function nthindex(a::Vector{Bool}, n::Int)
+    c = 0
+    for i in a
+        c+=i
+        c == n && return i
+    end
+    return length(a)
+end
+
 function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int)
     filtered_index = zeros(Bool, nrow(df))
     min_reads_range = 1:findfirst(x->x<min_reads, df.nb_ints)-1
-    search_string_index = isempty(search_strings) ?  ones(Bool, length(min_reads_range)) : zeros(Bool, length(min_reads_range))
+    search_string_index = isempty(search_strings) ? ones(Bool, length(min_reads_range)) : zeros(Bool, length(min_reads_range))
     for search_string in search_strings
         search_string_index .|= (df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string)
     end
