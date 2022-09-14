@@ -12,7 +12,7 @@ function load_data(results_path::String, genome_file::String)
     genome_info = Pair{String,Int}[]
     FASTA.Reader(open(genome_file)) do reader
         for record in reader
-            push!(genome_info, indentifier(record)=>length(record.sequence))
+            push!(genome_info, FASTX.identifier(record)=>length(record.sequence))
         end
     end
     return interactions_dfs, singles_dfs, stats_dfs, gene_names, genome_info
