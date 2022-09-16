@@ -5,7 +5,8 @@ using BioAlignments, BioSequences, GenomicFeatures, BioGenerics
 using Statistics, HypothesisTests, MultipleTesting, Combinatorics, Random, Distributions, StatsBase
 using ElasticArrays, IterTools, LightGraphs, DataFrames
 
-export chimeric_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, split_libs, align_mem
+export chimeric_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, align_mem
+export SingleTypeFiles, PairedSingleTypeFiles, check_files_exist
 
 include("types.jl")
 include("preprocess.jl")
