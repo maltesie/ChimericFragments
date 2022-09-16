@@ -30,7 +30,7 @@ is_reverse_complement=true
 
 srna_type="sRNA"
 cds_type="CDS"
-additional_types = []
+additional_types = ["MySpecialType"]
 rrna_type="rRNA"
 trna_type="tRNA"
 filter_types=["rRNA", "tRNA"]
