@@ -234,7 +234,7 @@ function Alignments(bam_file::String; include_secondary_alignments=true, include
     pindex = partsindex(ranges, nindex, rls, rds)
     return Alignments(chromosome_list, ns, ls[pindex], rs[pindex], rls[pindex], rrs[pindex], rds[pindex], nms[pindex], is[pindex], ss[pindex],
                         Vector{String}(undef,length(ns)), Vector{String}(undef,length(ns)), zeros(UInt8,length(ns)),
-                        ones(UInt8,length(ns)) .* 0xff, ones(UInt8,length(ns)) .* 0xff, ranges)
+                        fill(0xff, length(ns)), fill(0xff, length(ns)), zeros(UInt8, length(ns)), ranges)
 end
 
 Base.length(alns::Alignments) = length(alns.tempnames)
@@ -263,8 +263,6 @@ function Base.show(alns::Alignments; n=-1, only_chimeric=false, filter_name=noth
         c += 1
     end
 end
-
-
 
 AlignedPart(alns::Alignments, i::Int) =
 AlignedPart(
@@ -297,7 +295,7 @@ AlignedPart(
 Base.getindex(alns::Alignments, i::Int) = AlignedRead(alns.ranges[i], alns)
 Base.getindex(alns::Alignments, r::UnitRange{Int}) = Alignments(alns.chroms, alns.tempnames, alns.leftpos, alns.rightpos, alns.read_leftpos, alns.read_rightpos,
                                                                 alns.reads, alns.nms, alns.refnames, alns.strands, alns.annames, alns.antypes,
-                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.ranges[r])
+                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.mergestate, alns.ranges[r])
 
 """
     Constructor for the AlignedPart struct. Builds AlignedPart from a XA string, which is created by bwa-mem2
@@ -307,9 +305,9 @@ function AlignedPart(xapart::String; read=:read1)
     chr, pos, cigar, nm = split(xapart, ",")
     refstart = parse(Int, pos)
     strand = ((refstart > 0) != read===:read2) ? STRAND_POS : STRAND_NEG
-    refstart *= sign(refstart)
     readstart, readstop, relrefstop, readlen = readpositions(cigar)
     seq_interval = ((refstart > 0)  != (read === :read2)) ? (readstart:readstop) : (readlen-readstop+1:readlen-readstart+1)
+    refstart *= sign(refstart)
     ref_interval = Interval(chr, refstart, refstart+relrefstop, strand, AlignmentAnnotation())
     return AlignedPart(ref_interval, seq_interval, parse(UInt32, nm), read)
 end
@@ -555,17 +553,33 @@ distanceonread(aln1::AlignedPart, aln2::AlignedPart) = max(first(aln1.seq), firs
 
 isfirstread(part::AlignedPart) = part.read === :read1
 
+function mergereadoverlaps!(alns::Alignments)
+    for aln in alns
+        for i in aln.range, j in i+1:last(aln.range)
+            alns.mergestate[i] === 0x0 || continue
+            if alns.reads[i] !== alns.reads[j] && (alns.strands[i] === alns.strands[j]) && (alns.refnames[i] === alns.refnames[j]) &&
+                (alns.leftpos[i] <= alns.rightpos[j]) && (alns.rightpos[i] >= alns.leftpos[j])
+                alns.leftpos[i] = min(alns.leftpos[i], alns.leftpos[j])
+                alns.rightpos[i] = max(alns.rightpos[i], alns.rightpos[j])
+                alns.mergestate[i] = 0x1
+                alns.mergestate[j] = 0x2
+            end
+        end
+    end
+end
+
+Base.getindex(alnread::AlignedRead, i::Int) = AlignedPart(alnread.alns, alnread.range[i])
+Base.getindex(alnread::AlignedRead, r::UnitRange{Int}) = AlignedRead(alnread.range[r], alnread.alns)
+Base.getindex(alnread::AlignedRead, b::Vector{Bool}) = [alnread.alns[index] for (i::Int,index::Int) in enumerate(alnread.range) if b[i]]
+Base.isempty(alnread::AlignedRead) = isempty(alnread.range)
+Base.length(alnread::AlignedRead) = length(alnread.range)
+
 function Base.iterate(alnread::AlignedRead)
     return isnothing(alnread.range) ? nothing : (AlignedPart(alnread.alns, first(alnread.range)), first(alnread.range)+1)
 end
 function Base.iterate(alnread::AlignedRead, state::Int)
     return state > last(alnread.range) ? nothing : (AlignedPart(alnread.alns, state), state+1)
 end
-Base.getindex(alnread::AlignedRead, i::Int) = AlignedPart(alnread.alns, alnread.range[i])
-Base.getindex(alnread::AlignedRead, r::UnitRange{Int}) = AlignedRead(alnread.range[r], alnread.alns)
-Base.getindex(alnread::AlignedRead, b::Vector{Bool}) = [alnread.alns[index] for (i::Int,index::Int) in enumerate(alnread.range) if b[i]]
-Base.isempty(alnread::AlignedRead) = isempty(alnread.range)
-Base.length(alnread::AlignedRead) = length(alnread.range)
 
 readid(alnread::AlignedRead) = alnread.alns.tempnames[first(alnread.range)]
 parts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range]
@@ -604,10 +618,10 @@ function ispositivestrand(alnread::AlignedRead)
     return s === STRAND_POS
 end
 
-summarize(alnread::AlignedRead) =   (ischimeric(alnread) ? (ismulti(alnread) ? "Multi-chimeric" : "Chimeric") : "Single") *
+summarize(alnread::AlignedRead) = (ischimeric(alnread) ? (ismulti(alnread) ? "Multi-chimeric" : "Chimeric") : "Single") *
                                     " Alignment with $(length(alnread)) part(s):\n   " *
                                     join([summarize(part) for part in alnread], "\n   ") * "\n"
-summarize(alnread::AlignedRead, readseq::LongSequence) =   (ischimeric(alnread) ? (ismulti(alnread) ? "Multi-chimeric" : "Chimeric") : "Single") *
+summarize(alnread::AlignedRead, readseq::LongSequence) = (ischimeric(alnread) ? (ismulti(alnread) ? "Multi-chimeric" : "Chimeric") : "Single") *
                                     " Alignment with $(length(alnread)) part(s) on $(length(readseq)) nt read:\n   " *
                                     join([summarize(part, readseq[part]) for part in alnread], "\n   ") * "\n"
 function Base.show(alnread::AlignedRead)

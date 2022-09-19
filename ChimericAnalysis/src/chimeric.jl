@@ -17,37 +17,23 @@ function Base.write(filepath::String, interactions::Interactions)
     end
 end
 
-function leftmostposition(alnpart::AlignedPart, alnread::AlignedRead)
-    minimum(alnread.alns.leftpos[i] for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
+#function leftmostposition(alnpart::AlignedPart, alnread::AlignedRead)
+#    minimum(alnread.alns.leftpos[i] for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+#end
 
-function rightmostposition(alnpart::AlignedPart, alnread::AlignedRead)
-    maximum(alnread.alns.rightpos[i] for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
+#function rightmostposition(alnpart::AlignedPart, alnread::AlignedRead)
+#    maximum(alnread.alns.rightpos[i] for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+#end
 
-function leftmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
-    minimum(alnread.alns.antypes[i] === five_type ? 0x00 : (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anleftrel[i])
-        for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
+#function leftmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
+#    minimum(alnread.alns.antypes[i] === five_type ? 0x00 : (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anleftrel[i])
+#        for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+#end
 
-function rightmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
-    maximum(alnread.alns.antypes[i] === five_type ? 0x00 : (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anrightrel[i])
-        for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
-
-function leftmostreadposition(alnpart::AlignedPart, alnread::AlignedRead)
-    for i::Int in alnread.range
-        (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)) && return (alnread.aln.reads[i], alnread.aln.read_leftpos[i])
-    end
-    return nothing
-end
-
-function rightmostreadposition(alnpart::AlignedPart, alnread::AlignedRead)
-    for i::Int in reverse(alnread.range)
-        (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)) && return (alnread.aln.reads[i], alnread.aln.read_rightpos[i])
-    end
-    return nothing
-end
+#function rightmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
+#    maximum(alnread.alns.antypes[i] === five_type ? 0x00 : (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anrightrel[i])
+#        for i::Int in alnread.range if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+#end
 
 function myhash(part::AlignedPart; use_type=false)
     return use_type ? hash(name(part)*type(part)) : hash(name(part))
