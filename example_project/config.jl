@@ -13,12 +13,14 @@ suffix_read1 = "_1"
 suffix_read2 = "_2"
 
 samplename_condition = [
-    ("bc1", "conditionA"),
-    ("bc2", "conditionA"),
-    ("bc3", "conditionB"),
-    ("bc4", "conditionB"),
-    ("bc5", "conditionC"),
-    ("bc6", "conditionC"),
+    ("wt_lcd_1", "wt_lcd"),
+    ("wt_lcd_2", "wt_lcd"),
+    ("wt_hcd_1", "wt_hcd"),
+    ("wt_hcd_2", "wt_hcd"),
+    ("hfq_lcd_1", "hfq_lcd"),
+    ("hfq_lcd_2", "hfq_lcd"),
+    ("hfq_hcd_1", "hfq_hcd"),
+    ("hfq_hcd_2", "hfq_hcd"),
 ]
 
 #Chimeric fragments parameter
