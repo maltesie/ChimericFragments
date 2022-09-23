@@ -60,6 +60,7 @@ struct Alignments{T<:Union{String, UInt}}
     anleftrel::Vector{UInt8}
     anrightrel::Vector{UInt8}
     mergestate::Vector{UInt8}
+    pindex::Vector{Int}
     ranges::Vector{UnitRange{Int}}
 end
 
