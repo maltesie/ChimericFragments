@@ -56,10 +56,10 @@ reads_selection_layout() = html_div(
         ),
         html_div(
             className="horizontal",
-            style=Dict("padding-top"=>"10px"),
+            style=Dict("padding-top"=>"5px"),
             children=[
-                html_p(id="nb-interactions-text", style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="max-interactions", type="number", value=300, style=Dict("max-height"=>"18px", "min-width"=>"80px"))
+                html_p(id="nb-interactions-text", children=["Maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"80px"))
             ]
         )
     ]
@@ -152,6 +152,15 @@ cytoscape_layout() = html_div(
     ]
 )
 
+chords_track(data::Vector{Dict{String,Dict{String,Any}}}) = [Dict(
+    "type"=>"CHORDS",
+    "data"=>data,
+    "config"=>Dict(
+        "opacity"=>0.9,
+        "color"=>Dict("name"=> "color"),
+        "tooltipContent"=>Dict("name"=>"nb_ints")
+    )
+)]
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     id="circos-container",
     className="container",
@@ -178,15 +187,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             ),
             layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
             selectEvent=Dict("2"=> "both"),
-            tracks=[Dict(
-                "type"=>"CHORDS",
-                "data"=>[],
-                "config"=>Dict(
-                    "opacity"=>0.9,
-                    "color"=>Dict("name"=> "color"),
-                    "tooltipContent"=>Dict("name"=>"nb_ints")
-                )
-            )]
+            tracks=chords_track(Dict{String,Dict{String,Any}}[])
         )
     ]
 )

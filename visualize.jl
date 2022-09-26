@@ -1,14 +1,17 @@
-isempty(ARGS) && throw(AssertionError("Please provide the path to your project folder containing the results of the chimeric fragments analysis."))
-length(ARGS) > 1 && throw(AssertionError("Please provide only one path to your project folder."))
-isdir(ARGS[1]) || throw(AssertionError("Please provide a valid path."))
+isempty(ARGS) && throw(AssertionError("Please provide the path to your config.jl."))
+length(ARGS) > 1 && throw(AssertionError("Please provide only one path to your config.jl."))
 
-data_path = ARGS[1]
+config_file = ARGS[1]
 
-isdir(joinpath(data_path, "results")) || throw(AssertionError("Cannot find results folder in the specified project folder. Please run analyze.jl first."))
-isfile(joinpath(data_path, "config.jl")) || throw(AssertionError("Please add a config.jl to the specified folder."))
+isfile(config_file) || throw(AssertionError("Cannot find a file at $config_file."))
 
-include(joinpath(data_path, "config.jl"))
-isfile(joinpath(data_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
+include(config_file)
+
+project_path = dirname(config_file)
+
+isdir(joinpath(project_path, "results")) || throw(AssertionError("Cannot find results folder in the specified project folder. Please run analyze.jl first."))
+
+isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "ChimericBrowser"))
@@ -16,6 +19,4 @@ Pkg.instantiate()
 
 using ChimericBrowser
 
-data_path = joinpath(@__DIR__, "example_data")
-genome_file = "genome.fa"
-chimeric_browser(joinpath(data_path, "results"), joinpath(data_path, genome_file))
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), srna_type)

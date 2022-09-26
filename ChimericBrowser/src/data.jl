@@ -2,7 +2,7 @@ function load_data(results_path::String, genome_file::String)
     interactions_path = realpath(joinpath(results_path, "interactions"))
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".csv")]
     interactions_dfs = Dict(basename(fname)[1:end-4]=>DataFrame(CSV.File(fname)) for fname in interactions_files)
-    gene_names = Dict(dname=>sort(unique(vcat(df.name1, df.name2))) for (dname,df) in interactions_dfs)
+    gene_names_types = Dict{String,Dict{String,String}}(dname=>merge(Dict(zip(df.name1, df.type1)), Dict(zip(df.name2, df.type2))) for (dname,df) in interactions_dfs)
     singles_path = realpath(joinpath(results_path, "singles"))
     singles_files = [joinpath(singles_path, fname) for fname in readdir(singles_path) if endswith(fname, ".csv")]
     singles_dfs = Dict(basename(fname)[1:end-4]=>DataFrame(CSV.File(fname)) for fname in singles_files)
@@ -15,7 +15,7 @@ function load_data(results_path::String, genome_file::String)
             push!(genome_info, FASTX.identifier(record)=>FASTA.seqsize(record))
         end
     end
-    return interactions_dfs, singles_dfs, stats_dfs, gene_names, genome_info
+    return interactions_dfs, singles_dfs, stats_dfs, gene_names_types, genome_info
 end
 
 nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
@@ -32,15 +32,16 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     return @view df[filtered_index, :]
 end
 
-function cytoscape_elements(df::SubDataFrame)
-    edges = [Dict("source"=>row.name1, "target"=>row.name2) for row in eachrow(df)]
-    nodes = [Dict("id"=>n, "label"=>n) for n in unique(vcat(df.name1, df.name2))]
+function cytoscape_elements(df::SubDataFrame, srna_type::String, gene_name_type::Dict{String,String})
+    edges = [Dict("data"=>Dict("id"=>row.name1*row.name2, "source"=>row.name1, "target"=>row.name2),
+                    "classes"=>(srna_type in (row.type1, row.type2) ? "srna_edge" : "other_edge")) for row in eachrow(df)]
+    nodes = [Dict("data"=>Dict("id"=>n, "label"=>n), "classes"=>gene_name_type[n]) for n in Set(vcat(df.name1, df.name2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
 function circos_data(df::SubDataFrame)
-    [Dict("source"=>Dict("id"=>row.ref1, "start"=>row.meanleft1, "end"=>row.meanleft1+1500),
-            "target"=>Dict("id"=>row.ref2, "start"=>row.meanleft2, "end"=>row.meanleft2+1500)) for row in eachrow(df)]
+    chords_track([Dict{String,Dict{String,Any}}("source"=>Dict("id"=>row.ref1, "start"=>row.meanleft1, "end"=>row.meanleft1+1500),
+        "target"=>Dict("id"=>row.ref2, "start"=>row.meanleft2, "end"=>row.meanleft2+1500)) for row in eachrow(df)])
 end
 
 function table_data(df::SubDataFrame)
