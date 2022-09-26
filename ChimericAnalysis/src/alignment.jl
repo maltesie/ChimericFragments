@@ -562,36 +562,29 @@ end
 Base.lastindex(alnread::AlignedRead) = length(alnread.range)
 Base.getindex(alnread::AlignedRead, i::Int) = AlignedPart(alnread.alns, alnread.range[i])
 Base.getindex(alnread::AlignedRead, r::UnitRange{Int}) = AlignedRead(alnread.range[r], alnread.alns)
-Base.getindex(alnread::AlignedRead, b::Vector{Bool}) = [alnread.alns[index] for (i::Int,index::Int) in enumerate(alnread.range) if b[i]]
+Base.getindex(alnread::AlignedRead, b::Vector{Bool}) = [alnread.alns[alnread.prindex[index]] for (i::Int,index::Int) in enumerate(alnread.range) if b[i]]
 Base.isempty(alnread::AlignedRead) = isempty(alnread.range)
 Base.length(alnread::AlignedRead) = length(alnread.range)
 
-readid(alnread::AlignedRead) = alnread.alns.tempnames[first(alnread.range)]
+readid(alnread::AlignedRead) = alnread.alns.tempnames[alnread.alns.pindex[first(alnread.range)]]
 parts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range]
-typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.range if isassigned(alnread.alns.antypes, i))
-hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.range if isassigned(alnread.alns.antypes, i))
-namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.range if isassigned(alnread.alns.annames, i))
-hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.range if isassigned(alnread.alns.annames, i))
-hasannotation(alnread::AlignedRead) = any(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.range)
-annotatedcount(alnread::AlignedRead) = sum(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.range)
+typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
+hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
+namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
+hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
+hasannotation(alnread::AlignedRead) = any(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
+annotatedcount(alnread::AlignedRead) = sum(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
 annotationcount(alnread::AlignedRead) = length(Set(name(part) for part in alnread))
 
 function BioGenerics.leftposition(alnread::AlignedRead)
-    check_refname = alnread.alns.refnames[first(alnread.range)]
-    all(v .== check_refname for v in view(alnread.alns.refnames, alnread.range)) || throw(AssertionError("AlignmentParts are not on the same reference sequence."))
-    minimum(view(alnread.alns.leftpos, alnread.range))
+    check_refname = alnread.alns.refnames[alnread.alns.pindex[first(alnread.range)]]
+    all(v .== check_refname for v in view(alnread.alns.refnames, alnread.alns.pindex[alnread.range])) || throw(AssertionError("AlignmentParts are not on the same reference sequence."))
+    minimum(view(alnread.alns.leftpos, alnread.alns.pindex[alnread.range]))
 end
 function BioGenerics.rightposition(alnread::AlignedRead)
-    check_refname = alnread.alns.refnames[first(alnread.range)]
-    all(v .== check_refname for v in view(alnread.alns.refnames, alnread.range)) || throw(AssertionError("AlignmentParts are not on the same reference sequence."))
-    maximum(view(alnread.alns.rightpos, alnread.range))
-end
-
-function GenomicFeatures.strand(alnread::AlignedRead)
-    length(alnread) > 0 || (return STRAND_NA)
-    #println(view(alnread.alns.strands, alnread.range), "\n",alnread.alns.strands[first(alnread.range)])
-    check_strand = alnread.alns.strands[first(alnread.range)]
-    return all(s === check_strand for s in view(alnread.alns.strands, alnread.range)) ? check_strand : STRAND_BOTH
+    check_refname = alnread.alns.refnames[alnread.alns.pindex[first(alnread.range)]]
+    all(v .== check_refname for v in view(alnread.alns.refnames, alnread.alns.pindex[alnread.range])) || throw(AssertionError("AlignmentParts are not on the same reference sequence."))
+    maximum(view(alnread.alns.rightpos, alnread.alns.pindex[alnread.range]))
 end
 
 function ispositivestrand(alnread::AlignedRead)
