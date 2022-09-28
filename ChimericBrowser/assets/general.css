@@ -524,23 +524,6 @@ input[type="button"]:hover {
     margin-left: 60px;
 }
 
-th,
-td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #E1E1E1;
-}
-
-th:first-child,
-td:first-child {
-    padding-left: 0;
-}
-
-th:last-child,
-td:last-child {
-    padding-right: 0;
-}
-
 /* Circos
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 
@@ -649,4 +632,33 @@ td:last-child {
 
 .mean {
     border-bottom: 10px solid #ffebcd;
+}
+
+#distribution1 {
+  display:table !important;
+  table-layout: fixed !important;   
+  
+  width:60%;
+  max-width:700px;
+  height:200px;
+  margin:0 auto;
+  
+  background-image:linear-gradient(bottom, rgba(0, 0, 0, 0.1) 2%, transparent 2%);
+  background-size: 100% 50px;
+  background-position: left top;
+  
+  li{
+    position:relative;
+    display:table-cell;
+    vertical-align:bottom;
+    height:200px;
+  }
+  
+  span{
+    margin:0 1em;
+    display: block !important;
+    background: rgba(#d1ecfa, .75) !important;
+    
+  }
+  
 }

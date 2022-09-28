@@ -33,12 +33,17 @@ callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_ca
     return 0, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_names_types[dataset])))]
 end
 
+css_table(data::Vector{Int}, id::String) =
+    html_ul(id=id, className="chart", children=[
+        html_li(html_span(style=Dict("height"=>"$(Int(floor(v/maximum(data)*100)))%"))) for v in data
+    ])
 function edge_info(stats_df::Tuple{Dict{String,Int}, DataFrame}, source_name::String, target_name::String, interactions::Int)
     stats_row = stats_df[2][stats_df[1][source_name*target_name], :]
     return [html_div(id="edge-info", children=[
-        "$source_name and $target_name were found in $interactions chimeric read" * (interactions>1 ? "s" : "") * ".",
-        "$source_name fragment distribution:", string(stats_row[1:10]),
-        "$target_name fragment distribution:", string(stats_row[end-9:end])
+        #"$source_name and $target_name were found in $interactions chimeric read" * (interactions>1 ? "s" : "") * ".",
+        #"$source_name fragment distribution:", string(stats_row[1:10]),
+        #"$target_name fragment distribution:", string(stats_row[end-9:end])
+        css_table([1,2,3,4,5,6,1], "distribution1")
     ])]
 end
 
