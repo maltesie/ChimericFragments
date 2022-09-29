@@ -10,7 +10,7 @@ function load_data(results_path::String, genome_file::String)
     stats_files = [joinpath(stats_path, fname) for fname in readdir(stats_path) if endswith(fname, ".csv")]
     stats_matrices = Dict(basename(fname)[1:end-4]=>
         (Dict(row.name1*row.name2=>i for (i,row) in enumerate(eachrow(interactions_dfs[basename(fname)[1:end-4]]))),
-        DataFrame(CSV.File(fname; select=collect(1:204)))) for fname in stats_files)
+        Matrix(DataFrame(CSV.File(fname; select=collect(1:204))))) for fname in stats_files)
     genome_info = Pair{String,Int}[]
     FASTA.Reader(open(genome_file)) do reader
         for record in reader

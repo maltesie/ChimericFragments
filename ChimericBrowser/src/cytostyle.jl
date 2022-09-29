@@ -52,6 +52,22 @@ const cds_node_style = Dict(
     )
 )
 
+const utr5_node_style = Dict(
+    "selector"=> ".5UTR",
+    "style"=> Dict(
+        "background-color"=> "BurlyWood",
+        "font-weight"=>"bold"
+    )
+)
+
+const utr3_node_style = Dict(
+    "selector"=> ".3UTR",
+    "style"=> Dict(
+        "background-color"=> "BurlyWood",
+        "font-weight"=>"bold"
+    )
+)
+
 const base_edge_style = Dict(
     "selector"=> "edge",
     "style"=> Dict(
@@ -80,4 +96,5 @@ const srna_edge_style = Dict(
     )
 )
 
-const stylesheet = [core_style, base_node_style, selected_node_style, srna_node_style, cds_node_style, base_edge_style, selected_edge_style, srna_edge_style]
+const stylesheet = [core_style, base_node_style, selected_node_style, srna_node_style, cds_node_style, utr5_node_style, utr3_node_style,
+    base_edge_style, selected_edge_style, srna_edge_style]
