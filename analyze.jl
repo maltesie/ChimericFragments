@@ -44,12 +44,14 @@ else
     merge!(features, Features(joinpath(project_path, annotation_file), [igr_type]))
 end
 
+features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], "UTRS_CDS")
+
 show(features)
 
 bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin)
 
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))
-chimeric_analysis(features, bams, results_path, conditions; filter_types=filter_types, min_distance=min_distance, prioritize_type=srna_type,
+chimeric_analysis(features, bams, results_path, conditions; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
 overwrite_type=igr_type, cds_type=cds_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr,
 include_read_identity=include_read_identity, include_singles=include_singles)

@@ -146,6 +146,26 @@ function Base.merge(features1::Features{T}, features2::Features{T}) where T
 end
 Base.:*(features1::Features, features2::Features) = merge(features1, features2)
 
+function mergetypes(features::Features, types::Vector{String}, mergetype::String)
+    merged_features = Interval{Annotation}[]
+    feature_collector = Dict{String,Vector{Interval{Annotation}}}(name(feature)=>Interval{Annotation}[] for feature in features if type(feature) in types)
+    for feature in features
+        if type(feature) in types
+            push!(feature_collector[name[feature]], feature)
+        else
+            push!(merged_features, feature)
+        end
+    end
+    for (n, fs) in feature_collector
+        any((refname(f)!=refname(fs[1])) || (strand(f)!=strand(fs[1])) for f in fs) &&
+            throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
+        left = minimum(leftposition(f) for f in fs)
+        right = maximum(rightposition(f) for f in fs)
+        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n)))
+    end
+    return merged_features
+end
+
 Base.iterate(features::T) where T<:AnnotationContainer = iterate(features.list)
 Base.iterate(features::T, state::Tuple{Int64,GenomicFeatures.ICTree{I},GenomicFeatures.ICTreeIteratorState{I}}) where {T<:AnnotationContainer,I<:AnnotationStyle} = iterate(features.list, state)
 Base.length(features::T) where T<:AnnotationContainer = length(features.list)

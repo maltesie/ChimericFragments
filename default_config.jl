@@ -32,8 +32,10 @@ is_reverse_complement=true
 #Annotation parameter
 
 srna_type="sRNA"
+prioritize_srna=true
+min_prioritize_overlap=0.9
 cds_type="CDS"
-additional_types = ["MySpecialType"]
+additional_types=["MySpecialType"]
 rrna_type="rRNA"
 trna_type="tRNA"
 filter_types=["rRNA", "tRNA"]

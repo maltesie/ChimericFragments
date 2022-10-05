@@ -1,10 +1,27 @@
 struct Interactions
-    graph::SimpleDiGraph
     nodes::DataFrame
     edges::DataFrame
-    edgestats::ElasticArray{Int}
+    edgestats::Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}
     replicate_ids::Vector{Symbol}
 end
+
+function Interactions()
+    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :strand=>Char[], :hash=>UInt[])
+    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlength1=>Float64[], :meanlength2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
+    edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
+    Interactions(nodes, edges, edgestats, Symbol[])
+end
+
+Interactions(alignments::Alignments; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], multi_detection_method=:annotation) =
+    append!(Interactions(), alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                filter_types=filter_types, multi_detection_method=multi_detection_method)
+
+"""
+Load Interactions struct from jld2 file.
+"""
+Interactions(filepath::String) = load(filepath, "interactions")
+
+Base.length(interactions::Interactions) = nrow(interactions.edges)
 
 """
 Method of write function which saves the Interactions struct in a jld2 file.
@@ -17,41 +34,56 @@ function Base.write(filepath::String, interactions::Interactions)
     end
 end
 
-function leftmostposition(alnpart::AlignedPart, alnread::AlignedRead)
-    minimum(alnread.alns.leftpos[i] for i::Int in alnread.alns.pindex[alnread.range] if
-        (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+struct MergedAlignedPart
+    ref::Interval{AlignmentAnnotation}
+    seq1::UnitRange{Int}
+    seq2::UnitRange{Int}
+    nms1::UInt32
+    nms2::UInt32
+    read::Symbol
 end
 
-function rightmostposition(alnpart::AlignedPart, alnread::AlignedRead)
-    maximum(alnread.alns.rightpos[i] for i::Int in alnread.alns.pindex[alnread.range] if
-        (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
+MergedAlignedPart(part::AlignedPart) = MergedAlignedPart(part.ref, isfirstread(part) ? part.seq : (1:0), isfirstread(part) ? (1:0) : part.seq, part.nms, part.nms, part.read)
+function MergedAlignedPart(part1::AlignedPart, part2::AlignedPart)
+    firstpart, secondpart = isfirstread(part1) ? (part1, part2) : (part2, part1)
+    ref = Interval(refname(firstpart), min(leftposition(firstpart), leftposition(secondpart)),
+        max(rightposition(firstpart), rightposition(secondpart)),
+        annotation(overlap(fistpart)>overlap(secondpart) ? firstpart : secondpart))
+    return MergedAlignedPart(ref, firstpart.seq, secondpart.seq, firstpart.nms, secondpart.nms, :both)
+
+function mergedparts(parts::Vector{AlignedPart})
+    merged_parts = MergedAlignedPart[]
+    already_merged = zeros(Bool, length(parts))
+    for (i, part) in enumerate(parts)
+        already_merged[i] && continue
+        nextolpi = findnext(x->isoverlapping(parts[i].ref, x.ref) && !sameread(parts[i], x), parts, i+1)
+        if isnothing(nextolpi)
+            push!(MergedAlignedPart(part), merged_parts)
+        else
+            push!(MergedAlignedPart(par1, part2), merged_parts)
+            already_merged[nextolpi] = true
+        end
+    end
 end
 
-function leftmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
-    minimum(alnread.alns.antypes[i] === five_type ? 0x00 :
-        (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anleftrel[i])
-            for i::Int in alnread.alns.pindex[alnread.range] if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
+isligationpoint(part1::MergedAlignedPart, part2::MergedAlignedPart; max_distance=5) =
+    ((isempty(part1.seq1) || isempty(part2.seq1)) ? false : (first(part2.seq1) - last(part1.seq1) <= max_distance)) ||
+    ((isempty(part1.seq2) || isempty(part2.seq2)) ? false : (first(part2.seq2) - last(part1.seq2) <= max_distance))
 
-function rightmostrelposition(alnpart::AlignedPart, alnread::AlignedRead; five_type="5UTR", three_type="3UTR")
-    maximum(alnread.alns.antypes[i] === five_type ? 0x00 :
-        (alnread.alns.antypes[i] === three_type ? 0x65 : alnread.alns.anrightrel[i])
-            for i::Int in alnread.alns.pindex[alnread.range] if (isassigned(alnread.alns.annames, i) && alnread.alns.annames[i] === name(alnpart)))
-end
+Base.length(p::MergedAlignedPart) = rightposition(p.ref)-leftposition(p.ref)+1
 
-function myhash(part::AlignedPart; use_type=false)
+function myhash(part::AlignedPart; use_type=true)
     return use_type ? hash(name(part)*type(part)) : hash(name(part))
 end
 
 function Base.append!(interactions::Interactions, alignments::Alignments, replicate_id::Symbol;
-                        min_distance=1000, filter_types=[], merge_annotation_types=true, merge_type="merge",
-                        cds_type="CDS", five_type="5UTR", three_type="3UTR", multi_detection_method=:annotation)
+                        min_distance=1000, max_ligation_distance=5, filter_types=[], multi_detection_method=:annotation)
     if !(String(replicate_id) in interactions.replicate_ids)
-        interactions.edges[:, replicate_id] = repeat([false], nrow(interactions.edges))
+        interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
         push!(interactions.replicate_ids, replicate_id)
     end
     trans = Dict{UInt, Int}(interactions.nodes[i, :hash]=>i for i in 1:nrow(interactions.nodes))
-    trans_edges = Dict{Tuple{Int,Int},Int}((interactions.edges[i, :src],interactions.edges[i, :dst])=>i for i in 1:nrow(interactions.edges))
+    edgestats = interactions.edgestats
     exclude_count = 0
     single_count = 0
     chimeric_count = 0
@@ -63,84 +95,49 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
         is_chimeric ? chimeric_count += 1 : single_count +=1
         is_multi = is_chimeric ? ismulti(alignment; method=multi_detection_method) : false
         alnparts = parts(alignment)
+        filter!(x->isannotated(x), alnparts)
+        merged_parts = mergedparts(alnparts)
 
-        for (i,part) in enumerate(alnparts)
-            hasannotation(part) || continue
-            any(samename(part, formerpart) for formerpart in alnparts[1:i-1]) && continue
-
-            h = myhash(part; use_type=!merge_annotation_types)
+        for part in alnparts
+            h = myhash(part)
+            h in keys(trans) && continue
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
-                add_vertex!(interactions.graph)
-                push!(interactions.nodes, (name(part), (merge_annotation_types && (type(part) in (cds_type, three_type, five_type))) ? merge_type : type(part), refname(part), 0, 0, 0, 0, strand(part), h))
+                push!(interactions.nodes, (name(part), type(part), refname(part), 0, 0, 0, 0, strand(part), h))
             end
             is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
         end
 
-        for (part1, part2) in combinations(alnparts[collect(!any(samename(part, formerpart)
-                                                                        for formerpart in alnparts[1:i-1])
-                                                                            for (i, part) in enumerate(alnparts))], 2)
-            (hasannotation(part1) && hasannotation(part2)) || continue
+        for (part1, part2) in combinations(merged_parts, 2)
             ischimeric(part1, part2; min_distance=min_distance) || continue
-            a, b = trans[myhash(part1; use_type=!merge_annotation_types)], trans[myhash(part2; use_type=!merge_annotation_types)]
+            a, b = trans[myhash(part1)], trans[myhash(part2)]
             interactions.nodes[a, :nb_ints] += 1
             interactions.nodes[a, :nb_ints_src] += 1
             interactions.nodes[b, :nb_ints] += 1
             interactions.nodes[b, :nb_ints_dst] += 1
-            if !has_edge(interactions.graph, a, b)
-                add_edge!(interactions.graph, a, b)
-                trans_edges[(a,b)] = ne(interactions.graph)
+            if !((a,b) in keys(edgestats))
+                edgestats[(a,b)] = (length(trans_edges)+1, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
+                push!(interactions.edges, (a, b, 0, 0, 0.0, 0.0, 0.0, 0.0, (0 for i in 1:length(interactions.replicate_ids))...))
             end
-            iindex = trans_edges[(a, b)]
-            left1, right1 = leftmostposition(part1, alignment), rightmostposition(part1, alignment)
-            left2, right2 = leftmostposition(part2, alignment), rightmostposition(part2, alignment)
-            statindex1, statindex2 = rightmostrelposition(part1, alignment) + 0x01, leftmostrelposition(part2, alignment) + 0x67
-            nms1, nms2 = editdistance(part1), editdistance(part2)
-            if iindex > nrow(interactions.edges)
-                push!(interactions.edges, (a, b, 0, 0, left1, right1, left2, right2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                            (nms1>1 ? 1.0 : 0.0), (nms2>1 ? 1.0 : 0.0), 0.0, 0.0, (false for i in 1:length(interactions.replicate_ids))...))
-                append!(interactions.edgestats, zeros(Int, 204))
-            end
+            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = trans_edges[(a, b)]
             interactions.edges[iindex, :nb_ints] += 1
-            interactions.edgestats[statindex1, iindex] += 1
-            interactions.edgestats[statindex2, iindex] += 1
-            is_multi && (interactions.edges[iindex, :nb_multi] += 1)
-            interactions.edges[iindex, :minleft1] = min(interactions.edges[iindex, :minleft1], left1)
-            interactions.edges[iindex, :maxright1] = max(interactions.edges[iindex, :maxright1], right1)
-            interactions.edges[iindex, :minleft2] = min(interactions.edges[iindex, :minleft2], left2)
-            interactions.edges[iindex, :maxright2] = max(interactions.edges[iindex, :maxright2], right2)
-            for (s,v) in zip((:meanleft1, :meanright1, :meanleft2, :meanright2, :meanlength1, :meanlength2, :meanmiss1, :meanmiss2, :nms1, :nms2, :lps1, :lps2),
-                             (left1, right1, left2, right2, right1 - left1 + 1, right2 - left2 + 1, nms1, nms2, Int(nms1>0), Int(nms2>0), 0.0, 0.0))
+            interactions.edges[iindex, :nb_multi] += is_multi
+            interactions.edges[iindex, replicate_id] += 1
+            leftpos = rightpostion(part1.ref)
+            rightpos = leftposition(part2.ref)
+            leftcounter, rightcounter = isligationpoint(part1, part2; max_distance=max_ligation_distance) ? (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
+            leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
+            rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
+            for (s,v) in zip((:meanlength1, :meanlength2, :nms1, :nms2),(length(part1), length(part2), nms1, nms2))
                 interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
             end
-            interactions.edges[iindex, replicate_id] = true
         end
     end
     println("Processed $total_count reads, found $chimeric_count chimeras and $single_count singles and excluded $exclude_count.")
     return interactions
 end
 
-function Interactions()
-    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :strand=>Char[], :hash=>UInt[])
-    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :minleft1=>Int[], :maxright1=>Int[], :minleft2=>Int[],
-                        :maxright2=>Int[], :meanlength1=>Float64[], :meanlength2=>Float64[], :meanleft1=>Float64[], :meanleft2=>Float64[],
-                        :meanright1=>Float64[], :meanright2=>Float64[], :nms1=>Float64[], :nms2=>Float64[], :lps1=>Float64[], :lps2=>Float64[],
-                        :meanmiss1=>Float64[], :meanmiss2=>Float64[])
-    return Interactions(SimpleDiGraph(), nodes, edges, ElasticArray{Int}(undef, 204, 0), Symbol[])
-end
-
-function Interactions(alignments::Alignments; replicate_id=:first, min_distance=1000, filter_types=[])
-    append!(Interactions(), alignments, replicate_id, min_distance=min_distance, filter_types=filter_types)
-end
-
-"""
-Load Interactions struct from jld2 file.
-"""
-Interactions(filepath::String) = load(filepath, "interactions")
-
-Base.length(interactions::Interactions) = nrow(interactions.edges)
-
-hasfdrvalues(interactions::Interactions) = "fdr" in names(interactions.edges)
+hasfdrvalues(ints::Interactions) = "fdr" in names(ints.edges)
 
 function checkinteractions(ints::Interactions, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05, check_uppercase=true)
 	verified_dict = merge(Dict(pair=>zeros(2) for pair in verified_pairs),
@@ -173,14 +170,14 @@ function checkinteractions(conditions::Vector{Interactions}, verified_pairs::Vec
     end
     return verified_stats
 end
-function checkinteractions(graph_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05)
-    graph_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(graph_file) for graph_file in graph_files]
+function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05)
+    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
+    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
     return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr=max_fdr)
 end
-function checkinteractions(graph_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr=0.05)
-    graph_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(graph_file) for graph_file in graph_files]
+function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr=0.05)
+    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
+    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
     df = DataFrame(CSV.File(verified_pairs_file; stringtype=String))
     verified_pairs = [(a,b) for (a,b) in eachrow(df)]
     return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr=max_fdr)
@@ -205,7 +202,7 @@ end
 
 function addpvalues!(interactions::Interactions; method=:fisher, fisher_tail=:right, include_read_identity=true, include_singles=true)
     @assert method in (:disparity, :fisher)
-    pvalues = ones(ne(interactions.graph))
+    pvalues = ones(nrow(interactions.edges))
 
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
@@ -226,63 +223,50 @@ function addpvalues!(interactions::Interactions; method=:fisher, fisher_tail=:ri
 
     if method === :fisher
         tests = FisherExactTest.(ints_between, other_target, other_source, total_other)
-        #tests = ChisqTest.(hcat(vcat(ints_between, other_target), vcat(other_source, total_other)))
         pvalues = pvalue.(tests; tail=fisher_tail)
-    elseif method === :disparity
-        degrees = [degree(interactions.graph, i) - 1 for i in 1:nv(interactions.graph)]
-        p_source = (1 .- interactions.edges[!,:nb_ints] ./ interactions.nodes[interactions.edges[!, :src], :nb_ints]).^degrees[interactions.edges[!, :src]]
-        p_target = (1 .- interactions.edges[!,:nb_ints] ./ interactions.nodes[interactions.edges[!, :dst], :nb_ints]).^degrees[interactions.edges[!, :dst]]
-        pvalues = min.(p_source, p_target)
+    else
+        throw(AssertionError("$method not supported!"))
     end
 
     adjp = adjust(PValues(pvalues), BenjaminiHochberg())
     interactions.edges[:, :odds_ratio] = odds_ratio
     interactions.edges[:, :p_value] = pvalues
     interactions.edges[:, :fdr] = adjp
-    for colname in (:relmean1, :relmean2, :relmin1, :relmin2, :relmax1, :relmax2)
-        interactions.edges[:, colname] = ones(Float64, nrow(interactions.edges)) * -Inf
-    end
     return interactions
 end
 
-function addrelativepositions!(interactions::Interactions, features::Features; has_merge_type=true, merge_type="merge", cds_type="CDS")
-    tus = Dict(name(feature)*type(feature)=>(leftposition(feature), rightposition(feature)) for feature in features)
+function addpositions!(interactions::Interactions, features::Features)
+    tus = Dict(hash(name(feature)*type(feature))=>(leftposition(feature), rightposition(feature)) for feature in features)
     for edge_row in eachrow(interactions.edges)
-        name_src = interactions.nodes[edge_row[:src], :name]
-        type_src = has_merge_type && (interactions.nodes[edge_row[:src], :type] === merge_type) ? cds_type : interactions.nodes[edge_row[:src], :type]
-        (feature1_left, feature1_right) = tus[name_src*type_src]
-        name_dst = interactions.nodes[edge_row[:dst], :name]
-        type_dst = has_merge_type && (interactions.nodes[edge_row[:dst], :type] === merge_type) ? cds_type : interactions.nodes[edge_row[:dst], :type]
-        (feature2_left, feature2_right) = tus[name_dst*type_dst]
+        (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
+        (feature2_left, feature2_right) = tus[interactions.nodes[edge_row[:dst], :hash]]
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
-        p1 = collect(edge_row[[(isnegative1 ? :meanleft1 : :meanright1), :minleft1, :maxright1]])
-        p2 = collect(edge_row[[(isnegative2 ? :meanright2 : :meanleft2), :minleft2, :maxright2]])
-        (relpos1, relmin1, relmax1) = min.(1.0, max.(0.0, (p1 .- feature1_left) ./ (feature1_right - feature1_left)))
-        (relpos2, relmin2, relmax2) = min.(1.0, max.(0.0, (p2 .- feature2_left) ./ (feature2_right - feature2_left)))
-        isnegative1 && ((relpos1, relmin1, relmax1) = (1-relpos1, 1-relmax1, 1-relmin1))
-        isnegative2 && ((relpos2, relmin2, relmax2) = (1-relpos2, 1-relmax2, 1-relmin2))
-        edge_row[[:relmean1, :relmean2, :relmin1, :relmin2, :relmax1, :relmax2]] =
-            round.((relpos1, relpos2, relmin1, relmin2, relmax1, relmax2); digits=4)
+        stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
+        p1 = (sum(v*p for (v,p) in stats[2])/edge_row.nb_ints, sum(v*p for (v,p) in stats[3])/edge_row.nb_ints)
+        p2 = (sum(v*p for (v,p) in stats[4])/edge_row.nb_ints, sum(v*p for (v,p) in stats[5])/edge_row.nb_ints)
+        (relposints1, relposligation1) = (p1 .- feature1_left) ./ (feature1_right - feature1_left)
+        (relposints2, relposligation2) = (p2 .- feature2_left) ./ (feature2_right - feature2_left)
+        isnegative1 && ((relposints1, relposligation1) = (1-relposints1, 1-relposligation1))
+        isnegative2 && ((relposints2, relposligation2) = (1-relposints2, 1-relposligation2))
+        left1 = min(minimum(keys(stats[2])), minimum(keys(stats[3])))
+        right1 = max(maximum(keys(stats[2])), maximum(keys(stats[3])))
+        left2 = min(minimum(keys(stats[4])), minimum(keys(stats[5])))
+        right2 = max(maximum(keys(stats[4])), maximum(keys(stats[5])))
+        edge_row[[:left1, :right1, :left2, :right2, :relposints1, :relposints2, :relposligation1, :relposligation2]] =
+            round.((left1, right1, left2, right2, relposints1, relposints2, relposligation1, relposligation2); digits=4)
     end
     return interactions
 end
 
-function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, include_pvalues=true, include_relative_positions=true,
-                        annotate_type_from_position=true, merge_type="merge", cds_type="CDS", five_type="5UTR", three_type="3UTR")
+function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, include_pvalues=true, include_relative_positions=true, hist_bins=100)
     out_df = copy(interactions.edges)
     filter_index = (out_df[!, :nb_ints] .>= min_reads)
     "fdr" in names(out_df) && (filter_index .&= (out_df[!, :fdr] .<= max_fdr))
     out_df = out_df[filter_index, :]
     if output === :edges
-        out_df[!, :meanleft1] = Int.(round.(out_df[!, :meanleft1]))
-        out_df[!, :meanright1] = Int.(round.(out_df[!, :meanright1]))
-        out_df[!, :meanleft2] = Int.(round.(out_df[!, :meanleft2]))
-        out_df[!, :meanright2] = Int.(round.(out_df[!, :meanright2]))
         out_df[!, :meanlength1] = Int.(round.(out_df[!, :meanlength1]))
         out_df[!, :meanlength2] = Int.(round.(out_df[!, :meanlength2]))
-        out_df[!, :meanmiss1] = round.(out_df[!, :meanmiss1], digits=4)
-        out_df[!, :meanmiss2] = round.(out_df[!, :meanmiss2], digits=4)
         out_df[!, :nms1] = round.(out_df[!, :nms1], digits=4)
         out_df[!, :nms2] = round.(out_df[!, :nms2], digits=4)
         out_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
@@ -293,29 +277,11 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
-        out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids]))
+        out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
         out_columns = [:name1, :type1, :ref1, :name2, :type2, :ref2, :nb_ints, :nb_multi, :in_libs, :strand1,
-        :meanleft1, :meanright1, :meanleft2, :meanright2, :strand2, :meanlength1, :meanlength2, :minleft1, :maxright1,
-        :minleft2, :maxright2, :nms1, :nms2, :meanmiss1, :meanmiss2]
+        :left1, :right1, :left2, :right2, :strand2, :meanlength1, :meanlength2, :nms1, :nms2]
         include_pvalues && (out_columns = [out_columns[1:9]..., :p_value, :fdr, out_columns[10:end]...])
-        include_relative_positions && (out_columns = [out_columns..., :relmean1, :relmean2, :relmin1, :relmax1, :relmin2, :relmax2])
-        if annotate_type_from_position
-            ("relmean1" in names(out_df)) &&( "relmean2" in names(out_df)) || throw(AssertionError("Cannot annotate type, please run addrelativepositions! first."))
-            type1_merge = out_df[:, :type1] .=== merge_type
-            type1_5utr = type1_merge .& (out_df[:, :relmean1] .=== 0.0)
-            type1_3utr = type1_merge .& (out_df[:, :relmean1] .=== 1.0)
-            type1_cds = type1_merge .& .!(type1_3utr .| type1_5utr)
-            type2_merge = out_df[:, :type2] .=== merge_type
-            type2_5utr = type2_merge .& (out_df[:, :relmean2] .=== 0.0)
-            type2_3utr = type2_merge .& (out_df[:, :relmean2] .=== 1.0)
-            type2_cds = type2_merge .& .!(type2_3utr .| type2_5utr)
-            out_df[type1_5utr, :type1] .= five_type
-            out_df[type1_3utr, :type1] .= three_type
-            out_df[type1_cds, :type1] .= cds_type
-            out_df[type2_5utr, :type2] .= five_type
-            out_df[type2_3utr, :type2] .= three_type
-            out_df[type2_cds, :type2] .= cds_type
-        end
+        include_relative_positions && (out_columns = [out_columns..., :relposints1, :relposints2, :relposligation1, :relposligation2])
         return sort(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
@@ -324,29 +290,21 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         end
         return sort(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints]], :nb_single; rev=true)
     elseif output === :stats
-        stats_df = DataFrame(Matrix(interactions.edgestats)', ["5UTR_1", ["$(i)_1" for i in 1:100]..., "3UTR_1", "5UTR_2", ["$(i)_2" for i in 1:100]..., "3UTR_2"])[filter_index, :]
+        stats_df = DataFrame(zeros(length(out_df), 4*hist_bins), [
+            ["$(i)_ints1" for i in 1:hist_bins]...,
+            ["$(i)_ints2" for i in 1:hist_bins]...,
+            ["$(i)_ligation2" for i in 1:hist_bins]...,
+            ["$(i)_ligation2" for i in 1:hist_bins]...
+            ])[filter_index, :]
         stats_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
         stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
         stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
         stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
+        stats_df[:, :left1] = interactions.edges[!, :left1]
+        stats_df[:, :right1] = interactions.edges[!, :right1]
+        stats_df[:, :left2] = interactions.edges[!, :left2]
+        stats_df[:, :right2] = interactions.edges[!, :right2]
         stats_df[:, :nb_ints] = out_df[:, :nb_ints]
-        if annotate_type_from_position
-            ("relmean1" in names(out_df)) &&( "relmean2" in names(out_df)) || throw(AssertionError("Cannot annotate type, please run addrelativepositions! first."))
-            type1_merge = stats_df[:, :type1] .=== merge_type
-            type1_5utr = type1_merge .& (out_df[:, :relmean1] .=== 0.0)
-            type1_3utr = type1_merge .& (out_df[:, :relmean1] .=== 1.0)
-            type1_cds = type1_merge .& .!(type1_3utr .| type1_5utr)
-            type2_merge = stats_df[:, :type2] .=== merge_type
-            type2_5utr = type2_merge .& (out_df[:, :relmean2] .=== 0.0)
-            type2_3utr = type2_merge .& (out_df[:, :relmean2] .=== 1.0)
-            type2_cds = type2_merge .& .!(type2_3utr .| type2_5utr)
-            stats_df[type1_5utr, :type1] .= five_type
-            stats_df[type1_3utr, :type1] .= three_type
-            stats_df[type1_cds, :type1] .= cds_type
-            stats_df[type2_5utr, :type2] .= five_type
-            stats_df[type2_3utr, :type2] .= three_type
-            stats_df[type2_cds, :type2] .= cds_type
-        end
         return sort(stats_df, :nb_ints; rev=true)
     else
         throw(AssertionError("output has to be one of :edges, :nodes, :stats"))
@@ -354,8 +312,9 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
 end
 
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}};
-                            filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", overwrite_type="IGR", cds_type="CDS", merge_annotation_types=true,
-                            is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
+                            filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
+                            overwrite_type="IGR", cds_type="CDS", max_ligation_distance=5, is_reverse_complement=true,
+                            include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
                             overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation)
 
     isdir(joinpath(results_path, "interactions")) || mkpath(joinpath(results_path, "interactions"))
@@ -380,11 +339,11 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                                     include_alternative_alignments=include_alternative_alignments,
                                     is_reverse_complement=is_reverse_complement)
             println("Annotating alignments...")
-            annotate!(alignments, features; prioritize_type=prioritize_type, overwrite_type=overwrite_type)
+            annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
+                                            overwrite_type=overwrite_type)
             println("Building graph for replicate $replicate_id...")
-            append!(interactions, alignments, replicate_id; min_distance=min_distance, filter_types=filter_types,
-                                                            merge_annotation_types=merge_annotation_types,
-                                                            multi_detection_method=multi_detection_method)
+            append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                filter_types=filter_types, multi_detection_method=multi_detection_method)
             empty!(alignments)
         end
         length(interactions) == 0 && (println("No interactions found!"); continue)
@@ -416,10 +375,12 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 	write(joinpath(results_path, "interactions.xlsx"), ints)
 end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
-    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", overwrite_type="IGR", cds_type="CDS", merge_annotation_types=true,
+    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", cds_type="CDS", max_ligation_distance=5,
     is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
     overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation) =
 chimeric_analysis(features, bams, results_path, conditions;
-    filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, overwrite_type=overwrite_type, cds_type=cds_type, merge_annotation_types=merge_annotation_types,
-    is_reverse_complement=is_reverse_complement, include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model, min_reads=min_reads, max_fdr=max_fdr,
-    overwrite_existing=overwrite_existing, include_read_identity=include_read_identity, include_singles=include_singles, multi_detection_method=multi_detection_method)
+    filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
+    overwrite_type=overwrite_type, cds_type=cds_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
+    include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model,
+    min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
+    include_singles=include_singles, multi_detection_method=multi_detection_method)
