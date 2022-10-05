@@ -47,9 +47,10 @@ MergedAlignedPart(part::AlignedPart) = MergedAlignedPart(part.ref, isfirstread(p
 function MergedAlignedPart(part1::AlignedPart, part2::AlignedPart)
     firstpart, secondpart = isfirstread(part1) ? (part1, part2) : (part2, part1)
     ref = Interval(refname(firstpart), min(leftposition(firstpart), leftposition(secondpart)),
-        max(rightposition(firstpart), rightposition(secondpart)),
-        annotation(overlap(fistpart)>overlap(secondpart) ? firstpart : secondpart))
+        max(rightposition(firstpart), rightposition(secondpart)), strand(firstpart),
+        annotation(overlap(firstpart)>overlap(secondpart) ? firstpart : secondpart))
     return MergedAlignedPart(ref, firstpart.seq, secondpart.seq, firstpart.nms, secondpart.nms, :both)
+end
 
 function mergedparts(parts::Vector{AlignedPart})
     merged_parts = MergedAlignedPart[]
@@ -58,12 +59,13 @@ function mergedparts(parts::Vector{AlignedPart})
         already_merged[i] && continue
         nextolpi = findnext(x->isoverlapping(parts[i].ref, x.ref) && !sameread(parts[i], x), parts, i+1)
         if isnothing(nextolpi)
-            push!(MergedAlignedPart(part), merged_parts)
+            push!(merged_parts, MergedAlignedPart(part))
         else
-            push!(MergedAlignedPart(par1, part2), merged_parts)
+            push!(merged_parts, MergedAlignedPart(part, parts[nextolpi]))
             already_merged[nextolpi] = true
         end
     end
+    return merged_parts
 end
 
 isligationpoint(part1::MergedAlignedPart, part2::MergedAlignedPart; max_distance=5) =
@@ -72,8 +74,17 @@ isligationpoint(part1::MergedAlignedPart, part2::MergedAlignedPart; max_distance
 
 Base.length(p::MergedAlignedPart) = rightposition(p.ref)-leftposition(p.ref)+1
 
+function ischimeric(part1::MergedAlignedPart, part2::MergedAlignedPart; min_distance=1000, check_annotation=true)
+    check_annotation && (part1.ref.metadata.name == part2.ref.metadata.name) && return false
+    return distance(part1.ref, part2.ref) > min_distance
+end
+
 function myhash(part::AlignedPart; use_type=true)
     return use_type ? hash(name(part)*type(part)) : hash(name(part))
+end
+
+function myhash(part::MergedAlignedPart; use_type=true)
+    return use_type ? hash(part.ref.metadata.name*part.ref.metadata.type) : hash(part.ref.metadata.name)
 end
 
 function Base.append!(interactions::Interactions, alignments::Alignments, replicate_id::Symbol;
@@ -95,7 +106,7 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
         is_chimeric ? chimeric_count += 1 : single_count +=1
         is_multi = is_chimeric ? ismulti(alignment; method=multi_detection_method) : false
         alnparts = parts(alignment)
-        filter!(x->isannotated(x), alnparts)
+        filter!(x->hasannotation(x), alnparts)
         merged_parts = mergedparts(alnparts)
 
         for part in alnparts
@@ -116,19 +127,19 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
             interactions.nodes[b, :nb_ints] += 1
             interactions.nodes[b, :nb_ints_dst] += 1
             if !((a,b) in keys(edgestats))
-                edgestats[(a,b)] = (length(trans_edges)+1, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
+                edgestats[(a,b)] = (length(edgestats)+1, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
                 push!(interactions.edges, (a, b, 0, 0, 0.0, 0.0, 0.0, 0.0, (0 for i in 1:length(interactions.replicate_ids))...))
             end
-            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = trans_edges[(a, b)]
+            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = edgestats[(a, b)]
             interactions.edges[iindex, :nb_ints] += 1
             interactions.edges[iindex, :nb_multi] += is_multi
             interactions.edges[iindex, replicate_id] += 1
-            leftpos = rightpostion(part1.ref)
+            leftpos = rightposition(part1.ref)
             rightpos = leftposition(part2.ref)
             leftcounter, rightcounter = isligationpoint(part1, part2; max_distance=max_ligation_distance) ? (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
             leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
             rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
-            for (s,v) in zip((:meanlength1, :meanlength2, :nms1, :nms2),(length(part1), length(part2), nms1, nms2))
+            for (s,v) in zip((:meanlength1, :meanlength2, :nms1, :nms2),(length(part1), length(part2), max(part1.nms1, part1.nms2), max(part2.nms1, part2.nms2)))
                 interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
             end
         end
@@ -237,22 +248,26 @@ end
 
 function addpositions!(interactions::Interactions, features::Features)
     tus = Dict(hash(name(feature)*type(feature))=>(leftposition(feature), rightposition(feature)) for feature in features)
+    for (col_int, col_float) in zip([:left1, :right1, :left2, :right2], [:relposints1, :relposints2, :relposligation1, :relposligation2])
+        interactions.edges[:, col_int] = Vector{Int}(undef, length(interactions))
+        interactions.edges[:, col_float] = Vector{Float64}(undef, length(interactions))
+    end
     for edge_row in eachrow(interactions.edges)
         (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
         (feature2_left, feature2_right) = tus[interactions.nodes[edge_row[:dst], :hash]]
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
         stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        p1 = (sum(v*p for (v,p) in stats[2])/edge_row.nb_ints, sum(v*p for (v,p) in stats[3])/edge_row.nb_ints)
-        p2 = (sum(v*p for (v,p) in stats[4])/edge_row.nb_ints, sum(v*p for (v,p) in stats[5])/edge_row.nb_ints)
+        p1 = (length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) : Inf)/edge_row.nb_ints, (length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) : Inf)/edge_row.nb_ints
+        p2 = (length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[2]) : Inf)/edge_row.nb_ints, (length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[5]) : Inf)/edge_row.nb_ints
         (relposints1, relposligation1) = (p1 .- feature1_left) ./ (feature1_right - feature1_left)
         (relposints2, relposligation2) = (p2 .- feature2_left) ./ (feature2_right - feature2_left)
         isnegative1 && ((relposints1, relposligation1) = (1-relposints1, 1-relposligation1))
         isnegative2 && ((relposints2, relposligation2) = (1-relposints2, 1-relposligation2))
-        left1 = min(minimum(keys(stats[2])), minimum(keys(stats[3])))
-        right1 = max(maximum(keys(stats[2])), maximum(keys(stats[3])))
-        left2 = min(minimum(keys(stats[4])), minimum(keys(stats[5])))
-        right2 = max(maximum(keys(stats[4])), maximum(keys(stats[5])))
+        left1 = minimum(keys(merge(stats[2],stats[3])))
+        right1 = maximum(keys(merge(stats[2],stats[3])))
+        left2 = minimum(keys(merge(stats[4],stats[5])))
+        right2 = maximum(keys(merge(stats[4],stats[5])))
         edge_row[[:left1, :right1, :left2, :right2, :relposints1, :relposints2, :relposligation1, :relposligation2]] =
             round.((left1, right1, left2, right2, relposints1, relposints2, relposligation1, relposligation2); digits=4)
     end
@@ -290,20 +305,20 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         end
         return sort(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints]], :nb_single; rev=true)
     elseif output === :stats
-        stats_df = DataFrame(zeros(length(out_df), 4*hist_bins), [
+        stats_df = DataFrame(zeros(nrow(out_df), 4*hist_bins), [
             ["$(i)_ints1" for i in 1:hist_bins]...,
             ["$(i)_ints2" for i in 1:hist_bins]...,
-            ["$(i)_ligation2" for i in 1:hist_bins]...,
+            ["$(i)_ligation1" for i in 1:hist_bins]...,
             ["$(i)_ligation2" for i in 1:hist_bins]...
-            ])[filter_index, :]
+            ])
         stats_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
         stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
         stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
         stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
-        stats_df[:, :left1] = interactions.edges[!, :left1]
-        stats_df[:, :right1] = interactions.edges[!, :right1]
-        stats_df[:, :left2] = interactions.edges[!, :left2]
-        stats_df[:, :right2] = interactions.edges[!, :right2]
+        stats_df[:, :left1] = out_df[!, :left1]
+        stats_df[:, :right1] = out_df[!, :right1]
+        stats_df[:, :left2] = out_df[!, :left2]
+        stats_df[:, :right2] = out_df[!, :right2]
         stats_df[:, :nb_ints] = out_df[:, :nb_ints]
         return sort(stats_df, :nb_ints; rev=true)
     else
@@ -313,7 +328,7 @@ end
 
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}};
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
-                            overwrite_type="IGR", cds_type="CDS", max_ligation_distance=5, is_reverse_complement=true,
+                            overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true,
                             include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
                             overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation)
 
@@ -350,7 +365,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
         println("Computing significance levels...")
         addpvalues!(interactions; method=model, include_singles=include_singles, include_read_identity=include_read_identity)
-        addrelativepositions!(interactions, features; cds_type=cds_type)
+        addpositions!(interactions, features)
 
         total_reads = sum(interactions.edges[!, :nb_ints])
         above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
@@ -375,12 +390,12 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 	write(joinpath(results_path, "interactions.xlsx"), ints)
 end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
-    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", cds_type="CDS", max_ligation_distance=5,
+    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
     is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
     overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation) =
 chimeric_analysis(features, bams, results_path, conditions;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
-    overwrite_type=overwrite_type, cds_type=cds_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
+    overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
     include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model,
     min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
     include_singles=include_singles, multi_detection_method=multi_detection_method)

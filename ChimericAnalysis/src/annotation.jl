@@ -122,7 +122,7 @@ end
 
 types(features::Features) = Set(type(f) for f in features)
 refnames(features::Features) = collect(keys(features.list.trees))
-function overlaps(alignmentinterval::Interval{T}, feature::Interval{Annotation}) where T<:AnnotationStyle
+function isoverlapping(alignmentinterval::Interval{T}, feature::Interval{K}) where {T<:AnnotationStyle, K<:AnnotationStyle}
     refname(feature) == refname(alignmentinterval) || return false
     strand(feature) == strand(alignmentinterval) || return false
     return leftposition(feature) <= rightposition(alignmentinterval) && leftposition(alignmentinterval) <= rightposition(feature)
@@ -151,7 +151,7 @@ function mergetypes(features::Features, types::Vector{String}, mergetype::String
     feature_collector = Dict{String,Vector{Interval{Annotation}}}(name(feature)=>Interval{Annotation}[] for feature in features if type(feature) in types)
     for feature in features
         if type(feature) in types
-            push!(feature_collector[name[feature]], feature)
+            push!(feature_collector[name(feature)], feature)
         else
             push!(merged_features, feature)
         end
@@ -163,7 +163,7 @@ function mergetypes(features::Features, types::Vector{String}, mergetype::String
         right = maximum(rightposition(f) for f in fs)
         push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n)))
     end
-    return merged_features
+    return Features(merged_features)
 end
 
 Base.iterate(features::T) where T<:AnnotationContainer = iterate(features.list)
