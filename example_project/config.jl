@@ -6,6 +6,7 @@ samtools_bin = "samtools"
 annotation_file = "annotation.gff"
 genome_file = "genome.fa"
 data_folder = "data"
+results_folder = "results"
 
 is_paired_end = true
 

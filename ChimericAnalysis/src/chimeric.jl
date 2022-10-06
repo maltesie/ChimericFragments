@@ -98,6 +98,7 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
     exclude_count = 0
     single_count = 0
     chimeric_count = 0
+    multi_count = 0
     total_count = 0
     for alignment in alignments
         total_count += 1
@@ -105,6 +106,7 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
         is_chimeric = ischimeric(alignment; min_distance=min_distance)
         is_chimeric ? chimeric_count += 1 : single_count +=1
         is_multi = is_chimeric ? ismulti(alignment; method=multi_detection_method) : false
+        multi_count += is_multi
         alnparts = parts(alignment)
         filter!(x->hasannotation(x), alnparts)
         merged_parts = mergedparts(alnparts)
@@ -144,7 +146,7 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
             end
         end
     end
-    println("Processed $total_count reads, found $chimeric_count chimeras and $single_count singles and excluded $exclude_count.")
+    @info "Processed $total_count reads, found $single_count singles, $chimeric_count ($multi_count) chimeras and excluded $exclude_count."
     return interactions
 end
 
@@ -332,62 +334,71 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
                             overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation)
 
-    isdir(joinpath(results_path, "interactions")) || mkpath(joinpath(results_path, "interactions"))
-    isdir(joinpath(results_path, "stats")) || mkpath(joinpath(results_path, "stats"))
-    isdir(joinpath(results_path, "singles")) || mkpath(joinpath(results_path, "singles"))
-    for (condition, r) in conditions
-        println("Collecting $(length(r)) samples for condition $condition:")
-        if !overwrite_existing &&
-            isfile(joinpath(results_path, "interactions", "$(condition).csv")) &&
-            isfile(joinpath(results_path, "singles", "$(condition).csv")) &&
-            isfile(joinpath(results_path, "stats", "$(condition).csv"))
-            println("Found results files. Skipping...")
-            continue
-        end
-        replicate_ids = Vector{Symbol}()
-        interactions = Interactions()
-        for (i, bam) in enumerate(bams[r])
-            replicate_id = Symbol("$(condition)_$i")
-            push!(replicate_ids, replicate_id)
-            println("Reading $bam")
-            alignments = Alignments(bam; include_secondary_alignments=include_secondary_alignments,
-                                    include_alternative_alignments=include_alternative_alignments,
-                                    is_reverse_complement=is_reverse_complement)
-            println("Annotating alignments...")
-            annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
-                                            overwrite_type=overwrite_type)
-            println("Building graph for replicate $replicate_id...")
-            append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
-                filter_types=filter_types, multi_detection_method=multi_detection_method)
-            empty!(alignments)
-        end
-        length(interactions) == 0 && (println("No interactions found!"); continue)
-
-        println("Computing significance levels...")
-        addpvalues!(interactions; method=model, include_singles=include_singles, include_read_identity=include_read_identity)
-        addpositions!(interactions, features)
-
-        total_reads = sum(interactions.edges[!, :nb_ints])
-        above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
-        total_ints = nrow(interactions.edges)
-        above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
-        total_sig_reads = sum(interactions.edges[interactions.edges.fdr .<= max_fdr, :nb_ints])
-        above_min_sig_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
-        total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
-        above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
-        println("\n\t\ttotal\treads>=$min_reads\tfdr<=$max_fdr\tboth")
-        println("reads:\t\t$total_reads\t$above_min_reads\t\t$total_sig_reads\t\t$above_min_sig_reads")
-        println("interactions:\t$total_ints\t$above_min_ints\t\t$total_sig_ints\t\t$above_min_sig_ints\n")
-        CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
-        CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr))
-        CSV.write(joinpath(results_path, "singles", "$(condition).csv"), asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr))
+    filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
+        println(io, "[", args.level, "] ", args.message)
     end
-    (!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx"))) && return
-    println("Writing tables...")
-    singles = CsvFiles(joinpath(results_path, "singles"))
-	ints = CsvFiles(joinpath(results_path, "interactions"))
-	write(joinpath(results_path, "singles.xlsx"), singles)
-	write(joinpath(results_path, "interactions.xlsx"), ints)
+    with_logger(TeeLogger(filelogger, ConsoleLogger())) do
+        @info "Starting new analysis..."
+        @info summarize(features)
+        isdir(joinpath(results_path, "interactions")) || mkpath(joinpath(results_path, "interactions"))
+        isdir(joinpath(results_path, "stats")) || mkpath(joinpath(results_path, "stats"))
+        isdir(joinpath(results_path, "singles")) || mkpath(joinpath(results_path, "singles"))
+        for (condition, r) in conditions
+            @info "Collecting $(length(r)) samples for condition $condition:"
+            if !overwrite_existing &&
+                isfile(joinpath(results_path, "interactions", "$(condition).csv")) &&
+                isfile(joinpath(results_path, "singles", "$(condition).csv")) &&
+                isfile(joinpath(results_path, "stats", "$(condition).csv"))
+                @info "Found results files. Skipping..."
+                continue
+            end
+            replicate_ids = Vector{Symbol}()
+            interactions = Interactions()
+            for (i, bam) in enumerate(bams[r])
+                replicate_id = Symbol("$(condition)_$i")
+                push!(replicate_ids, replicate_id)
+                @info "Reading $bam"
+                alignments = Alignments(bam; include_secondary_alignments=include_secondary_alignments,
+                                        include_alternative_alignments=include_alternative_alignments,
+                                        is_reverse_complement=is_reverse_complement)
+                @info "Annotating alignments..."
+                annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
+                                                overwrite_type=overwrite_type)
+                @info "Building graph for replicate $replicate_id..."
+                append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                    filter_types=filter_types, multi_detection_method=multi_detection_method)
+                empty!(alignments)
+            end
+            length(interactions) == 0 && (@warn "No interactions found!"; continue)
+
+            @info "Computing significance levels..."
+            addpvalues!(interactions; method=model, include_singles=include_singles, include_read_identity=include_read_identity)
+            addpositions!(interactions, features)
+
+            total_reads = sum(interactions.edges[!, :nb_ints])
+            above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
+            total_ints = nrow(interactions.edges)
+            above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
+            total_sig_reads = sum(interactions.edges[interactions.edges.fdr .<= max_fdr, :nb_ints])
+            above_min_sig_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
+            total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
+            above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
+            infotable = DataFrame(""=>["total:", "pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
+                "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
+            @info "chimeric reads stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+            CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
+            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr))
+            CSV.write(joinpath(results_path, "singles", "$(condition).csv"), asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr))
+        end
+        if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
+            @info "Writing tables..."
+            singles = CsvFiles(joinpath(results_path, "singles"))
+            ints = CsvFiles(joinpath(results_path, "interactions"))
+            write(joinpath(results_path, "singles.xlsx"), singles)
+            write(joinpath(results_path, "interactions.xlsx"), ints)
+        end
+        @info "Done."
+    end
 end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
     filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
