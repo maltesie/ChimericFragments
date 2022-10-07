@@ -122,7 +122,7 @@ end
 
 types(features::Features) = Set(type(f) for f in features)
 refnames(features::Features) = collect(keys(features.list.trees))
-function overlaps(alignmentinterval::Interval{T}, feature::Interval{Annotation}) where T<:AnnotationStyle
+function isoverlapping(alignmentinterval::Interval{T}, feature::Interval{K}) where {T<:AnnotationStyle, K<:AnnotationStyle}
     refname(feature) == refname(alignmentinterval) || return false
     strand(feature) == strand(alignmentinterval) || return false
     return leftposition(feature) <= rightposition(alignmentinterval) && leftposition(alignmentinterval) <= rightposition(feature)
@@ -145,6 +145,26 @@ function Base.merge(features1::Features{T}, features2::Features{T}) where T
     return re
 end
 Base.:*(features1::Features, features2::Features) = merge(features1, features2)
+
+function mergetypes(features::Features, types::Vector{String}, mergetype::String)
+    merged_features = Interval{Annotation}[]
+    feature_collector = Dict{String,Vector{Interval{Annotation}}}(name(feature)=>Interval{Annotation}[] for feature in features if type(feature) in types)
+    for feature in features
+        if type(feature) in types
+            push!(feature_collector[name(feature)], feature)
+        else
+            push!(merged_features, feature)
+        end
+    end
+    for (n, fs) in feature_collector
+        any((refname(f)!=refname(fs[1])) || (strand(f)!=strand(fs[1])) for f in fs) &&
+            throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
+        left = minimum(leftposition(f) for f in fs)
+        right = maximum(rightposition(f) for f in fs)
+        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n)))
+    end
+    return Features(merged_features)
+end
 
 Base.iterate(features::T) where T<:AnnotationContainer = iterate(features.list)
 Base.iterate(features::T, state::Tuple{Int64,GenomicFeatures.ICTree{I},GenomicFeatures.ICTreeIteratorState{I}}) where {T<:AnnotationContainer,I<:AnnotationStyle} = iterate(features.list, state)
@@ -282,9 +302,9 @@ function addigrs!(features::Features; igr_type="IGR", min_igr_length=20)
     merge!(features, Features(new_features))
 end
 
-function Base.show(features::Features)
+function summarize(features::Features)
     chrs = refnames(features)
-    ts = types(features)
+    ts = sort(collect(types(features)))
     stats = Dict(chr=>Dict(t=>0 for t in ts) for chr in chrs)
     nb_pos = 0
     nb_neg = 0
@@ -293,11 +313,12 @@ function Base.show(features::Features)
         nb_pos += strand(f) === STRAND_POS
         nb_neg += strand(f) === STRAND_NEG
     end
-    dt = Int(floor(maximum(length(t) for t in ts)/8))+1
-    printstring = "\n$(nb_pos+nb_neg) features in total with $nb_pos on + strand and $nb_neg on - strand:\n\n"
-    printstring *= "type$(repeat("\t",dt))$(join([chr[1:min(8,length(chr))]*repeat(" ", 9-min(8,length(chr))) for chr in chrs], "\t"))\n\n"
-    for t in ts
-        printstring *= "$(t)$(repeat("\t",dt-Int(floor(length(t)/8))))$(join([stats[chr][t] for chr in chrs], "\t\t"))\n"
-    end
-    println(printstring)
+    printstring = "$(nb_pos+nb_neg) features in total with $nb_pos on + strand and $nb_neg on - strand:\n"
+    infotable = DataFrame("type"=>ts, [chr=>[stats[chr][t] for t in ts] for chr in chrs]...)
+    printstring *= DataFrames.pretty_table(String, infotable, nosubheader=true)
+    return printstring
+end
+
+function Base.show(features::Features)
+    println(summarize(features))
 end

@@ -120,6 +120,19 @@ end
 groupfiles(files::SingleTypeFiles) = groups([basename(f) for f in files.list])
 groupfiles(files::PairedSingleTypeFiles) = groups([basename(f[1]) for f in files.list])
 
+function check_files_exist(files::SingleTypeFiles)
+    for file in files
+        isfile(file) || throw(AssertionError("$file does not exist!"))
+    end
+end
+
+function check_files_exist(files::PairedSingleTypeFiles)
+    for (file1, file2) in files
+        isfile(file1) || throw(AssertionError("$file1 does not exist!"))
+        isfile(file2) || throw(AssertionError("$file2 does not exist!"))
+    end
+end
+
 type(files::T) where {T<:FileCollection} = files.type
 Base.length(files::T) where {T<:FileCollection} = length(files.list)
 Base.iterate(files::T) where {T<:FileCollection} = iterate(files.list)
