@@ -385,7 +385,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
             infotable = DataFrame(""=>["total:", "pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
-            @info "chimeric reads stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+            @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
             CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
             CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr))
             CSV.write(joinpath(results_path, "singles", "$(condition).csv"), asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr))
