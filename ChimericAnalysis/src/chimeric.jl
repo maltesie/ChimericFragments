@@ -43,28 +43,39 @@ struct MergedAlignedPart
     read::Symbol
 end
 
-MergedAlignedPart(part::AlignedPart) = MergedAlignedPart(part.ref, isfirstread(part) ? part.seq : (1:0), isfirstread(part) ? (1:0) : part.seq, part.nms, part.nms, part.read)
-function MergedAlignedPart(part1::AlignedPart, part2::AlignedPart)
-    firstpart, secondpart = isfirstread(part1) ? (part1, part2) : (part2, part1)
-    ref = Interval(refname(firstpart), min(leftposition(firstpart), leftposition(secondpart)),
-        max(rightposition(firstpart), rightposition(secondpart)), strand(firstpart),
-        annotation(overlap(firstpart)>overlap(secondpart) ? firstpart : secondpart))
-    return MergedAlignedPart(ref, firstpart.seq, secondpart.seq, firstpart.nms, secondpart.nms, :both)
-end
+MergedAlignedPart() = MergedAlignedPart(Interval("", 0, 0, STRAND_NA, AlignmentAnnotation()), 1:0, 1:0, 0x0, 0x0, :both)
 
-function mergedparts(parts::Vector{AlignedPart})
-    merged_parts = MergedAlignedPart[]
-    already_merged = zeros(Bool, length(parts))
-    for (i, part) in enumerate(parts)
+function mergeparts!(merged_parts::Vector{MergedAlignedPart}, alnread::AlignedRead; min_distance=1000)
+    index = alnread.alns.pindex[alnread.range]
+    filter!(x->isassigned(alnread.alns.annames, x), index)
+    resize!(merged_parts, length(index))
+    already_merged = zeros(Bool, length(index))
+    lefts = @view alnread.alns.leftpos[index]
+    rights = @view alnread.alns.rightpos[index]
+    reads = @view alnread.alns.reads[index]
+    names = @view alnread.alns.annames[index]
+    types = @view alnread.alns.antypes[index]
+    strands = @view alnread.alns.strands[index]
+    refs = @view alnread.alns.refnames[index]
+    nms = @view alnread.alns.nms[index]
+    rls = @view alnread.alns.read_leftpos[index]
+    rrs = @view alnread.alns.read_rightpos[index]
+    c=0
+    for (i, (left, right, rd, n, t, s, r, nm, rl, rr)) in enumerate(zip(lefts, rights, reads, names, types, strands, refs, nms, rls, rrs))
         already_merged[i] && continue
-        nextolpi = findnext(x->isoverlapping(parts[i].ref, x.ref) && !sameread(parts[i], x), parts, i+1)
+        c += 1
+        nextolpi = findfirst(x->rd!==reads[x] && left<lefts[x] && lefts[x]-right>min_distance, i+1:length(index))
         if isnothing(nextolpi)
-            push!(merged_parts, MergedAlignedPart(part))
+            merged_parts[c] = MergedAlignedPart(Interval(r, left, right, s, AlignmentAnnotation(t, n, 0x0)),
+                rd===:read1 ? (rl:rr) : (1:0), rd===:read2 ? (rl:rr) : (1:0), rd===:read1 ? nm : 0x0, rd===:read2 ? nm : 0x0, rd)
         else
-            push!(merged_parts, MergedAlignedPart(part, parts[nextolpi]))
+            nextolpi += i
+            merged_parts[c] = MergedAlignedPart(Interval(r, left, rights[nextolpi], s, AlignmentAnnotation(t, n, 0x0)),
+                rl:rr, lefts[nextolpi]:rights[nextolpi], nm, nms[nextolpi], :both)
             already_merged[nextolpi] = true
         end
     end
+    resize!(merged_parts, c)
     return merged_parts
 end
 
@@ -74,21 +85,29 @@ isligationpoint(part1::MergedAlignedPart, part2::MergedAlignedPart; max_distance
 
 Base.length(p::MergedAlignedPart) = rightposition(p.ref)-leftposition(p.ref)+1
 
-function ischimeric(part1::MergedAlignedPart, part2::MergedAlignedPart; min_distance=1000, check_annotation=true)
-    check_annotation && (part1.ref.metadata.name == part2.ref.metadata.name) && return false
-    return distance(part1.ref, part2.ref) > min_distance
+function ischimeric(part1::MergedAlignedPart, part2::MergedAlignedPart; min_distance=1000, check_annotation=true, check_order=false)
+    check_annotation && !isempty(part1.ref.metadata) && !isempty(part2.ref.metadata) && (part1.ref.metadata.name == part2.ref.metadata.name) && return false
+    return distance(part1.ref, part2.ref; check_order=check_order) > min_distance
+end
+
+function ischimeric(merged_parts::Vector{MergedAlignedPart}; min_distance=1000, check_annotation=true, check_order=false)
+    length(merged_parts) > 1 || return false
+    for (p1, p2) in combinations(merged_parts, 2)
+        ischimeric(p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order) && return true
+    end
+    return false
 end
 
 function myhash(part::AlignedPart; use_type=true)
-    return use_type ? hash(name(part)*type(part)) : hash(name(part))
+    return use_type ? hash(name(part), hash(type(part))) : hash(name(part))
 end
 
 function myhash(part::MergedAlignedPart; use_type=true)
-    return use_type ? hash(part.ref.metadata.name*part.ref.metadata.type) : hash(part.ref.metadata.name)
+    return use_type ? hash(part.ref.metadata.name, hash(part.ref.metadata.type)) : hash(part.ref.metadata.name)
 end
 
 function Base.append!(interactions::Interactions, alignments::Alignments, replicate_id::Symbol;
-                        min_distance=1000, max_ligation_distance=5, filter_types=[], multi_detection_method=:annotation)
+                        min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=true)
     if !(String(replicate_id) in interactions.replicate_ids)
         interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
         push!(interactions.replicate_ids, replicate_id)
@@ -100,29 +119,29 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
     chimeric_count = 0
     multi_count = 0
     total_count = 0
+    merged_parts = [MergedAlignedPart()]
     for alignment in alignments
         total_count += 1
         !isempty(filter_types) && typein(alignment, filter_types) && (exclude_count += 1; continue)
-        is_chimeric = ischimeric(alignment; min_distance=min_distance)
+        mergeparts!(merged_parts, alignment)
+        is_chimeric = ischimeric(merged_parts)
         is_chimeric ? chimeric_count += 1 : single_count +=1
-        is_multi = is_chimeric ? ismulti(alignment; method=multi_detection_method) : false
-        multi_count += is_multi
-        alnparts = parts(alignment)
-        filter!(x->hasannotation(x), alnparts)
-        merged_parts = mergedparts(alnparts)
 
-        for part in alnparts
+        is_multi = is_chimeric ? length(merged_parts)>2 : false
+        multi_count += is_multi
+
+        for part in merged_parts
             h = myhash(part)
             h in keys(trans) && continue
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
-                push!(interactions.nodes, (name(part), type(part), refname(part), 0, 0, 0, 0, strand(part), h))
+                push!(interactions.nodes, (part.ref.metadata.name, part.ref.metadata.type, refname(part.ref), 0, 0, 0, 0, strand(part.ref), h))
             end
             is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
         end
 
         for (part1, part2) in combinations(merged_parts, 2)
-            ischimeric(part1, part2; min_distance=min_distance) || continue
+            ischimeric(part1, part2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
             a, b = trans[myhash(part1)], trans[myhash(part2)]
             interactions.nodes[a, :nb_ints] += 1
             interactions.nodes[a, :nb_ints_src] += 1
@@ -249,7 +268,7 @@ function addpvalues!(interactions::Interactions; method=:fisher, fisher_tail=:ri
 end
 
 function addpositions!(interactions::Interactions, features::Features)
-    tus = Dict(hash(name(feature)*type(feature))=>(leftposition(feature), rightposition(feature)) for feature in features)
+    tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature)) for feature in features)
     for (col_int, col_float) in zip([:left1, :right1, :left2, :right2], [:relposints1, :relposints2, :relposligation1, :relposligation2])
         interactions.edges[:, col_int] = Vector{Int}(undef, length(interactions))
         interactions.edges[:, col_float] = Vector{Float64}(undef, length(interactions))
@@ -332,7 +351,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true,
                             include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
-                            overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation)
+                            overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -365,8 +384,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
                                                 overwrite_type=overwrite_type)
                 @info "Building graph for replicate $replicate_id..."
-                append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
-                    filter_types=filter_types, multi_detection_method=multi_detection_method)
+                @time append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                    filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
                 empty!(alignments)
             end
             length(interactions) == 0 && (@warn "No interactions found!"; continue)
