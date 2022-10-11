@@ -7,14 +7,14 @@ end
 
 function Interactions()
     nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :strand=>Char[], :hash=>UInt[])
-    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlength1=>Float64[], :meanlength2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
+    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
     Interactions(nodes, edges, edgestats, Symbol[])
 end
 
-Interactions(alignments::Alignments; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], multi_detection_method=:annotation) =
+Interactions(alignments::Alignments; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
     append!(Interactions(), alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
-                filter_types=filter_types, multi_detection_method=multi_detection_method)
+                filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
 
 """
 Load Interactions struct from jld2 file.
@@ -34,76 +34,65 @@ function Base.write(filepath::String, interactions::Interactions)
     end
 end
 
-struct MergedAlignedPart
-    ref::Interval{AlignmentAnnotation}
-    seq1::UnitRange{Int}
-    seq2::UnitRange{Int}
-    nms1::UInt32
-    nms2::UInt32
-    read::Symbol
+struct MergedAlignedRead
+    alnread::AlignedRead
+    pindexpairs::Vector{Tuple{Int,Int}}
+    merged::Vector{Bool}
 end
 
-MergedAlignedPart() = MergedAlignedPart(Interval("", 0, 0, STRAND_NA, AlignmentAnnotation()), 1:0, 1:0, 0x0, 0x0, :both)
+MergedAlignedRead(alnread::AlignedRead) = MergedAlignedRead(alnread, Tuple{Int, Int}[], Bool[])
 
-function mergeparts!(merged_parts::Vector{MergedAlignedPart}, alnread::AlignedRead; min_distance=1000)
-    index = alnread.alns.pindex[alnread.range]
-    filter!(x->isassigned(alnread.alns.annames, x), index)
-    resize!(merged_parts, length(index))
-    already_merged = zeros(Bool, length(index))
-    lefts = @view alnread.alns.leftpos[index]
-    rights = @view alnread.alns.rightpos[index]
-    reads = @view alnread.alns.reads[index]
-    names = @view alnread.alns.annames[index]
-    types = @view alnread.alns.antypes[index]
-    strands = @view alnread.alns.strands[index]
-    refs = @view alnread.alns.refnames[index]
-    nms = @view alnread.alns.nms[index]
-    rls = @view alnread.alns.read_leftpos[index]
-    rrs = @view alnread.alns.read_rightpos[index]
-    c=0
-    for (i, (left, right, rd, n, t, s, r, nm, rl, rr)) in enumerate(zip(lefts, rights, reads, names, types, strands, refs, nms, rls, rrs))
-        already_merged[i] && continue
+Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
+
+canmerge(alns::Alignments, i1::Int, i2::Int; min_distance=1000) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
+(alns.leftpos[i1]<alns.leftpos[i2]) && (alns.leftpos[i2]-alns.rightpos[i1]<min_distance)
+
+function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_distance=1000)
+    alns = alnread.alns
+    index = @view alns.pindex[alnread.range]
+    length(mergedread.pindexpairs) >= length(index) || resize!(mergedread.pindexpairs, length(index))
+    length(mergedread.merged) >= length(index) || resize!(mergedread.merged, length(index))
+    mergedread.merged .= false
+    c::Int = 0
+    for (i::Int, ii::Int) in enumerate(index)
+        (mergedread.merged[i] || !alns.annotated[ii]) && continue
         c += 1
-        nextolpi = findfirst(x->rd!==reads[x] && left<lefts[x] && lefts[x]-right>min_distance, i+1:length(index))
+        nextolpi = findnext(x->canmerge(alns, ii, x; min_distance=min_distance), index, i+1)
         if isnothing(nextolpi)
-            merged_parts[c] = MergedAlignedPart(Interval(r, left, right, s, AlignmentAnnotation(t, n, 0x0)),
-                rd===:read1 ? (rl:rr) : (1:0), rd===:read2 ? (rl:rr) : (1:0), rd===:read1 ? nm : 0x0, rd===:read2 ? nm : 0x0, rd)
+            mergedread.pindexpairs[c] = (ii, ii)
         else
-            nextolpi += i
-            merged_parts[c] = MergedAlignedPart(Interval(r, left, rights[nextolpi], s, AlignmentAnnotation(t, n, 0x0)),
-                rl:rr, lefts[nextolpi]:rights[nextolpi], nm, nms[nextolpi], :both)
-            already_merged[nextolpi] = true
+            mergedread.pindexpairs[c] = (ii, index[nextolpi])
+            mergedread.merged[nextolpi] = true
         end
     end
-    resize!(merged_parts, c)
-    return merged_parts
+    resize!(mergedread.pindexpairs, c)
+    return mergedread
 end
 
-isligationpoint(part1::MergedAlignedPart, part2::MergedAlignedPart; max_distance=5) =
-    ((isempty(part1.seq1) || isempty(part2.seq1)) ? false : (first(part2.seq1) - last(part1.seq1) <= max_distance)) ||
-    ((isempty(part1.seq2) || isempty(part2.seq2)) ? false : (first(part2.seq2) - last(part1.seq2) <= max_distance))
-
-Base.length(p::MergedAlignedPart) = rightposition(p.ref)-leftposition(p.ref)+1
-
-function ischimeric(part1::MergedAlignedPart, part2::MergedAlignedPart; min_distance=1000, check_annotation=true, check_order=false)
-    check_annotation && !isempty(part1.ref.metadata) && !isempty(part2.ref.metadata) && (part1.ref.metadata.name == part2.ref.metadata.name) && return false
-    return distance(part1.ref, part2.ref; check_order=check_order) > min_distance
+function hasligationpoint(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; max_distance=5)
+    alns = mergedread.alnread.alns
+    return (alns.reads[first(pair2)]!==alns.reads[last(pair1)]) ? false : alns.read_leftpos[first(pair2)]-alns.read_rightpos[last(pair1)] <= max_distance
 end
 
-function ischimeric(merged_parts::Vector{MergedAlignedPart}; min_distance=1000, check_annotation=true, check_order=false)
-    length(merged_parts) > 1 || return false
-    for (p1, p2) in combinations(merged_parts, 2)
-        ischimeric(p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order) && return true
+function ischimeric(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; min_distance=1000, check_annotation=true, check_order=false)
+    check_annotation && (mergedread.alnread.alns.annames[first(pair1)] == mergedread.alnread.alns.annames[first(pair2)]) && return false
+    return distance(
+        mergedread.alnread.alns.leftpos[first(pair1)],
+        mergedread.alnread.alns.rightpos[last(pair1)],
+        mergedread.alnread.alns.leftpos[first(pair2)],
+        mergedread.alnread.alns.rightpos[last(pair2)]; check_order=check_order) > min_distance
+end
+
+function ischimeric(mergedread::MergedAlignedRead; min_distance=1000, check_annotation=true, check_order=false)
+    length(mergedread) > 1 || return false
+    for (p1, p2) in combinations(mergedread.pindexpairs, 2)
+        ischimeric(mergedread, p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order) && return true
     end
     return false
 end
 
-function myhash(part::AlignedPart; use_type=true)
-    return use_type ? hash(name(part), hash(type(part))) : hash(name(part))
-end
-
-function myhash(part::MergedAlignedPart; use_type=true)
-    return use_type ? hash(part.ref.metadata.name, hash(part.ref.metadata.type)) : hash(part.ref.metadata.name)
+function myhash(alns::Alignments, i::Int; use_type=true)
+    return use_type ? hash(alns.annames[i], hash(alns.antypes[i])) : hash(alns.annames[i])
 end
 
 function Base.append!(interactions::Interactions, alignments::Alignments, replicate_id::Symbol;
@@ -119,30 +108,30 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
     chimeric_count = 0
     multi_count = 0
     total_count = 0
-    merged_parts = [MergedAlignedPart()]
+    mergedread = MergedAlignedRead(first(alignments))
     for alignment in alignments
         total_count += 1
         !isempty(filter_types) && typein(alignment, filter_types) && (exclude_count += 1; continue)
-        mergeparts!(merged_parts, alignment)
-        is_chimeric = ischimeric(merged_parts)
+        mergeparts!(mergedread, alignment; min_distance=min_distance)
+        is_chimeric = ischimeric(mergedread)
         is_chimeric ? chimeric_count += 1 : single_count +=1
 
-        is_multi = is_chimeric ? length(merged_parts)>2 : false
+        is_multi = is_chimeric ? length(mergedread)>2 : false
         multi_count += is_multi
 
-        for part in merged_parts
-            h = myhash(part)
+        for (i1,_) in mergedread.pindexpairs
+            h = myhash(alignments, i1)
             h in keys(trans) && continue
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
-                push!(interactions.nodes, (part.ref.metadata.name, part.ref.metadata.type, refname(part.ref), 0, 0, 0, 0, strand(part.ref), h))
+                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, alignments.strands[i1], h))
             end
             is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
         end
 
-        for (part1, part2) in combinations(merged_parts, 2)
-            ischimeric(part1, part2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
-            a, b = trans[myhash(part1)], trans[myhash(part2)]
+        for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
+            ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
+            a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
             interactions.nodes[a, :nb_ints] += 1
             interactions.nodes[a, :nb_ints_src] += 1
             interactions.nodes[b, :nb_ints] += 1
@@ -155,17 +144,21 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
             interactions.edges[iindex, :nb_ints] += 1
             interactions.edges[iindex, :nb_multi] += is_multi
             interactions.edges[iindex, replicate_id] += 1
-            leftpos = rightposition(part1.ref)
-            rightpos = leftposition(part2.ref)
-            leftcounter, rightcounter = isligationpoint(part1, part2; max_distance=max_ligation_distance) ? (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
+            leftpos = alignments.rightpos[last(pair1)]
+            rightpos = alignments.leftpos[first(pair2)]
+            leftcounter, rightcounter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ?
+                                            (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
             leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
             rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
-            for (s,v) in zip((:meanlength1, :meanlength2, :nms1, :nms2),(length(part1), length(part2), max(part1.nms1, part1.nms2), max(part2.nms1, part2.nms2)))
+            for (s,v) in zip((:meanlen1, :meanlen2, :nms1, :nms2),
+                (leftpos-alignments.leftpos[first(pair1)], alignments.rightpos[last(pair2)]-rightpos,
+                    max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
+                    max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
                 interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
             end
         end
     end
-    @info "Processed $total_count reads, found $single_count singles, $chimeric_count ($multi_count) chimeras and excluded $exclude_count."
+    @info "Processed $total_count reads, found $single_count singles, $chimeric_count ($multi_count) chimeras and excluded $exclude_count"
     return interactions
 end
 
@@ -269,7 +262,7 @@ end
 
 function addpositions!(interactions::Interactions, features::Features)
     tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature)) for feature in features)
-    for (col_int, col_float) in zip([:left1, :right1, :left2, :right2], [:relposints1, :relposints2, :relposligation1, :relposligation2])
+    for (col_int, col_float) in zip([:min1, :max1, :min2, :max2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
         interactions.edges[:, col_int] = Vector{Int}(undef, length(interactions))
         interactions.edges[:, col_float] = Vector{Float64}(undef, length(interactions))
     end
@@ -279,18 +272,20 @@ function addpositions!(interactions::Interactions, features::Features)
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
         stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        p1 = (length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) : Inf)/edge_row.nb_ints, (length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) : Inf)/edge_row.nb_ints
-        p2 = (length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[2]) : Inf)/edge_row.nb_ints, (length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[5]) : Inf)/edge_row.nb_ints
-        (relposints1, relposligation1) = (p1 .- feature1_left) ./ (feature1_right - feature1_left)
-        (relposints2, relposligation2) = (p2 .- feature2_left) ./ (feature2_right - feature2_left)
-        isnegative1 && ((relposints1, relposligation1) = (1-relposints1, 1-relposligation1))
-        isnegative2 && ((relposints2, relposligation2) = (1-relposints2, 1-relposligation2))
+        int1 = length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) / sum(v for v in values(stats[2])) : NaN64
+        lig1 = length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) / sum(v for v in values(stats[3])) : NaN64
+        int2 = length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[4]) / sum(v for v in values(stats[4])) : NaN64
+        lig2 = length(stats[5]) > 0 ? sum(v*p for (v,p) in stats[5]) / sum(v for v in values(stats[5])) : NaN64
+        (rel_int1, rel_lig1) = ((int1, lig1) .- feature1_left) ./ (feature1_right - feature1_left)
+        (rel_int2, rel_lig2) = ((int2, lig2) .- feature2_left) ./ (feature2_right - feature2_left)
+        isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
+        isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
         left1 = minimum(keys(merge(stats[2],stats[3])))
         right1 = maximum(keys(merge(stats[2],stats[3])))
         left2 = minimum(keys(merge(stats[4],stats[5])))
         right2 = maximum(keys(merge(stats[4],stats[5])))
-        edge_row[[:left1, :right1, :left2, :right2, :relposints1, :relposints2, :relposligation1, :relposligation2]] =
-            round.((left1, right1, left2, right2, relposints1, relposints2, relposligation1, relposligation2); digits=4)
+        edge_row[[:min1, :max1, :min2, :max2, :rel_int1, :rel_int2, :rel_lig1, :rel_lig2]] =
+            round.((left1, right1, left2, right2, rel_int1, rel_int2, rel_lig1, rel_lig2); digits=4)
     end
     return interactions
 end
@@ -301,8 +296,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
     "fdr" in names(out_df) && (filter_index .&= (out_df[!, :fdr] .<= max_fdr))
     out_df = out_df[filter_index, :]
     if output === :edges
-        out_df[!, :meanlength1] = Int.(round.(out_df[!, :meanlength1]))
-        out_df[!, :meanlength2] = Int.(round.(out_df[!, :meanlength2]))
+        out_df[!, :meanlen1] = Int.(round.(out_df[!, :meanlen1]))
+        out_df[!, :meanlen2] = Int.(round.(out_df[!, :meanlen2]))
         out_df[!, :nms1] = round.(out_df[!, :nms1], digits=4)
         out_df[!, :nms2] = round.(out_df[!, :nms2], digits=4)
         out_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
@@ -315,9 +310,9 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
         out_columns = [:name1, :type1, :ref1, :name2, :type2, :ref2, :nb_ints, :nb_multi, :in_libs, :strand1,
-        :left1, :right1, :left2, :right2, :strand2, :meanlength1, :meanlength2, :nms1, :nms2]
+        :min1, :max1, :min2, :max2, :strand2, :meanlen1, :meanlen2, :nms1, :nms2]
         include_pvalues && (out_columns = [out_columns[1:9]..., :p_value, :fdr, out_columns[10:end]...])
-        include_relative_positions && (out_columns = [out_columns..., :relposints1, :relposints2, :relposligation1, :relposligation2])
+        include_relative_positions && (out_columns = [out_columns..., :rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
         return sort(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
@@ -329,17 +324,17 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         stats_df = DataFrame(zeros(nrow(out_df), 4*hist_bins), [
             ["$(i)_ints1" for i in 1:hist_bins]...,
             ["$(i)_ints2" for i in 1:hist_bins]...,
-            ["$(i)_ligation1" for i in 1:hist_bins]...,
-            ["$(i)_ligation2" for i in 1:hist_bins]...
+            ["$(i)_lig1" for i in 1:hist_bins]...,
+            ["$(i)_lig2" for i in 1:hist_bins]...
             ])
         stats_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
         stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
         stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
         stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
-        stats_df[:, :left1] = out_df[!, :left1]
-        stats_df[:, :right1] = out_df[!, :right1]
-        stats_df[:, :left2] = out_df[!, :left2]
-        stats_df[:, :right2] = out_df[!, :right2]
+        stats_df[:, :min1] = out_df[!, :min1]
+        stats_df[:, :max1] = out_df[!, :max1]
+        stats_df[:, :min2] = out_df[!, :min2]
+        stats_df[:, :max2] = out_df[!, :max2]
         stats_df[:, :nb_ints] = out_df[:, :nb_ints]
         return sort(stats_df, :nb_ints; rev=true)
     else
@@ -384,7 +379,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
                                                 overwrite_type=overwrite_type)
                 @info "Building graph for replicate $replicate_id..."
-                @time append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                     filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
                 empty!(alignments)
             end
@@ -422,10 +417,10 @@ end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
     filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
     is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
-    overwrite_existing=false, include_read_identity=true, include_singles=true, multi_detection_method=:annotation) =
+    overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=false) =
 chimeric_analysis(features, bams, results_path, conditions;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
     overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
     include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model,
     min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
-    include_singles=include_singles, multi_detection_method=multi_detection_method)
+    include_singles=include_singles, allow_self_chimeras=allow_self_chimeras)

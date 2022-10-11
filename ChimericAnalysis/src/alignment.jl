@@ -231,7 +231,7 @@ function Alignments(bam_file::String; include_secondary_alignments=true, include
     pindex = partsindex(ranges, nindex, rls, rds)
     return Alignments(chromosome_list, ns, ls, rs, rls, rrs, rds, nms, is, ss,
                         Vector{String}(undef,length(ns)), Vector{String}(undef,length(ns)), zeros(UInt8,length(ns)),
-                        fill(0xff,length(ns)), fill(0xff,length(ns)), pindex, ranges)
+                        fill(0xff,length(ns)), fill(0xff,length(ns)), pindex, zeros(Bool, length(ns)), ranges)
 end
 
 Base.length(alns::Alignments) = length(alns.tempnames)
@@ -276,8 +276,8 @@ function AlignedPart(alns::Alignments, i::Int)
     AlignedPart(
         Interval(alns.refnames[i_p], alns.leftpos[i_p], alns.rightpos[i_p], alns.strands[i_p],
             AlignmentAnnotation(
-                isassigned(alns.antypes, i_p) ? alns.antypes[i_p] : "",
-                isassigned(alns.annames, i_p) ? alns.annames[i_p] : "",
+                alns.annotated[i_p] ? alns.antypes[i_p] : "",
+                alns.annotated[i_p] ? alns.annames[i_p] : "",
                 alns.anols[i_p]
             )
         ),
@@ -304,7 +304,7 @@ AlignedPart(
 Base.getindex(alns::Alignments, i::Int) = AlignedRead(alns.ranges[i], alns)
 Base.getindex(alns::Alignments, r::UnitRange{Int}) = Alignments(alns.chroms, alns.tempnames, alns.leftpos, alns.rightpos, alns.read_leftpos, alns.read_rightpos,
                                                                 alns.reads, alns.nms, alns.refnames, alns.strands, alns.annames, alns.antypes,
-                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.pindex, alns.ranges[r])
+                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.pindex, alns.annotated, alns.ranges[r])
 
 """
     Constructor for the AlignedPart struct. Builds AlignedPart from a XA string, which is created by bwa-mem2
@@ -568,14 +568,13 @@ Base.length(alnread::AlignedRead) = length(alnread.range)
 
 readid(alnread::AlignedRead) = alnread.alns.tempnames[alnread.alns.pindex[first(alnread.range)]]
 parts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range]
-annotatedparts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range
-    if isassigned(alnread.alns.annames, alnread.alns.pindex[i]) && isassigned(alnread.alns.antypes, alnread.alns.pindex[i])]
-typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
-hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
-namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
-hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
-hasannotation(alnread::AlignedRead) = any(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
-annotatedcount(alnread::AlignedRead) = sum(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
+annotatedparts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range if alnread.alns.annotated[alnread.alns.pindex[i]]]
+typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hasannotation(alnread::AlignedRead) = any(alnread.alns.annotated[i] for i in alnread.alns.pindex[alnread.range])
+annotatedcount(alnread::AlignedRead) = sum(alnread.alns.annotated[i] for i in alnread.alns.pindex[alnread.range])
 annotationcount(alnread::AlignedRead) = length(Set(name(part) for part in alnread))
 
 function BioGenerics.leftposition(alnread::AlignedRead)
@@ -630,7 +629,8 @@ function overlapdistance(i1::Interval{T}, i2::Interval{I})::Float64 where {T,I}
     )
 end
 
-function distance(l1::Int, r1::Int, l2::Int, r2::Int)::Int
+function distance(l1::Int, r1::Int, l2::Int, r2::Int; check_order=false)::Float64
+    check_order && l1 > l2 && return Inf
     l2>r1 && return l2-r1+1
     l1>r2 && return l1-r2+1
     return 0
@@ -692,10 +692,11 @@ function Base.empty!(alns::Alignments)
     empty!(alns.anleftrel)
     empty!(alns.anrightrel)
     empty!(alns.pindex)
+    empty!(alns.annotated)
     empty!(alns.reads)
 end
 
-annotatedcount(alns::Alignments) = sum(isassigned(alns.annames, i) && isassigned(alns.antypes, i) for i in 1:length(alns))
+annotatedcount(alns::Alignments) = sum(alns.annotated)
 
 function occurences(test_sequence::LongSequence, bam_file::String, similarity_cut::Float64; score_model=nothing, ignore_mapped=true)
     record = BAM.Record()
@@ -727,7 +728,7 @@ function annotate!(alns::Alignments, features::Features{Annotation}; prioritize_
                                 (alns.rightpos[i] - alns.leftpos[i] + 1) * 100)
 
             priority = !isnothing(prioritize_type) && (type(feature_interval) === prioritize_type) && (olp > min_prioritize_overlap)
-            overwrite = !isnothing(overwrite_type) && isassigned(alns.antypes, i) && (alns.antypes[i] === overwrite_type)
+            overwrite = !isnothing(overwrite_type) && alns.annotated[i] && (alns.antypes[i] === overwrite_type)
 
             if  priority || overwrite || alns.anols[i]<olp
                 alns.antypes[i] = type(feature_interval)
@@ -739,6 +740,7 @@ function annotate!(alns::Alignments, features::Features{Annotation}; prioritize_
                     round(UInt8, (alns.rightpos[i] - leftposition(feature_interval) + 1) / feature_length * 100) : 0x65
                 strand(feature_interval) === STRAND_NEG && ((alns.anleftrel[i], alns.anrightrel[i]) = (0x65 - alns.anrightrel[i], 0x65 - alns.anleftrel[i]))
                 alns.anols[i] = olp
+                alns.annotated[i] = true
                 priority && break
             end
         end

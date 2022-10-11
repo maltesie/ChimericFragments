@@ -28,7 +28,8 @@ samplename_condition = [
 
 min_distance=1000
 is_reverse_complement=true
-allow_self_chimeras=true
+allow_self_chimeras=false
+max_ligation_distance=5
 
 #Annotation parameter
 

@@ -20,9 +20,7 @@ samplename_condition = [
     ("hfq_lcd_1", "hfq_lcd"),
     ("hfq_lcd_2", "hfq_lcd"),
     ("hfq_hcd_1", "hfq_hcd"),
-    ("hfq_hcd_2", "hfq_hcd"),
-    ("hfq_0.2_1", "hfq_0.2"),
-    ("hfq_0.2_2", "hfq_0.2"),
+    ("hfq_hcd_2", "hfq_hcd")
 ]
 
 #Chimeric fragments parameter
@@ -30,6 +28,7 @@ samplename_condition = [
 min_distance=1000
 is_reverse_complement=true
 allow_self_chimeras=false
+max_ligation_distance=5
 
 #Annotation parameter
 
@@ -53,4 +52,4 @@ igr_type="IGR"
 include_read_identity=true
 include_singles=true
 max_fdr=0.05
-min_reads=10
+min_reads=1

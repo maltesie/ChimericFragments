@@ -60,6 +60,7 @@ struct Alignments{T<:Union{String, UInt}}
     anleftrel::Vector{UInt8}
     anrightrel::Vector{UInt8}
     pindex::Vector{Int}
+    annotated::Vector{Bool}
     ranges::Vector{UnitRange{Int}}
 end
 
