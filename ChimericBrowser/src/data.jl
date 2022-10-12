@@ -1,23 +1,37 @@
+struct Interactions
+    nodes::DataFrame
+    edges::DataFrame
+    edgestats::Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}
+    replicate_ids::Vector{Symbol}
+end
+
+Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAnalysis.Interactions" => Interactions)) do f
+    f["interactions"]
+end
+
 function load_data(results_path::String, genome_file::String)
-    interactions_path = realpath(joinpath(results_path, "interactions"))
-    interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".csv")]
-    interactions_dfs = Dict(basename(fname)[1:end-4]=>DataFrame(CSV.File(fname; stringtype=String)) for fname in interactions_files)
-    gene_names_types = Dict(dname=>merge(Dict(zip(df.name1, df.type1)), Dict(zip(df.name2, df.type2))) for (dname,df) in interactions_dfs)
-    singles_path = realpath(joinpath(results_path, "singles"))
-    singles_files = [joinpath(singles_path, fname) for fname in readdir(singles_path) if endswith(fname, ".csv")]
-    singles_dfs = Dict(basename(fname)[1:end-4]=>DataFrame(CSV.File(fname; stringtype=String)) for fname in singles_files)
-    stats_path = realpath(joinpath(results_path,  "stats"))
-    stats_files = [joinpath(stats_path, fname) for fname in readdir(stats_path) if endswith(fname, ".csv")]
-    stats_matrices = Dict(basename(fname)[1:end-4]=>
-        (Dict(row.name1*row.name2=>i for (i,row) in enumerate(eachrow(interactions_dfs[basename(fname)[1:end-4]]))),
-        Matrix(DataFrame(CSV.File(fname; select=collect(1:204))))) for fname in stats_files)
+    interactions_path = realpath(joinpath(results_path, "stats"))
+    interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
+    interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
     genome_info = Pair{String,Int}[]
     FASTA.Reader(open(genome_file)) do reader
         for record in reader
             push!(genome_info, FASTX.identifier(record)=>FASTA.seqsize(record))
         end
     end
-    return interactions_dfs, singles_dfs, stats_matrices, gene_names_types, genome_info
+    for interact in values(interactions)
+        interact.edges[:, :name1] = interact.nodes[interact.edges[!,:src], :name]
+        interact.edges[:, :name2] = interact.nodes[interact.edges[!,:dst], :name]
+        interact.edges[:, :ref1] = interact.nodes[interact.edges[!,:src], :ref]
+        interact.edges[:, :ref2] = interact.nodes[interact.edges[!,:dst], :ref]
+        interact.edges[:, :type1] = interact.nodes[interact.edges[!,:src], :type]
+        interact.edges[:, :type2] = interact.nodes[interact.edges[!,:dst], :type]
+        interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
+        interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
+        interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
+    end
+    gene_names_types = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
+    return interactions, gene_names_types, genome_info
 end
 
 nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
@@ -36,9 +50,8 @@ end
 
 node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
 nb_partner(df::SubDataFrame, node_name::String) = Set(df.name1[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
-function cytoscape_elements(df::SubDataFrame, srna_type::String, gene_name_type::Dict{String,String})
+function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String})
     total_ints = sum(df.nb_ints)
-    srnainteractionindex = (df.type1 .=== srna_type) .!= (df.type2 .=== srna_type)
     edges = [Dict(
         "data"=>Dict(
             "id"=>row.name1*row.name2,
@@ -47,9 +60,16 @@ function cytoscape_elements(df::SubDataFrame, srna_type::String, gene_name_type:
             "current_total"=>total_ints,
             "current_ratio"=>round(row.nb_ints/total_ints; digits=2),
             "interactions"=>row.nb_ints,
-            "relpos"=>round(srnainteractionindex[i] && row.type1 === srna_type ? row.relmean2 : row.relmean1; digits=2),
+            "left1"=>row.left1,
+            "right1"=>row.right1,
+            "left2"=>row.left2,
+            "right2"=>row.right2,
+            "rel_int1"=>isnan(row.rel_int1) ? -1.0 : row.rel_int1,
+            "rel_lig1"=>isnan(row.rel_lig1) ? -1.0 : row.rel_lig1,
+            "rel_int2"=>isnan(row.rel_int2) ? -1.0 : row.rel_int2,
+            "rel_lig2"=>isnan(row.rel_lig2) ? -1.0 : row.rel_lig2
         ),
-        "classes"=>(srnainteractionindex[i] ? "srna_edge" : "other_edge")) for (i, row) in enumerate(eachrow(df))]
+        "classes"=>"srna_edge") for row in eachrow(df)]
     nodes = [Dict(
         "data"=>Dict(
             "id"=>n,
@@ -64,8 +84,8 @@ function cytoscape_elements(df::SubDataFrame, srna_type::String, gene_name_type:
 end
 
 function circos_data(df::SubDataFrame)
-    chords_track([Dict{String,Dict{String,Any}}("source"=>Dict("id"=>row.ref1, "start"=>row.meanleft1, "end"=>row.meanleft1+1500),
-        "target"=>Dict("id"=>row.ref2, "start"=>row.meanleft2, "end"=>row.meanleft2+1500)) for row in eachrow(df)])
+    chords_track([Dict{String,Dict{String,Any}}("source"=>Dict("id"=>row.ref1, "start"=>row.left1, "end"=>row.right1),
+        "target"=>Dict("id"=>row.ref2, "start"=>row.left2, "end"=>row.right2)) for row in eachrow(df)])
 end
 
 function table_data(df::SubDataFrame)

@@ -623,42 +623,14 @@ input[type="button"]:hover {
 .colorbar-arrow {
     width: 0; 
     height: 0; 
+    left: -12%;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    position:absolute;
+    position:relative;
     border-bottom: 10px solid #7fafdf;
-    margin-top: 10px;
+    margin-top: -35px;
 }
 
 .mean {
     border-bottom: 10px solid #ffebcd;
-}
-
-#distribution1 {
-  display:table !important;
-  table-layout: fixed !important;   
-  
-  width:60%;
-  max-width:700px;
-  height:200px;
-  margin:0 auto;
-  
-  background-image:linear-gradient(bottom, rgba(0, 0, 0, 0.1) 2%, transparent 2%);
-  background-size: 100% 50px;
-  background-position: left top;
-  
-  li{
-    position:relative;
-    display:table-cell;
-    vertical-align:bottom;
-    height:200px;
-  }
-  
-  span{
-    margin:0 1em;
-    display: block !important;
-    background: rgba(#d1ecfa, .75) !important;
-    
-  }
-  
 }

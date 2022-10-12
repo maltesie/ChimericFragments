@@ -11,12 +11,12 @@ const update_selection_inputs = [
 const update_selection_states = [
     State("dropdown-update-dataset", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions_dfs::Dict{String,DataFrame}, srna_type::String, gene_name_types::Dict{String, Dict{String, String}}) =
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_types::Dict{String, Dict{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, dataset
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
-    df = filtered_dfview(interactions_dfs[dataset], my_search_strings, min_reads, max_interactions)
+    df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
     table_output = table_data(df)
-    cytoscape_output = cytoscape_elements(df, srna_type, gene_name_types[dataset])
+    cytoscape_output = cytoscape_elements(df, gene_name_types[dataset])
     circos_output = circos_data(df)
     return table_output, cytoscape_output, circos_output
 end
@@ -38,28 +38,27 @@ css_table(data::Vector{Int}, id::String) = html_ul(
         html_li(html_span(style=Dict("height"=>"$(Int(floor(v/maximum(data)*100)))%"))) for v in data
     ]
 )
-mapvalue(normalized_value::Float64; to_min=17, to_max=73) = to_min + min(max(normalized_value, -0.1), 1.1) * (to_max-to_min)
-css_gradient_and_mean(m::Float64, id::String) = html_div(
-    id=id, className="horizontal deflate", children=[
-        html_p("5'UTR", className="cb-left"),
-        html_div(id="colorbar-edges", className="controls-block", children=[
-            html_p("CDS", className="cb-middle"),
-            html_div(className="colorbar-arrow", style=Dict("left"=>"$(mapvalue(m))"))
+mapvalue(normalized_value::Float64; to_min=-12, to_max=104) = Int(floor(to_min + normalized_value * (to_max-to_min)))
+function css_gradient_and_means(m1::Float64, m2::Float64, left::Int, right::Int, id::String)
+    arrows = [html_p("CDS", className="cb-middle")]
+    m1==-1.0 || push!(arrows, html_div(className="colorbar-arrow", style=Dict("left"=>"$(mapvalue(m1))%")))
+    m2==-1.0 || push!(arrows, html_div(className="colorbar-arrow", style=Dict("left"=>"$(mapvalue(m2))%")))
+    return html_div(id=id, children=[
+        html_div(className="horizontal deflate", children=[
+            html_p("5'", className="cb-left"),
+            html_div(id="colorbar-edges", className="controls-block", children=arrows),
+            html_p("3'", className="cb-right")
         ]),
-        html_p("3'UTR", className="cb-right")
-    ]
-)
-function edge_info(stats_matrices::Tuple{Dict{String,Int}, Matrix{Int}}, source_name::String, target_name::String, interactions::Int)
-    stats_row = stats_matrices[2][stats_matrices[1][source_name*target_name], :]
+        html_p("$left $right $(mapvalue(m1)) $(mapvalue(m2))")
+    ])
+end
+function edge_info(edge_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
-        #"$source_name and $target_name were found in $interactions chimeric read" * (interactions>1 ? "s" : "") * ".",
-        #"$source_name fragment distribution:", string(stats_row[1:10]),
-        #"$target_name fragment distribution:", string(stats_row[end-9:end])
-        #css_table([1,2,3,4,5,6,1], "distribution1")
-        source_name * string(argmax(@view stats_row[1:102])),
-        css_gradient_and_mean(argmax(@view stats_row[1:102])/102.0, "rna1"),
-        target_name * string(argmax(@view stats_row[103:204])),
-        css_gradient_and_mean(argmax(@view stats_row[103:204])/102.0, "rna2"),
+        "$(edge_data["source"]) and $(edge_data["target"]) were found in $(edge_data["interactions"]) chimeric read" * (edge_data["interactions"]>1 ? "s" : "") * ".",
+        edge_data["source"],
+        css_gradient_and_means(Float64(edge_data["rel_lig1"]), Float64(edge_data["rel_int1"]), edge_data["left1"], edge_data["right1"], "source"),
+        edge_data["target"],
+        css_gradient_and_means(Float64(edge_data["rel_lig2"]), Float64(edge_data["rel_int2"]), edge_data["left2"], edge_data["right2"], "target"),
     ])]
 end
 
@@ -70,14 +69,14 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-const update_selected_element_states = [
-    State("dropdown-update-dataset", "value")
-]
-update_selected_element_callback!(app::Dash.DashApp, stats_matrices::Dict{String, Tuple{Dict{String,Int}, Matrix{Int}}}) =
-callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, dataset
+#const update_selected_element_states = [
+#    State("dropdown-update-dataset", "value")
+#]
+update_selected_element_callback!(app::Dash.DashApp) =
+callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data
     no_node_data = isnothing(node_data) || isempty(node_data)
     no_edge_data = isnothing(edge_data) || isempty(edge_data)
     no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information."]
     no_edge_data && return ["$(node_data[1]["id"]) has $(node_data[1]["nb_partners"]) partner" * (node_data[1]["nb_partners"]>1 ? "s" : "") * " in the current selection."]
-    return edge_info(stats_matrices[dataset], edge_data[1]["source"], edge_data[1]["target"], edge_data[1]["interactions"])
+    return edge_info(edge_data[1])
 end

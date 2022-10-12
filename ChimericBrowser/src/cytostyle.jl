@@ -68,14 +68,6 @@ const utr3_node_style = Dict(
     )
 )
 
-const combined_node_style = Dict(
-    "selector"=> ".UTRS_CDS",
-    "style"=> Dict(
-        "background-color"=> "BurlyWood",
-        "font-weight"=>"bold"
-    )
-)
-
 const base_edge_style = Dict(
     "selector"=> "edge",
     "style"=> Dict(

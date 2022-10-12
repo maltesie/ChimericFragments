@@ -1,6 +1,6 @@
 module ChimericBrowser
 
-using Dash, DataFrames, CSV, FASTX
+using Dash, DataFrames, CSV, FASTX, JLD2
 
 export chimeric_browser
 

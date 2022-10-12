@@ -29,6 +29,7 @@ min_distance=1000
 is_reverse_complement=true
 allow_self_chimeras=false
 max_ligation_distance=5
+position_distribution_bins = 50
 
 #Annotation parameter
 

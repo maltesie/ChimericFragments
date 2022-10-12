@@ -262,9 +262,10 @@ end
 
 function addpositions!(interactions::Interactions, features::Features)
     tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature)) for feature in features)
-    for (col_int, col_float) in zip([:min1, :max1, :min2, :max2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
-        interactions.edges[:, col_int] = Vector{Int}(undef, length(interactions))
-        interactions.edges[:, col_float] = Vector{Float64}(undef, length(interactions))
+    for (col_featurepos, col_modes, col_rels) in zip([:left1, :right1, :left2, :right2], [:modeint1, :modeint2, :modelig1, :modelig2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
+        interactions.edges[:, col_featurepos] = Vector{Int}(undef, length(interactions))
+        interactions.edges[:, col_modes] = Vector{Float64}(undef, length(interactions))
+        interactions.edges[:, col_rels] = Vector{Float64}(undef, length(interactions))
     end
     for edge_row in eachrow(interactions.edges)
         (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
@@ -272,24 +273,34 @@ function addpositions!(interactions::Interactions, features::Features)
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
         stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        int1 = length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) / sum(v for v in values(stats[2])) : NaN64
-        lig1 = length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) / sum(v for v in values(stats[3])) : NaN64
-        int2 = length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[4]) / sum(v for v in values(stats[4])) : NaN64
-        lig2 = length(stats[5]) > 0 ? sum(v*p for (v,p) in stats[5]) / sum(v for v in values(stats[5])) : NaN64
-        (rel_int1, rel_lig1) = ((int1, lig1) .- feature1_left) ./ (feature1_right - feature1_left)
-        (rel_int2, rel_lig2) = ((int2, lig2) .- feature2_left) ./ (feature2_right - feature2_left)
+        #meanint1 = length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) / sum(v for v in values(stats[2])) : NaN64
+        #meanlig1 = length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) / sum(v for v in values(stats[3])) : NaN64
+        #meanint2 = length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[4]) / sum(v for v in values(stats[4])) : NaN64
+        #meanlig2 = length(stats[5]) > 0 ? sum(v*p for (v,p) in stats[5]) / sum(v for v in values(stats[5])) : NaN64
+        modeint1 = length(stats[2]) > 0 ? argmax(stats[2]) : NaN64
+        modelig1 = length(stats[3]) > 0 ? argmax(stats[3]) : NaN64
+        modeint2 = length(stats[4]) > 0 ? argmax(stats[4]) : NaN64
+        modelig2 = length(stats[5]) > 0 ? argmax(stats[5]) : NaN64
+        (rel_int1, rel_lig1) = ((modeint1, modelig1) .- feature1_left) ./ (feature1_right - feature1_left)
+        (rel_int2, rel_lig2) = ((modeint2, modelig2) .- feature2_left) ./ (feature2_right - feature2_left)
         isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
         isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
-        left1 = minimum(keys(merge(stats[2],stats[3])))
-        right1 = maximum(keys(merge(stats[2],stats[3])))
-        left2 = minimum(keys(merge(stats[4],stats[5])))
-        right2 = maximum(keys(merge(stats[4],stats[5])))
-        edge_row[[:min1, :max1, :min2, :max2, :rel_int1, :rel_int2, :rel_lig1, :rel_lig2]] =
-            round.((left1, right1, left2, right2, rel_int1, rel_int2, rel_lig1, rel_lig2); digits=4)
+        edge_row[[:left1, :right1, :left2, :right2, :modeint1, :rel_int1, :modeint2, :rel_int2, :modelig1, :rel_lig1, :modelig2, :rel_lig2]] =
+            round.((feature1_left, feature1_right, feature2_left, feature2_right, modeint1, rel_int1, modeint2, rel_int2, modelig1, rel_lig1, modelig2, rel_lig2); digits=4)
     end
     return interactions
 end
 
+function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
+    h = zeros(Int, nbins)
+    dbin = (ma-mi+1)/nbins
+    for i in mi:ma
+        if i in keys(ints)
+            h[Int(floor((i-mi)/dbin)) + 1] += ints[i]
+        end
+    end
+    return h
+end
 function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, include_pvalues=true, include_relative_positions=true, hist_bins=100)
     out_df = copy(interactions.edges)
     filter_index = (out_df[!, :nb_ints] .>= min_reads)
@@ -309,9 +320,9 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
-        out_columns = [:name1, :type1, :ref1, :name2, :type2, :ref2, :nb_ints, :nb_multi, :in_libs, :strand1,
-        :min1, :max1, :min2, :max2, :strand2, :meanlen1, :meanlen2, :nms1, :nms2]
-        include_pvalues && (out_columns = [out_columns[1:9]..., :p_value, :fdr, out_columns[10:end]...])
+        out_columns = [:name1, :type1, :ref1, :left1, :right1, :strand1, :name2, :type2, :ref2, :left2, :right2, :strand2,
+        :nb_ints, :nb_multi, :in_libs, :meanlen1, :meanlen2, :nms1, :nms2]
+        include_pvalues && (out_columns = [out_columns[1:14]..., :p_value, :fdr, out_columns[15:end]...])
         include_relative_positions && (out_columns = [out_columns..., :rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
         return sort(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
@@ -321,7 +332,16 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         end
         return sort(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints]], :nb_single; rev=true)
     elseif output === :stats
-        stats_df = DataFrame(zeros(nrow(out_df), 4*hist_bins), [
+        edgestats = interactions.edgestats
+        statsmatrix = zeros(nrow(out_df), 4*hist_bins)
+        for (i, (a,b, mi1, ma1, mi2, ma2)) in enumerate(zip(out_df[!,:src], out_df[!,:dst], out_df[!, :left1], out_df[!, :right1], out_df[!, :left2], out_df[!, :right2]))
+            (_, ints1, ligs1, ints2, ligs2) = edgestats[(a, b)]
+            statsmatrix[i, 1:hist_bins] .= histo(ints1, mi1, ma1, hist_bins)
+            statsmatrix[i, (hist_bins+1):(2*hist_bins)] .= histo(ligs1, mi1, ma1, hist_bins)
+            statsmatrix[i, (2*hist_bins+1):(3*hist_bins)] .= histo(ints2, mi2, ma2, hist_bins)
+            statsmatrix[i, (3*hist_bins+1):(4*hist_bins)] .= histo(ligs2, mi2, ma2, hist_bins)
+        end
+        stats_df = DataFrame(statsmatrix, [
             ["$(i)_ints1" for i in 1:hist_bins]...,
             ["$(i)_ints2" for i in 1:hist_bins]...,
             ["$(i)_lig1" for i in 1:hist_bins]...,
@@ -331,10 +351,10 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
         stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
         stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
-        stats_df[:, :min1] = out_df[!, :min1]
-        stats_df[:, :max1] = out_df[!, :max1]
-        stats_df[:, :min2] = out_df[!, :min2]
-        stats_df[:, :max2] = out_df[!, :max2]
+        stats_df[:, :left1] = out_df[!, :left1]
+        stats_df[:, :right1] = out_df[!, :right1]
+        stats_df[:, :left2] = out_df[!, :left2]
+        stats_df[:, :right2] = out_df[!, :right2]
         stats_df[:, :nb_ints] = out_df[:, :nb_ints]
         return sort(stats_df, :nb_ints; rev=true)
     else
@@ -346,7 +366,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true,
                             include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
-                            overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true)
+                            overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -401,7 +421,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
             CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
-            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr))
+            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, hist_bins=position_distribution_bins))
+            write(joinpath(results_path, "stats", "$(condition).jld2"), interactions)
             CSV.write(joinpath(results_path, "singles", "$(condition).csv"), asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr))
         end
         if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
@@ -417,10 +438,10 @@ end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
     filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
     is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
-    overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=false) =
+    overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=false, position_distribution_bins=50) =
 chimeric_analysis(features, bams, results_path, conditions;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
     overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
     include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model,
     min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
-    include_singles=include_singles, allow_self_chimeras=allow_self_chimeras)
+    include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

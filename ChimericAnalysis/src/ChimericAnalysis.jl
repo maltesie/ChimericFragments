@@ -1,12 +1,12 @@
 module ChimericAnalysis
 
-using XAM, FASTX, CodecZlib, GFF3, BigWig, DelimitedFiles, BGZFStreams, CSV, XLSX
+using XAM, FASTX, CodecZlib, GFF3, BigWig, DelimitedFiles, BGZFStreams, CSV, XLSX, JLD2
 using BioAlignments, BioSequences, GenomicFeatures, BioGenerics
 using Statistics, HypothesisTests, MultipleTesting, Combinatorics, Random, Distributions, StatsBase
 using ElasticArrays, IterTools, LightGraphs, DataFrames, LoggingExtras
 
 export chimeric_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, align_mem
-export SingleTypeFiles, PairedSingleTypeFiles, check_files_exist, mergetypes, summarize
+export SingleTypeFiles, PairedSingleTypeFiles, check_files_exist, mergetypes, summarize, Interactions
 
 include("types.jl")
 include("preprocess.jl")

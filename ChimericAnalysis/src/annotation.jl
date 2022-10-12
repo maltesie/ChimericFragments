@@ -161,7 +161,10 @@ function mergetypes(features::Features, types::Vector{String}, mergetype::String
             throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
         left = minimum(leftposition(f) for f in fs)
         right = maximum(rightposition(f) for f in fs)
-        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n)))
+        inbetweens = sort([rightposition(f) for f in fs if rightposition(f)!=right])
+        relinbetweens = (inbetweens .- left) ./ (right-left)
+        ann = Dict("Name"=>n, "inbetween"=>join(",", inbetweens), "relinbetweens"=>join(",", round.(relinbetweens; digits=4)))
+        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n, ann)))
     end
     return Features(merged_features)
 end
