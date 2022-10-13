@@ -6,7 +6,7 @@ struct Interactions
 end
 
 function Interactions()
-    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :strand=>Char[], :hash=>UInt[])
+    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
     edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
     Interactions(nodes, edges, edgestats, Symbol[])
@@ -124,7 +124,7 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
             h in keys(trans) && continue
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
-                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, alignments.strands[i1], h))
+                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, 0, alignments.strands[i1], h))
             end
             is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
         end
@@ -301,10 +301,9 @@ function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
     end
     return h
 end
-function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, include_pvalues=true, include_relative_positions=true, hist_bins=100)
+function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, hist_bins=100)
     out_df = copy(interactions.edges)
-    filter_index = (out_df[!, :nb_ints] .>= min_reads)
-    "fdr" in names(out_df) && (filter_index .&= (out_df[!, :fdr] .<= max_fdr))
+    filter_index = (out_df[!, :nb_ints] .>= min_reads) .& (out_df[!, :fdr] .<= max_fdr)
     out_df = out_df[filter_index, :]
     if output === :edges
         out_df[!, :meanlen1] = Int.(round.(out_df[!, :meanlen1]))
@@ -320,17 +319,18 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
-        out_columns = [:name1, :type1, :ref1, :left1, :right1, :strand1, :name2, :type2, :ref2, :left2, :right2, :strand2,
-        :nb_ints, :nb_multi, :in_libs, :meanlen1, :meanlen2, :nms1, :nms2]
-        include_pvalues && (out_columns = [out_columns[1:14]..., :p_value, :fdr, out_columns[15:end]...])
-        include_relative_positions && (out_columns = [out_columns..., :rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
-        return sort(out_df[!, out_columns], :nb_ints; rev=true)
+        out_columns = [:name1, :type1, :ref1, :strand1, :name2, :type2, :ref2, :strand2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,
+        :left1, :right1, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1,
+        :left2, :right2, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+        return sort!(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
         for (i,row) in enumerate(eachrow(out_nodes))
             row[:nb_ints] = sum(out_df[(out_df.src .== i) .| (out_df.dst .== i), :nb_ints])
+            names = Set(hcat(interactions.nodes[out_df[!,:src], :name],interactions.nodes[out_df[!,:src], :name])[hcat((out_df.src .== i),(out_df.dst .== i))])
+            row[:nb_partners] = length(names)
         end
-        return sort(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints]], :nb_single; rev=true)
+        return sort!(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints, :nb_partners]], :nb_single; rev=true)
     elseif output === :stats
         edgestats = interactions.edgestats
         statsmatrix = zeros(nrow(out_df), 4*hist_bins)
@@ -356,7 +356,7 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         stats_df[:, :left2] = out_df[!, :left2]
         stats_df[:, :right2] = out_df[!, :right2]
         stats_df[:, :nb_ints] = out_df[:, :nb_ints]
-        return sort(stats_df, :nb_ints; rev=true)
+        return sort!(stats_df, :nb_ints; rev=true)
     else
         throw(AssertionError("output has to be one of :edges, :nodes, :stats"))
     end

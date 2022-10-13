@@ -19,4 +19,4 @@ Pkg.instantiate()
 
 using ChimericBrowser
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file))
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), srna_type)

@@ -24,10 +24,10 @@ positioning_control_layout() = html_div(
         html_p("Positioning:"),
         dcc_dropdown(
             id="dropdown-update-layout",
-            value="random",
+            value="preset",
             clearable=false,
             options=[
-                Dict("label"=>n, "value"=>n) for n in ["cose", "grid", "random", "circle", "concentric"]
+                Dict("label"=>l, "value"=>v) for (l,v) in ["clustered"=>"cose", "grid"=>"grid", "random"=>"preset"]
             ]
         ),
     ]
@@ -43,23 +43,18 @@ reads_selection_layout() = html_div(
     children=[
         html_div(
             className="horizontal",
+            style=Dict("padding-top"=>"5px"),
             children=[
-                html_p("Minimum # of reads:"),
-                dcc_slider(
-                    id="reads-slider",
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=0
-                ),
+                html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-widh"=>"70px"))
             ]
         ),
         html_div(
             className="horizontal",
             style=Dict("padding-top"=>"5px"),
             children=[
-                html_p(id="nb-interactions-text", children=["Maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"80px"))
+                html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-widh"=>"70px"))
             ]
         )
     ]
@@ -111,7 +106,7 @@ info_area_layout() = html_div(
     children=[html_p(id="info-output", children=["No interaction selected."])]
 )
 
-control_column_layout(datasets::Vector{String}, function_categories::Vector{Dict{String,String}}) = html_div(
+control_column_layout(datasets::Vector{String}) = html_div(
     id="left-column",
     children=[
         headline_layout(),
@@ -121,7 +116,6 @@ control_column_layout(datasets::Vector{String}, function_categories::Vector{Dict
                 dataset_and_postioning_layout(datasets),
                 reads_selection_layout(),
                 search_layout(),
-                annotation_control_layout(function_categories),
                 info_area_layout()
             ]
         )
@@ -153,13 +147,17 @@ cytoscape_layout() = html_div(
     ]
 )
 
-chords_track(data::Vector{Dict{String,Dict{String,Any}}}) = [Dict(
+chords_track(data::Vector{Dict{String,Any}}) = [Dict(
     "type"=>"CHORDS",
     "data"=>data,
     "config"=>Dict(
         "opacity"=>0.9,
-        "color"=>Dict("name"=> "color"),
-        "tooltipContent"=>Dict("name"=>"nb_ints")
+        "color"=>"black",
+        "tooltipContent"=>Dict(
+            "source"=>"RNA1",
+            "target"=>"RNA2",
+            "targetEnd"=>"nbints"
+        )
     )
 )]
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
@@ -188,7 +186,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             ),
             layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
             selectEvent=Dict("2"=> "both"),
-            tracks=chords_track(Dict{String,Dict{String,Any}}[])
+            tracks=chords_track(Dict{String,Any}[])
         )
     ]
 )
@@ -245,12 +243,12 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     ]
 )
 
-browser_layout(datasets::Vector{String}, function_categories::Vector{Dict{String,String}}, genome_info::Vector{Pair{String,Int}}) = html_div(
+browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}) = html_div(
     id="root",
     children=[html_div(
         id="app-container",
         children=[
-            control_column_layout(datasets, function_categories),
+            control_column_layout(datasets),
             tabs_layout(genome_info)
         ]
     )]

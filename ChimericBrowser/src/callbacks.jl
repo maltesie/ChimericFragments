@@ -4,19 +4,20 @@ const update_selection_outputs = [
     Output("my-dashbio-circos", "tracks")
 ]
 const update_selection_inputs = [
-    Input("reads-slider", "value"),
+    Input("min-reads", "value"),
     Input("max-interactions", "value"),
     Input("gene-multi-select", "value"),
 ]
 const update_selection_states = [
     State("dropdown-update-dataset", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_types::Dict{String, Dict{String, String}}) =
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_type::Dict{String, Dict{String, String}},
+    gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, dataset
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
     table_output = table_data(df)
-    cytoscape_output = cytoscape_elements(df, gene_name_types[dataset])
+    cytoscape_output = cytoscape_elements(df, gene_name_type[dataset], gene_name_position[dataset], sRNA_type)
     circos_output = circos_data(df)
     return table_output, cytoscape_output, circos_output
 end
@@ -25,12 +26,12 @@ const update_dataset_inputs = [
     Input("dropdown-update-dataset", "value")
 ]
 const update_dataset_outputs = [
-    Output("reads-slider", "value"),
+    Output("min-reads", "value"),
     Output("gene-multi-select", "options")
 ]
-update_dataset_callback!(app::Dash.DashApp, gene_names_types::Dict{String,Dict{String,String}}) =
+update_dataset_callback!(app::Dash.DashApp, gene_name_type::Dict{String,Dict{String,String}}) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return 0, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_names_types[dataset])))]
+    return 1, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_type[dataset])))]
 end
 
 css_table(data::Vector{Int}, id::String) = html_ul(
@@ -38,27 +39,30 @@ css_table(data::Vector{Int}, id::String) = html_ul(
         html_li(html_span(style=Dict("height"=>"$(Int(floor(v/maximum(data)*100)))%"))) for v in data
     ]
 )
-mapvalue(normalized_value::Float64; to_min=-12, to_max=104) = Int(floor(to_min + normalized_value * (to_max-to_min)))
-function css_gradient_and_means(m1::Float64, m2::Float64, left::Int, right::Int, id::String)
-    arrows = [html_p("CDS", className="cb-middle")]
-    m1==-1.0 || push!(arrows, html_div(className="colorbar-arrow", style=Dict("left"=>"$(mapvalue(m1))%")))
-    m2==-1.0 || push!(arrows, html_div(className="colorbar-arrow", style=Dict("left"=>"$(mapvalue(m2))%")))
-    return html_div(id=id, children=[
+normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
+mapvalue(value::Float64; to_min=-12, to_max=104) = Int(floor(to_min + value * (to_max-to_min)))
+function css_gradient_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool, id::String)
+    arrows = [html_p(id, className="cb-middle")]
+    push!(arrows, m1==0 ? html_div(style=Dict("margin-top"=>"-27px")) :
+        html_div(className="colorbar-arrow-mean", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, isnegative)))%")))
+    push!(arrows, m2==0 ? html_div(style=Dict("margin-top"=>"-27px")) :
+        html_div(className="colorbar-arrow-mode", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, isnegative)))%")))
+    return html_div(children=[
         html_div(className="horizontal deflate", children=[
-            html_p("5'", className="cb-left"),
+            html_p(["5'", html_br(), isnegative ? "$right" : "$left"], className="cb-left"),
             html_div(id="colorbar-edges", className="controls-block", children=arrows),
-            html_p("3'", className="cb-right")
+            html_p(["3'", html_br(), isnegative ? "$left" : "$right"], className="cb-right")
         ]),
-        html_p("$left $right $(mapvalue(m1)) $(mapvalue(m2))")
+        m2 == 0 ? html_p("mode of interaction point distribution: $m1") : html_p("mode of ligation point distribution: $m2")
     ])
 end
 function edge_info(edge_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
-        "$(edge_data["source"]) and $(edge_data["target"]) were found in $(edge_data["interactions"]) chimeric read" * (edge_data["interactions"]>1 ? "s" : "") * ".",
-        edge_data["source"],
-        css_gradient_and_means(Float64(edge_data["rel_lig1"]), Float64(edge_data["rel_int1"]), edge_data["left1"], edge_data["right1"], "source"),
-        edge_data["target"],
-        css_gradient_and_means(Float64(edge_data["rel_lig2"]), Float64(edge_data["rel_int2"]), edge_data["left2"], edge_data["right2"], "target"),
+        html_p("$(edge_data["source"])->$(edge_data["target"]): $(edge_data["interactions"]) chimeric read" * (edge_data["interactions"]>1 ? "s" : "") * "."),
+        html_br(),
+        css_gradient_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", edge_data["source"]),
+        html_br(),
+        css_gradient_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", edge_data["target"]),
     ])]
 end
 

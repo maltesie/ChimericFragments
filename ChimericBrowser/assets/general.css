@@ -436,10 +436,6 @@ input[type="button"]:hover {
     min-width:120px;
 }
 
-#max-interactions {
-    max-width:60px;
-}
-
 #gene-multi-select{
     width:100%;
 }
@@ -601,18 +597,21 @@ input[type="button"]:hover {
 */
 
 .cb-right {
-    padding-top:15px;
+    padding-top:7px;
     padding-left:5px;
+    text-align:left;
+    
 }
 
 .cb-left {
-    padding-top:15px;
+    padding-top:7px;
     padding-right:5px;
+    text-align:right;
 }
 
 .cb-middle {
     padding-top:15px;
-    padding-left:45%;
+    text-align:center;
 }
 
 .text-block {
@@ -620,15 +619,24 @@ input[type="button"]:hover {
     width:500px;
 }
 
-.colorbar-arrow {
+.colorbar-arrow-mean {
     width: 0; 
-    height: 0; 
-    left: -12%;
+    height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     position:relative;
     border-bottom: 10px solid #7fafdf;
-    margin-top: -35px;
+    margin-top: -38px;
+}
+
+.colorbar-arrow-mode {
+   width: 0; 
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    position:relative;
+    border-top: 10px solid DarkSalmon;
+    margin-top: -38px;
 }
 
 .mean {

@@ -6,7 +6,7 @@ using Statistics, HypothesisTests, MultipleTesting, Combinatorics, Random, Distr
 using ElasticArrays, IterTools, LightGraphs, DataFrames, LoggingExtras
 
 export chimeric_analysis, add5utrs!, add3utrs!, addigrs!, Genome, Features, merge!, align_mem
-export SingleTypeFiles, PairedSingleTypeFiles, check_files_exist, mergetypes, summarize, Interactions
+export SingleTypeFiles, PairedSingleTypeFiles, check_files_exist, mergetypes, summarize
 
 include("types.jl")
 include("preprocess.jl")

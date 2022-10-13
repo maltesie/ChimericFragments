@@ -29,9 +29,13 @@ function load_data(results_path::String, genome_file::String)
         interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
         interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
+        interact.nodes[:, :x] = rand(nrow(interact.nodes)) .* 100
+        interact.nodes[:, :y] = rand(nrow(interact.nodes)) .* 100
+        sort!(interact.edges, :nb_ints; rev=true)
     end
-    gene_names_types = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
-    return interactions, gene_names_types, genome_info
+    gene_name_type = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
+    gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in zip(interact.nodes.name, interact.nodes.x, interact.nodes.y)) for (dname,interact) in interactions)
+    return interactions, gene_name_type, gene_name_position, genome_info
 end
 
 nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
@@ -50,8 +54,9 @@ end
 
 node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
 nb_partner(df::SubDataFrame, node_name::String) = Set(df.name1[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
-function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String})
+function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String)
     total_ints = sum(df.nb_ints)
+    srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
     edges = [Dict(
         "data"=>Dict(
             "id"=>row.name1*row.name2,
@@ -60,16 +65,19 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "current_total"=>total_ints,
             "current_ratio"=>round(row.nb_ints/total_ints; digits=2),
             "interactions"=>row.nb_ints,
+            "strand1"=>row.strand1,
+            "strand2"=>row.strand2,
             "left1"=>row.left1,
             "right1"=>row.right1,
             "left2"=>row.left2,
             "right2"=>row.right2,
-            "rel_int1"=>isnan(row.rel_int1) ? -1.0 : row.rel_int1,
-            "rel_lig1"=>isnan(row.rel_lig1) ? -1.0 : row.rel_lig1,
-            "rel_int2"=>isnan(row.rel_int2) ? -1.0 : row.rel_int2,
-            "rel_lig2"=>isnan(row.rel_lig2) ? -1.0 : row.rel_lig2
+            "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
+            "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
+            "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
+            "modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
+            "relpos"=> s2 ? (isnan(row.rel_lig1) ? row.rel_int1 : row.rel_lig1) : (isnan(row.rel_lig2) ? row.rel_int2 : row.rel_lig2)
         ),
-        "classes"=>"srna_edge") for row in eachrow(df)]
+        "classes"=>s1 != s2 ? "srna_edge" : "other_edge") for (row, (s1, s2)) in zip(eachrow(df), eachrow(srnaindex))]
     nodes = [Dict(
         "data"=>Dict(
             "id"=>n,
@@ -79,18 +87,26 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
             "current_total"=>total_ints
         ),
-        "classes"=>gene_name_type[n]) for n in Set(vcat(df.name1, df.name2))]
+        "classes"=>gene_name_type[n],
+        "position"=>gene_name_position[n]) for n in Set(vcat(df.name1, df.name2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
-function circos_data(df::SubDataFrame)
-    chords_track([Dict{String,Dict{String,Any}}("source"=>Dict("id"=>row.ref1, "start"=>row.left1, "end"=>row.right1),
-        "target"=>Dict("id"=>row.ref2, "start"=>row.left2, "end"=>row.right2)) for row in eachrow(df)])
+function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=6000)
+    current_total = sum(df.nb_ints)
+    chords_track([Dict{String,Any}(
+        "nbints"=>row.nb_ints,
+        "RNA1"=>row.name1,
+        "RNA2"=>row.name2,
+        "source"=>Dict("id"=>row.ref1,
+            "start"=>(row.left1 + row.right1)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
+            "end"=>(row.left1 + row.right1)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2)),
+        "target"=>Dict("id"=>row.ref2,
+            "start"=>(row.left2 + row.right2)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
+            "end"=>(row.left2 + row.right2)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2))
+    ) for row in eachrow(df)])
 end
 
 function table_data(df::SubDataFrame)
     Dict.(pairs.(eachrow(df[!, ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]])))
-end
-
-function functional_annotation(gene_names::Vector{String})
 end
