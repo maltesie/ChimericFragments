@@ -46,7 +46,7 @@ reads_selection_layout() = html_div(
             style=Dict("padding-top"=>"5px"),
             children=[
                 html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-widh"=>"70px"))
+                dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
             ]
         ),
         html_div(
@@ -54,7 +54,7 @@ reads_selection_layout() = html_div(
             style=Dict("padding-top"=>"5px"),
             children=[
                 html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-widh"=>"70px"))
+                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
             ]
         )
     ]
@@ -132,7 +132,7 @@ cytoscape_layout() = html_div(
             autoRefreshLayout=true,
             stylesheet=stylesheet,
             responsive=true,
-            layout=Dict("name"=>"random"),
+            layout=Dict("name"=>"preset"),
             minZoom=0.1,
             maxZoom=2.0,
         ),
@@ -154,9 +154,9 @@ chords_track(data::Vector{Dict{String,Any}}) = [Dict(
         "opacity"=>0.9,
         "color"=>"black",
         "tooltipContent"=>Dict(
-            "source"=>"RNA1",
-            "target"=>"RNA2",
-            "targetEnd"=>"nbints"
+        #    "source"=>"RNA1",
+        #    "target"=>"RNA2",
+        #    "targetEnd"=>"nbints"
         )
     )
 )]
@@ -185,7 +185,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
                 )
             ),
             layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
-            selectEvent=Dict("2"=> "both"),
+            selectEvent=Dict("0"=> "hover"),
             tracks=chords_track(Dict{String,Any}[])
         )
     ]
@@ -212,8 +212,16 @@ table_layout() = html_div(
             ]
         ),
         html_div([
-            html_button("DOWNLOAD CSV", id="btn_csv"),
-            dcc_download(id="download-dataframe-csv"),
+            html_div([
+                html_button("DOWNLOAD CSV", id="btn-csv"),
+                dcc_download(id="download-dataframe-csv"),
+            ]),
+            dcc_radioitems(
+                id="radio-options-csv",
+                options=[(label="full", value="full"), (label="selected", value="selected")],
+                style=Dict("align-content"=>"center"),
+                value="selected"
+            )
         ])
     ]
 )
@@ -234,6 +242,7 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
         dcc_tabs(
             id="data-tabs",
             value="graph",
+            persistence=true,
             children=[
                 astab(cytoscape_layout(), "graph"),
                 astab(circos_layout(genome_info), "circos"),

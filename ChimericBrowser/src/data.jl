@@ -29,8 +29,8 @@ function load_data(results_path::String, genome_file::String)
         interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
         interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
-        interact.nodes[:, :x] = rand(nrow(interact.nodes)) .* 100
-        interact.nodes[:, :y] = rand(nrow(interact.nodes)) .* 100
+        interact.nodes[:, :x] = (rand(rng, nrow(interact.nodes)) .- 0.5) .* 1200
+        interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)) .- 0.5) .* 800
         sort!(interact.edges, :nb_ints; rev=true)
     end
     gene_name_type = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
@@ -71,6 +71,8 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "right1"=>row.right1,
             "left2"=>row.left2,
             "right2"=>row.right2,
+            "ref1"=>row.ref1,
+            "ref2"=>row.ref2,
             "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
             "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
@@ -92,18 +94,35 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
-function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=6000)
+function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=5000)
     current_total = sum(df.nb_ints)
     chords_track([Dict{String,Any}(
-        "nbints"=>row.nb_ints,
-        "RNA1"=>row.name1,
-        "RNA2"=>row.name2,
         "source"=>Dict("id"=>row.ref1,
             "start"=>(row.left1 + row.right1)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
             "end"=>(row.left1 + row.right1)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2)),
         "target"=>Dict("id"=>row.ref2,
             "start"=>(row.left2 + row.right2)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
-            "end"=>(row.left2 + row.right2)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2))
+            "end"=>(row.left2 + row.right2)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2)),
+        "data"=>Dict(
+                "id"=>row.name1*row.name2,
+                "source"=>row.name1,
+                "target"=>row.name2,
+                "current_total"=>current_total,
+                "current_ratio"=>round(row.nb_ints/current_total; digits=2),
+                "interactions"=>row.nb_ints,
+                "strand1"=>row.strand1,
+                "strand2"=>row.strand2,
+                "left1"=>row.left1,
+                "right1"=>row.right1,
+                "left2"=>row.left2,
+                "right2"=>row.right2,
+                "ref1"=>row.ref1,
+                "ref2"=>row.ref2,
+                "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
+                "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
+                "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
+                "modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
+        )
     ) for row in eachrow(df)])
 end
 
