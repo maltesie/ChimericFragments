@@ -1,6 +1,6 @@
 module ChimericBrowser
 
-using Dash, DataFrames, Random, CSV, FASTX, JLD2
+using Dash, DataFrames, Random, CSV, FASTX, JLD2, NetworkLayout, LightGraphs, GeometryBasics, Packing
 
 export chimeric_browser
 

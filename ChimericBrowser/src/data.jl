@@ -29,8 +29,8 @@ function load_data(results_path::String, genome_file::String)
         interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
         interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
-        interact.nodes[:, :x] = (rand(rng, nrow(interact.nodes)) .- 0.5) .* 1200
-        interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)) .- 0.5) .* 800
+        interact.nodes[:, :x] = rand(rng, nrow(interact.nodes)) .* 1200
+        interact.nodes[:, :y] = rand(rng, nrow(interact.nodes)) .* 800
         sort!(interact.edges, :nb_ints; rev=true)
     end
     gene_name_type = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
@@ -52,11 +52,41 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     return @view df[filtered_index, :]
 end
 
+function get_positions(g::SimpleGraph; xmax=1100, ymax=5000, mean_distance=100)
+    pos = Vector{Point2}(undef, nv(g))
+    components = sort([component for component in connected_components(g)], by=length, rev=true)
+    packed_rectangles = GuillotinePacker(xmax, ymax)
+    for component in components
+        adj = adjacency_matrix(g[component])
+        pos[component] .= (stress(adj) .* mean_distance)
+        minx = minimum(first(p) for p in pos[component])
+        maxx = maximum(first(p) for p in pos[component])
+        miny = minimum(last(p) for p in pos[component])
+        maxy = maximum(last(p) for p in pos[component])
+        pos[component] .-= Point2(minx-(mean_distance/2), miny-(mean_distance/2))
+        push!(packed_rectangles, Rect2(0, 0, Int(ceil(maxx-minx+mean_distance)), Int(ceil(maxy-miny+mean_distance))))
+    end
+    for (component, rect) in zip(components, packed_rectangles.used_rectangles)
+        pos[component] .+= Point2(rect.origin[1], rect.origin[2])
+    end
+    maxx = maximum(first(p) for p in pos)
+    ((xmax-mean_distance) / maxx) > 1.5 && (pos .*= ((xmax-mean_distance) / maxx))
+    return pos
+end
+function clustered_positions(df::SubDataFrame)
+    names = collect(Set(vcat(df.name1, df.name2)))
+    name_trans = Dict(n=>i for (i,n) in enumerate(names))
+    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(df.name1, df.name2))
+    g = Graph(edges)
+    pos = get_positions(g)
+    return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
+end
 node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
 nb_partner(df::SubDataFrame, node_name::String) = Set(df.name1[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
-function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String)
+function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     total_ints = sum(df.nb_ints)
     srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
+    pos = layout_value == "random" ? gene_name_position : clustered_positions(df)
     edges = [Dict(
         "data"=>Dict(
             "id"=>row.name1*row.name2,
@@ -90,13 +120,13 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "current_total"=>total_ints
         ),
         "classes"=>gene_name_type[n],
-        "position"=>gene_name_position[n]) for n in Set(vcat(df.name1, df.name2))]
+        "position"=>pos[n]) for n in Set(vcat(df.name1, df.name2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
 function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=5000)
     current_total = sum(df.nb_ints)
-    chords_track([Dict{String,Any}(
+    tracks = [chords_track([Dict{String,Any}(
         "source"=>Dict("id"=>row.ref1,
             "start"=>(row.left1 + row.right1)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
             "end"=>(row.left1 + row.right1)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2)),
@@ -123,7 +153,8 @@ function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=5000)
                 "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
                 "modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
         )
-    ) for row in eachrow(df)])
+    ) for row in eachrow(df)])]
+    return tracks
 end
 
 function table_data(df::SubDataFrame)

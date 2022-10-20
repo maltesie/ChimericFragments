@@ -619,26 +619,26 @@ input[type="button"]:hover {
     width:500px;
 }
 
-.colorbar-arrow-mean {
+.mean {
+    border-bottom: 10px solid #7fafdf;
+    margin-top: 10px;
+}
+
+.mode {
+    border-top: 10px solid DarkSalmon;
+    margin-top: -20px;
+}
+
+.empty {
+    border-top: 10px solid transparent !important;
+    border-bottom: 10px solid transparent !important; 
+}
+
+.colorbar-arrow {
     width: 0; 
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     position:relative;
-    border-bottom: 10px solid #7fafdf;
-    margin-top: -38px;
-}
-
-.colorbar-arrow-mode {
-   width: 0; 
-    height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
-    position:relative;
-    border-top: 10px solid DarkSalmon;
-    margin-top: -38px;
-}
-
-.mean {
-    border-bottom: 10px solid #ffebcd;
+    margin-left: -20px;
 }

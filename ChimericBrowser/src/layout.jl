@@ -24,10 +24,10 @@ positioning_control_layout() = html_div(
         html_p("Positioning:"),
         dcc_dropdown(
             id="dropdown-update-layout",
-            value="preset",
+            value="clustered",
             clearable=false,
             options=[
-                Dict("label"=>l, "value"=>v) for (l,v) in ["clustered"=>"cose", "grid"=>"grid", "random"=>"preset"]
+                Dict("label"=>l, "value"=>v) for (l,v) in ["clustered"=>"clustered", "random"=>"random"]
             ]
         ),
     ]
@@ -41,22 +41,22 @@ dataset_and_postioning_layout(datasets::Vector{String}) = html_div(
 reads_selection_layout() = html_div(
     className="controls-block",
     children=[
-        html_div(
-            className="horizontal",
-            style=Dict("padding-top"=>"5px"),
-            children=[
-                html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-            ]
-        ),
-        html_div(
-            className="horizontal",
-            style=Dict("padding-top"=>"5px"),
-            children=[
-                html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-            ]
-        )
+        html_div(className="horizontal", children=[
+            html_div(
+                style=Dict("padding-top"=>"5px"),
+                children=[
+                    html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                    dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                ]
+            ),
+            html_div(
+                style=Dict("padding-top"=>"5px", "margin-left"=>"15px"),
+                children=[
+                    html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                    dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                ]
+            )
+        ])
     ]
 )
 
@@ -129,12 +129,13 @@ cytoscape_layout() = html_div(
         cytoscape(
             id="graph",
             elements=[],
-            autoRefreshLayout=true,
+            autoRefreshLayout=false,
             stylesheet=stylesheet,
             responsive=true,
-            layout=Dict("name"=>"preset"),
-            minZoom=0.1,
-            maxZoom=2.0,
+            layout=Dict("name"=>"preset", "animate"=>false),
+            minZoom=0.2,
+            maxZoom=0.9,
+            zoom=0.9
         ),
         html_div(
             children=[
@@ -147,7 +148,7 @@ cytoscape_layout() = html_div(
     ]
 )
 
-chords_track(data::Vector{Dict{String,Any}}) = [Dict(
+chords_track(data::Vector{Dict{String,Any}}) = Dict(
     "type"=>"CHORDS",
     "data"=>data,
     "config"=>Dict(
@@ -159,7 +160,7 @@ chords_track(data::Vector{Dict{String,Any}}) = [Dict(
         #    "targetEnd"=>"nbints"
         )
     )
-)]
+)
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     id="circos-container",
     className="container",
@@ -186,7 +187,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             ),
             layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
             selectEvent=Dict("0"=> "hover"),
-            tracks=chords_track(Dict{String,Any}[])
+            tracks=[chords_track(Dict{String,Any}[])]
         )
     ]
 )

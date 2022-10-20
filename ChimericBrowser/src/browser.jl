@@ -10,6 +10,8 @@ function chimeric_browser(results_folder::String, genome_file::String, srna_type
     update_selected_element_callback!(app)
     click_cyto_button_callback!(app)
     click_table_button_callback!(app, interactions)
+    click_add_node_callback!(app)
+    #update_layout_callback!(app::Dash.DashApp)
 
     run_server(app, "0.0.0.0", debug=true)
 end
