@@ -231,7 +231,7 @@ function Alignments(bam_file::String; include_secondary_alignments=true, include
     pindex = partsindex(ranges, nindex, rls, rds)
     return Alignments(chromosome_list, ns, ls, rs, rls, rrs, rds, nms, is, ss,
                         Vector{String}(undef,length(ns)), Vector{String}(undef,length(ns)), zeros(UInt8,length(ns)),
-                        fill(0xff,length(ns)), fill(0xff,length(ns)), pindex, ranges)
+                        fill(0xff,length(ns)), fill(0xff,length(ns)), pindex, zeros(Bool, length(ns)), ranges)
 end
 
 Base.length(alns::Alignments) = length(alns.tempnames)
@@ -276,8 +276,8 @@ function AlignedPart(alns::Alignments, i::Int)
     AlignedPart(
         Interval(alns.refnames[i_p], alns.leftpos[i_p], alns.rightpos[i_p], alns.strands[i_p],
             AlignmentAnnotation(
-                isassigned(alns.antypes, i_p) ? alns.antypes[i_p] : "",
-                isassigned(alns.annames, i_p) ? alns.annames[i_p] : "",
+                alns.annotated[i_p] ? alns.antypes[i_p] : "",
+                alns.annotated[i_p] ? alns.annames[i_p] : "",
                 alns.anols[i_p]
             )
         ),
@@ -304,7 +304,7 @@ AlignedPart(
 Base.getindex(alns::Alignments, i::Int) = AlignedRead(alns.ranges[i], alns)
 Base.getindex(alns::Alignments, r::UnitRange{Int}) = Alignments(alns.chroms, alns.tempnames, alns.leftpos, alns.rightpos, alns.read_leftpos, alns.read_rightpos,
                                                                 alns.reads, alns.nms, alns.refnames, alns.strands, alns.annames, alns.antypes,
-                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.pindex, alns.ranges[r])
+                                                                alns.anols, alns.anleftrel, alns.anrightrel, alns.pindex, alns.annotated, alns.ranges[r])
 
 """
     Constructor for the AlignedPart struct. Builds AlignedPart from a XA string, which is created by bwa-mem2
@@ -568,12 +568,13 @@ Base.length(alnread::AlignedRead) = length(alnread.range)
 
 readid(alnread::AlignedRead) = alnread.alns.tempnames[alnread.alns.pindex[first(alnread.range)]]
 parts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range]
-typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
-hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.antypes, i))
-namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
-hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.alns.pindex[alnread.range] if isassigned(alnread.alns.annames, i))
-hasannotation(alnread::AlignedRead) = any(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
-annotatedcount(alnread::AlignedRead) = sum(isassigned(alnread.alns.annames, i) && isassigned(alnread.alns.antypes, i) for i in alnread.alns.pindex[alnread.range])
+annotatedparts(alnread::AlignedRead) = [AlignedPart(alnread.alns, i) for i in alnread.range if alnread.alns.annotated[alnread.alns.pindex[i]]]
+typein(alnread::AlignedRead, types::Vector{String}) = any(alnread.alns.antypes[i] in types for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hastype(alnread::AlignedRead, t::String) = any(alnread.alns.antypes[i] === t for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+namein(alnread::AlignedRead, names::Vector{String}) = any(alnread.alns.annames[i] in names for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hasname(alnread::AlignedRead, n::String) = any(alnread.alns.annames[i] === n for i::Int in alnread.alns.pindex[alnread.range] if alnread.alns.annotated[i])
+hasannotation(alnread::AlignedRead) = any(alnread.alns.annotated[i] for i in alnread.alns.pindex[alnread.range])
+annotatedcount(alnread::AlignedRead) = sum(alnread.alns.annotated[i] for i in alnread.alns.pindex[alnread.range])
 annotationcount(alnread::AlignedRead) = length(Set(name(part) for part in alnread))
 
 function BioGenerics.leftposition(alnread::AlignedRead)
@@ -585,6 +586,13 @@ function BioGenerics.rightposition(alnread::AlignedRead)
     check_refname = alnread.alns.refnames[alnread.alns.pindex[first(alnread.range)]]
     all(v .== check_refname for v in view(alnread.alns.refnames, alnread.alns.pindex[alnread.range])) || throw(AssertionError("AlignmentParts are not on the same reference sequence."))
     maximum(view(alnread.alns.rightpos, alnread.alns.pindex[alnread.range]))
+end
+
+function GenomicFeatures.strand(alnread::AlignedRead)
+    length(alnread) > 0 || (return STRAND_NA)
+    #println(view(alnread.alns.strands, alnread.range), "\n",alnread.alns.strands[first(alnread.range)])
+    check_strand = alnread.alns.strands[alnread.alns.pindex[first(alnread.range)]]
+    return all(s === check_strand for s in view(alnread.alns.strands, alnread.alns.pindex[alnread.range])) ? check_strand : STRAND_BOTH
 end
 
 function ispositivestrand(alnread::AlignedRead)
@@ -621,48 +629,44 @@ function overlapdistance(i1::Interval{T}, i2::Interval{I})::Float64 where {T,I}
     )
 end
 
+function distance(l1::Int, r1::Int, l2::Int, r2::Int; check_order=false)::Float64
+    check_order && l1 > l2 && return Inf
+    l2>r1 && return l2-r1+1
+    l1>r2 && return l1-r2+1
+    return 0
+end
+
 """
     distance(i1::Interval, i2::Interval)::Float64
 
 Returns the distance between two AlignedParts on the reference sequence. Returns Inf if the alignments do not share
 the same reference id or lie on different strands
 """
-distance(i1::Interval, i2::Interval)::Float64 = -min(-0.0, overlapdistance(i1,i2))
-
-function distance(l1::Int, r1::Int, l2::Int, r2::Int)::Int
-    l2>r1 && (return l2-r1)
-    l1>r2 && (return l1-r2)
-    return 0
+function distance(i1::Interval, i2::Interval; check_order=false)::Float64
+    d::Float64 = distance(leftposition(i1), rightposition(i1), leftposition(i2), rightposition(i2))
+    return check_order && d>0 && first(i1) > first(i2) ? Inf : d
 end
 
-function countchimeric(alnread::AlignedRead; min_distance=1000, check_annotation=true)
-    length(alnread) > 1 || (return 0)
+function nchimeric(alnread::AlignedRead; min_distance=1000, check_annotation=true, check_order=false)
+    length(alnread) > 1 || return 0
     c = 0
-    for (i1, i2) in combinations(alnread.alns.pindex[alnread.range], 2)
-        (check_annotation && isassigned(alnread.alns.annames, i1) &&  isassigned(alnread.alns.annames, i2) &&
-            (alnread.alns.annames[i1] === alnread.alns.annames[i2])) && continue
-        ((alnread.alns.refnames[i1] === alnread.alns.refnames[i2]) && (alnread.alns.strands[i1] === alnread.alns.strands[i2]) &&
-            distance(alnread.alns.leftpos[i1], alnread.alns.rightpos[i1], alnread.alns.leftpos[i2], alnread.alns.rightpos[i2]) < min_distance) && continue
-        c += 1
+    for (p1, p2) in combinations(parts(alnread), 2)
+        c += ischimeric(p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order)
     end
     return c
 end
 
-function ischimeric(alnread::AlignedRead; min_distance=1000, check_annotation=true)
-    length(alnread) > 1 || (return false)
-    for (i1, i2) in combinations(alnread.alns.pindex[alnread.range], 2)
-        (check_annotation && isassigned(alnread.alns.annames, i1) &&  isassigned(alnread.alns.annames, i2) &&
-            (alnread.alns.annames[i1] === alnread.alns.annames[i2])) && continue
-        ((alnread.alns.refnames[i1] === alnread.alns.refnames[i2]) && (alnread.alns.strands[i1] === alnread.alns.strands[i2]) &&
-            distance(alnread.alns.leftpos[i1], alnread.alns.rightpos[i1], alnread.alns.leftpos[i2], alnread.alns.rightpos[i2]) < min_distance) && continue
-        return true
+function ischimeric(alnread::AlignedRead; min_distance=1000, check_annotation=true, check_order=false)
+    length(alnread) > 1 || return false
+    for (p1, p2) in combinations(parts(alnread), 2)
+        ischimeric(p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order) && return true
     end
     return false
 end
 
-function ischimeric(part1::AlignedPart, part2::AlignedPart; min_distance=1000, check_annotation=true)
+function ischimeric(part1::AlignedPart, part2::AlignedPart; min_distance=1000, check_annotation=true, check_order=false)
     check_annotation && hasannotation(part1) && hasannotation(part2) && (name(part1) == name(part2)) && (return false)
-    return distance(refinterval(part1), refinterval(part2)) > min_distance
+    return distance(refinterval(part1), refinterval(part2); check_order=check_order) > min_distance
 end
 
 function ismulti(alnread::AlignedRead; method=:distance)
@@ -688,10 +692,11 @@ function Base.empty!(alns::Alignments)
     empty!(alns.anleftrel)
     empty!(alns.anrightrel)
     empty!(alns.pindex)
+    empty!(alns.annotated)
     empty!(alns.reads)
 end
 
-annotatedcount(alns::Alignments) = sum(isassigned(alns.annames, i) && isassigned(alns.antypes, i) for i in 1:length(alns))
+annotatedcount(alns::Alignments) = sum(alns.annotated)
 
 function occurences(test_sequence::LongSequence, bam_file::String, similarity_cut::Float64; score_model=nothing, ignore_mapped=true)
     record = BAM.Record()
@@ -723,7 +728,7 @@ function annotate!(alns::Alignments, features::Features{Annotation}; prioritize_
                                 (alns.rightpos[i] - alns.leftpos[i] + 1) * 100)
 
             priority = !isnothing(prioritize_type) && (type(feature_interval) === prioritize_type) && (olp > min_prioritize_overlap)
-            overwrite = !isnothing(overwrite_type) && isassigned(alns.antypes, i) && (alns.antypes[i] === overwrite_type)
+            overwrite = !isnothing(overwrite_type) && alns.annotated[i] && (alns.antypes[i] === overwrite_type)
 
             if  priority || overwrite || alns.anols[i]<olp
                 alns.antypes[i] = type(feature_interval)
@@ -735,6 +740,7 @@ function annotate!(alns::Alignments, features::Features{Annotation}; prioritize_
                     round(UInt8, (alns.rightpos[i] - leftposition(feature_interval) + 1) / feature_length * 100) : 0x65
                 strand(feature_interval) === STRAND_NEG && ((alns.anleftrel[i], alns.anrightrel[i]) = (0x65 - alns.anrightrel[i], 0x65 - alns.anleftrel[i]))
                 alns.anols[i] = olp
+                alns.annotated[i] = true
                 priority && break
             end
         end

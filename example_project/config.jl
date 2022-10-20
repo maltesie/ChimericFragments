@@ -20,13 +20,16 @@ samplename_condition = [
     ("hfq_lcd_1", "hfq_lcd"),
     ("hfq_lcd_2", "hfq_lcd"),
     ("hfq_hcd_1", "hfq_hcd"),
-    ("hfq_hcd_2", "hfq_hcd"),
+    ("hfq_hcd_2", "hfq_hcd")
 ]
 
 #Chimeric fragments parameter
 
 min_distance=1000
 is_reverse_complement=true
+allow_self_chimeras=false
+max_ligation_distance=5
+position_distribution_bins = 50
 
 #Annotation parameter
 

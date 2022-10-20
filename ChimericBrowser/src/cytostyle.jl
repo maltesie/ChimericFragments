@@ -10,10 +10,10 @@ const core_style = Dict(
 const base_node_style = Dict(
     "selector"=> "node",
     "style"=> Dict(
-        "width"=> "mapData(current_ratio, 0, 0.7, 55, 150)",
-        "height"=> "mapData(current_ratio, 0, 0.7, 55, 150)",
+        "width"=> "mapData(current_ratio, 0, 0.7, 55, 100)",
+        "height"=> "mapData(current_ratio, 0, 0.7, 55, 100)",
         "content"=> "data(label)",
-        "font-size"=> "mapData(current_ratio, 0, 0.7, 12px, 32px)",
+        "font-size"=> "mapData(current_ratio, 0, 0.7, 12px, 24px)",
         "text-valign"=> "center",
         "text-halign"=> "center",
         "background-color"=> "#555",
@@ -62,14 +62,6 @@ const utr5_node_style = Dict(
 
 const utr3_node_style = Dict(
     "selector"=> ".3UTR",
-    "style"=> Dict(
-        "background-color"=> "BurlyWood",
-        "font-weight"=>"bold"
-    )
-)
-
-const combined_node_style = Dict(
-    "selector"=> ".UTRS_CDS",
     "style"=> Dict(
         "background-color"=> "BurlyWood",
         "font-weight"=>"bold"

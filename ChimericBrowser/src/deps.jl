@@ -21,8 +21,8 @@ function __init__()
             version = "0.3.0",
             [
                 DashBase.Resource(
-                    relative_package_path = "dash_cytoscape.min.js",
-                    external_url = "https://unpkg.com/dash-cytoscape@0.3.0/dash_cytoscape/dash_cytoscape.min.js",
+                    relative_package_path = "dash_cytoscape_extra.min.js",
+                    external_url = "https://unpkg.com/dash-cytoscape@0.3.0/dash_cytoscape/dash_cytoscape_extra.min.js",
                     dynamic = nothing,
                     async = nothing,
                     type = :js
