@@ -1,7 +1,7 @@
 # Chimeric fragments analysis tool
 
-This is a configurable script for demultiplexing, mapping and analyzing sequencing data from RNA-Seq 
-experiments that produce chimeric reads. This document serves as an installation guide and manual.
+This is a tool for mapping and analyzing sequencing data from RNA-Seq experiments that produce 
+chimeric reads. It also provides a visualization of the results.
 
 ## Dependencies
 
@@ -39,7 +39,7 @@ OR EXCHANGE true AND false.
 All relevant analysis parameter and the dependencies can be set in the config.jl file. Some 
 parameters have to be set, others are optional and affect the analysis outcome.
 
-#### Necessary parameter:
+#### Necessary parameters:
 
 If bwa-mem2 and samtools are installed systemwide, the options bwa\_mem2\_bin and samtools\_bin can be
 left unchanged, otherwise they should point to the executables of bwa-mem2 and samtools.
@@ -55,14 +55,14 @@ corresponding barcode to a sample name and its condition. For every sample, one 
 set, providing a sample name, the condition and the antibarcode, each in quotes ("") and separated by 
 comma as in the default config.jl.
 
-#### Chimeric fragments parameter:
+#### Chimeric fragments parameters:
 
 Here, the way how alignments are processed and chimeric fragments are classified, can be set.
 min\_distance defines the minimum distance between two aligned fragments on the same strand from to
 be classified as chimeric. is\_reverse\_complement has to be set, if the reads come from complementary
 DNA as in the RIL-Seq experiment.
 
-#### Annotation parameter:
+#### Annotation parameters:
 
 The RILSeq analysis requires a complete annotation of the genome, i.e. all regions without an
 annotation are ignored. The analysis can automatically generate a complete annotation, or expects
@@ -70,21 +70,27 @@ the annotation to be supplied by the annotation\_file. This can be set using the
 option in the config.jl file. If set to false, the types of the supplied UTRs and IGRs have to be
 the same as defined by the options fiveutr\_type, threeutr\_type and igr\_type.
 
-#### Fisher Exact Test parameter:
+#### Fisher Exact Test parameters:
 
 include\_read\_identity defines, if the test should take the order of the chimeric pair's placement
 on the read(s) into account and include\_singles the addition of single transcripts of each partner.
 max\_fdr sets the maximum false discovery rate and min\_reads defines a cut off for the output into
 the final tables.
 
-### run chimeric_fragments.jl
+#### Visualization parameters:
 
-The script can be executed by passing it to the julia executable. In a terminal, run
+The visualization of the results is implemented as a Dash web application. It 
+### run analyze.jl and visualize.jl
 
->julia path/to/chimeric_fragments.jl path/to/project_folder
+The scripts can be executed by passing them to the julia executable. In a terminal, run
+
+>julia path/to/analyze.jl path/to/project_folder/config.jl
 
 To rerun the analysis (e.g. with a different set of parameters), remove the results folder from
-the project folder and rerun the above command. 
+the project folder and rerun the above command. After a successful run of the analysis, the
+visualization can be started by running
+
+>julia path/to/visualize.jl path/to/project_folder/config.jl
 
 ## Analysis results
 
@@ -93,11 +99,15 @@ extracted reads (fastq.gz) and alignments (.bam, .bam.bai) are saved. Also align
 generated (.bam.log). In the results folder, several subfolder are generated and all relevant 
 results are combined in two tables with filenames interactions.xlsx and singles.xlsx
 
+## Analysis visualization
+
+Chimeric
+
 ## Example analysis data
 
 To run the analysis on the supplied example data, open a terminal in this folder and run
 
->julia chimeric_fragments.jl example_data
+>julia chimeric_analysis.jl example_data/config.jl
 
 The example analysis will take a minute and the resulting tables will be located in the folder 
 example_data/results. Since this toy data only contains a few thousand reads, the tables should 
