@@ -15,4 +15,4 @@ isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find
 
 using ChimericBrowser
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), srna_type)
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), srna_type, address, port)

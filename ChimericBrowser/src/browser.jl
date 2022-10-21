@@ -1,4 +1,4 @@
-function chimeric_browser(results_folder::String, genome_file::String, srna_type::String)
+function chimeric_browser(results_folder::String, genome_file::String, srna_type::String, address::String, port::Int)
 
     interactions, gene_names_types, gene_name_position, genome_info = load_data(results_folder, genome_file)
 
@@ -11,7 +11,6 @@ function chimeric_browser(results_folder::String, genome_file::String, srna_type
     click_cyto_button_callback!(app)
     click_table_button_callback!(app, interactions)
     click_add_node_callback!(app)
-    #update_layout_callback!(app::Dash.DashApp)
 
-    run_server(app, "0.0.0.0", debug=true)
+    run_server(app, address, port, debug=false)
 end

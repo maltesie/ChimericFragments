@@ -18,18 +18,22 @@ https://github.com/bwa-mem2/bwa-mem2/releases
 https://github.com/samtools/samtools/releases
 
 The default parameters of this script expect samtools and bwa-mem2 installed on the system or set
-in the $PATH variable. When running the script for the first time, a number of Julia packages are 
-installed and precompiled. This procedure might take a few minutes, all further executions will
-directly start the analysis.
+in the $PATH variable. ChimericFragments depends on a number of Julia packages that have to be 
+installed and precompiled. To do this, run
+
+>julia install.jl
+
+The installation process could take up to a few minutes.
 
 ## Analysis procedure
 
 The workflow can be split into the following steps:
 
 1. create a project folder
-2. add 2 paired end sequencing files, an annotation file and a genome sequence file
-3. add default config.jl and edit as necessary
-4. run the chimeric_fragments.jl script and pass the project folder as an argument
+2. add sequencing files, an annotation file and a genome sequence file
+3. copy default config.jl to the folder and edit as necessary
+4. run analyze.jl to analyze your experiment
+5. run visualize.jl to visualize the results
 
 ### edit config.jl
 
@@ -79,7 +83,11 @@ the final tables.
 
 #### Visualization parameters:
 
-The visualization of the results is implemented as a Dash web application. It 
+The visualization of the results is implemented as a Dash web application. When it runs, it can be
+accessed from within your internet browser, or any internet browser within your local network. The
+parameter address and port define where the server runs. The default values will make it possible
+to reach the application by visiting http://localhost:8050 in your browser.
+
 ### run analyze.jl and visualize.jl
 
 The scripts can be executed by passing them to the julia executable. In a terminal, run
@@ -99,15 +107,11 @@ extracted reads (fastq.gz) and alignments (.bam, .bam.bai) are saved. Also align
 generated (.bam.log). In the results folder, several subfolder are generated and all relevant 
 results are combined in two tables with filenames interactions.xlsx and singles.xlsx
 
-## Analysis visualization
-
-Chimeric
-
 ## Example analysis data
 
 To run the analysis on the supplied example data, open a terminal in this folder and run
 
->julia chimeric_analysis.jl example_data/config.jl
+>julia analyze.jl example_data/config.jl
 
 The example analysis will take a minute and the resulting tables will be located in the folder 
 example_data/results. Since this toy data only contains a few thousand reads, the tables should 

@@ -54,3 +54,8 @@ include_read_identity=true
 include_singles=true
 max_fdr=0.05
 min_reads=1
+
+#Visualization parameters
+
+address="0.0.0.0"
+port=8050

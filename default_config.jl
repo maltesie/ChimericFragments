@@ -1,4 +1,4 @@
-#Necessary parameter
+#Necessary parameters
 
 bwa_mem2_bin = "bwa-mem2"
 samtools_bin = "samtools"
@@ -24,7 +24,7 @@ samplename_condition = [
     ("conditionC_rep3", "conditionC"),
 ]
 
-#Chimeric fragments parameter
+#Chimeric fragments parameters
 
 min_distance=1000
 is_reverse_complement=true
@@ -32,7 +32,7 @@ allow_self_chimeras=false
 max_ligation_distance=5
 position_distribution_bins = 50
 
-#Annotation parameter
+#Annotation parameters
 
 srna_type="sRNA"
 prioritize_srna=true
@@ -49,9 +49,14 @@ threeutr_type="3UTR"
 autocomplete_igrs=true
 igr_type="IGR"
 
-#Fisher Exact Test parameter
+#Fisher Exact Test parameters
 
 include_read_identity=true
 include_singles=true
 max_fdr=0.05
 min_reads=1
+
+#Visualization parameters
+
+address="0.0.0.0"
+port=8050
