@@ -121,12 +121,12 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
 
         for (i1,_) in mergedread.pindexpairs
             h = myhash(alignments, i1)
+            is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
             h in keys(trans) && continue
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
                 push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, 0, alignments.strands[i1], h))
             end
-            is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
         end
 
         for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
