@@ -19,10 +19,7 @@ isfile(genome_file) || throw(AssertionError("Cannot find $genome_file. Please ed
 isdir(data_folder) || (data_folder = joinpath(project_path, data_folder))
 isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data_folder. Please edit config.jl."))
 
-Pkg.activate(joinpath(@__DIR__, "ChimericAnalysis"))
-Pkg.instantiate()
-
-using ChimericAnalysis, BioSequences
+using ChimericAnalysis
 
 fastqs = is_paired_end ? PairedSingleTypeFiles([(joinpath(data_folder, sname*suffix_read1*".fastq.gz"), joinpath(data_folder, sname*suffix_read2*".fastq.gz"))
                                                 for (sname, _) in samplename_condition]) :
