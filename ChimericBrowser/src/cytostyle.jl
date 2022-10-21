@@ -36,38 +36,6 @@ const selected_node_style = Dict(
     )
 )
 
-const srna_node_style = Dict(
-    "selector"=> ".sRNA",
-    "style"=> Dict(
-        "background-color"=> "CadetBlue",
-        "font-weight"=>"bold"
-    )
-)
-
-const cds_node_style = Dict(
-    "selector"=> ".CDS",
-    "style"=> Dict(
-        "background-color"=> "BurlyWood",
-        "font-weight"=>"bold"
-    )
-)
-
-const utr5_node_style = Dict(
-    "selector"=> ".5UTR",
-    "style"=> Dict(
-        "background-color"=> "BurlyWood",
-        "font-weight"=>"bold"
-    )
-)
-
-const utr3_node_style = Dict(
-    "selector"=> ".3UTR",
-    "style"=> Dict(
-        "background-color"=> "BurlyWood",
-        "font-weight"=>"bold"
-    )
-)
-
 const base_edge_style = Dict(
     "selector"=> "edge",
     "style"=> Dict(
@@ -96,5 +64,35 @@ const srna_edge_style = Dict(
     )
 )
 
-const stylesheet = [core_style, base_node_style, selected_node_style, srna_node_style, cds_node_style, utr5_node_style, utr3_node_style,
+function stylesheet(types::Dict{String,String})
+    srna_node_style = Dict(
+        "selector"=> ".$(types["srna"])",
+        "style"=> Dict(
+            "background-color"=> "CadetBlue",
+            "font-weight"=>"bold"
+        )
+    )
+    cds_node_style = Dict(
+        "selector"=> ".$(types["cds"])",
+        "style"=> Dict(
+            "background-color"=> "BurlyWood",
+            "font-weight"=>"bold"
+        )
+    )
+    utr5_node_style = Dict(
+        "selector"=> ".$(types["5utr"])",
+        "style"=> Dict(
+            "background-color"=> "BurlyWood",
+            "font-weight"=>"bold"
+        )
+    )
+    utr3_node_style = Dict(
+        "selector"=> ".$(types["3utr"])",
+        "style"=> Dict(
+            "background-color"=> "BurlyWood",
+            "font-weight"=>"bold"
+        )
+    )
+    return [core_style, base_node_style, selected_node_style, srna_node_style, cds_node_style, utr5_node_style, utr3_node_style,
     base_edge_style, selected_edge_style, srna_edge_style]
+end

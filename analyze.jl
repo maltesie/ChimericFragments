@@ -29,21 +29,21 @@ check_files_exist(fastqs)
 genome = Genome(genome_file)
 
 types = vcat([srna_type, cds_type, rrna_type, trna_type], additional_types)
-features = Features(annotation_file, types)
+features = Features(annotation_file, types; name_keys=name_keys)
 if autocomplete_utrs
     add5utrs!(features; cds_type=cds_type, utr_type=fiveutr_type, utr_length=autocomplete_utr_length)
     add3utrs!(features; cds_type=cds_type, utr_type=threeutr_type, utr_length=autocomplete_utr_length)
 else
-    merge!(features, Features(annotation_file, [threeutr_type, fiveutr_type]))
+    merge!(features, Features(annotation_file, [threeutr_type, fiveutr_type]; name_keys=name_keys))
 end
 
 if autocomplete_igrs
     addigrs!(features; igr_type=igr_type)
 else
-    merge!(features, Features(annotation_file, [igr_type]))
+    merge!(features, Features(annotation_file, [igr_type]; name_keys=name_keys))
 end
 
-features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], "CDS")
+merge_utrs_and_cds && (features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], cds_type))
 
 bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin)
 

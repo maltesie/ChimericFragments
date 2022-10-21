@@ -46,8 +46,10 @@ autocomplete_utrs=true
 autocomplete_utr_length=200
 fiveutr_type="5UTR"
 threeutr_type="3UTR"
+merge_utrs_and_cds=true
 autocomplete_igrs=true
 igr_type="IGR"
+name_keys=["Name", "ID"]
 
 #Fisher Exact Test parameters
 

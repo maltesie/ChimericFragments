@@ -122,7 +122,7 @@ control_column_layout(datasets::Vector{String}) = html_div(
     ]
 )
 
-cytoscape_layout() = html_div(
+cytoscape_layout(stylesheet::Vector{Dict{String,Any}}) = html_div(
     id="graph-container",
     className="container",
     children=[
@@ -236,7 +236,7 @@ astab(div_component::Component, tab_id::String) = dcc_tab(
     children=[div_component]
 )
 
-tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
+tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}}) = html_div(
     id="tabs-container",
     className="container",
     children=[
@@ -245,7 +245,7 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             value="graph",
             persistence=true,
             children=[
-                astab(cytoscape_layout(), "graph"),
+                astab(cytoscape_layout(stylesheet), "graph"),
                 astab(circos_layout(genome_info), "circos"),
                 astab(table_layout(), "table"),
             ]
@@ -253,13 +253,13 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     ]
 )
 
-browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}) = html_div(
+browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}}) = html_div(
     id="root",
     children=[html_div(
         id="app-container",
         children=[
             control_column_layout(datasets),
-            tabs_layout(genome_info)
+            tabs_layout(genome_info, stylesheet)
         ]
     )]
 )

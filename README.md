@@ -30,10 +30,9 @@ The installation process could take up to a few minutes.
 The workflow can be split into the following steps:
 
 1. create a project folder
-2. add sequencing files, an annotation file and a genome sequence file
 3. copy default config.jl to the folder and edit as necessary
-4. run analyze.jl to analyze your experiment
-5. run visualize.jl to visualize the results
+4. run analyze.jl on the config file to analyze your experiment
+5. run visualize.jl ont the config file to visualize the results
 
 ### edit config.jl
 
