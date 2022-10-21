@@ -16,7 +16,7 @@ function load_data(results_path::String, genome_file::String)
     genome_info = Pair{String,Int}[]
     FASTA.Reader(open(genome_file)) do reader
         for record in reader
-            push!(genome_info, FASTX.identifier(record)=>FASTA.seqsize(record))
+            push!(genome_info, identifier(record)=>length(sequence(record)))
         end
     end
     for interact in values(interactions)
@@ -29,8 +29,8 @@ function load_data(results_path::String, genome_file::String)
         interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
         interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
-        interact.nodes[:, :x] = rand(rng, nrow(interact.nodes)) .* 1200
-        interact.nodes[:, :y] = rand(rng, nrow(interact.nodes)) .* 800
+        interact.nodes[:, :x] = (rand(rng, nrow(interact.nodes)).+0.5) .* 1200
+        interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)).+0.5) .* 800
         sort!(interact.edges, :nb_ints; rev=true)
     end
     gene_name_type = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
