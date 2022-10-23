@@ -8,9 +8,12 @@ genome_file = "genome.fa"
 data_folder = "data"
 
 is_paired_end = true
+is_single_file_paired_end = false
 
 suffix_read1 = "_1"
 suffix_read2 = "_2"
+
+file_type = ".fastq.gz"
 
 samplename_condition = [
     ("wt_lcd_1", "wt_lcd"),

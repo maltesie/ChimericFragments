@@ -21,9 +21,9 @@ isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data
 
 using ChimericAnalysis
 
-fastqs = is_paired_end ? PairedSingleTypeFiles([(joinpath(data_folder, sname*suffix_read1*".fastq.gz"), joinpath(data_folder, sname*suffix_read2*".fastq.gz"))
-                                                for (sname, _) in samplename_condition]) :
-                            SingleTypeFiles([joinpath(data_folder, sname*".fastq.gz") for (sname, _) in samplename_condition])
+fastqs = (is_paired_end & !is_single_file_paired_end) ? 
+    PairedSingleTypeFiles([(joinpath(data_folder, sname*suffix_read1*file_type), joinpath(data_folder, sname*suffix_read2*file_type)) for (sname, _) in samplename_condition]) :
+    SingleTypeFiles([joinpath(data_folder, sname*file_type) for (sname, _) in samplename_condition])
 check_files_exist(fastqs)
 
 genome = Genome(genome_file)
