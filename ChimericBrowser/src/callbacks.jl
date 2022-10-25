@@ -36,7 +36,7 @@ callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_ca
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
-mapvalue(value::Float64; to_min=0, to_max=120) = Int(floor(to_min + value * (to_max-to_min)))
+mapvalue(value::Float64; to_min=0, to_max=110) = Int(floor(to_min + value * (to_max-to_min)))
 function css_gradient_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool)
     arrows = [
         m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className="colorbar-arrow mean", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, isnegative)))%")),

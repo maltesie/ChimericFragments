@@ -52,15 +52,20 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     return @view df[filtered_index, :]
 end
 
-function get_positions(g::SimpleGraph; xmax=1100, ymax=5000, mean_distance=100)
+function get_positions(g::SimpleGraph; xmax=1100, ymax=5000, mean_distance=100, scaling_factor=0.1)
     pos = Vector{Point2}(undef, nv(g))
     components = sort([component for component in connected_components(g)], by=length, rev=true)
     packed_rectangles = GuillotinePacker(xmax, ymax)
     for component in components
         adj = adjacency_matrix(g[component])
-        pos[component] .= (stress(adj) .* mean_distance)
+        pos[component] .= (stress(adj) .* mean_distance * (1.0 + scaling_factor * sqrt(length(component))))
         minx = minimum(first(p) for p in pos[component])
         maxx = maximum(first(p) for p in pos[component])
+        if ((maxx-minx) > (xmax-mean_distance))
+            pos[component] .*= (xmax-mean_distance)/(maxx-minx)
+            minx = minimum(first(p) for p in pos[component])
+            maxx = maximum(first(p) for p in pos[component])
+        end
         miny = minimum(last(p) for p in pos[component])
         maxy = maximum(last(p) for p in pos[component])
         pos[component] .-= Point2(minx-(mean_distance/2), miny-(mean_distance/2))
