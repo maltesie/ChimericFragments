@@ -403,11 +403,15 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 empty!(alignments)
             end
             length(interactions) == 0 && (@warn "No interactions found!"; continue)
-
+            correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
+            correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
+            for (i,repid) in enumerate(interactions.replicate_ids)
+                correlation_df[:, repid] = correlation_matrix[:, i]
+            end
+            @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Computing significance levels..."
             addpvalues!(interactions; method=model, include_singles=include_singles, include_read_identity=include_read_identity)
             addpositions!(interactions, features)
-
             total_reads = sum(interactions.edges[!, :nb_ints])
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             total_ints = nrow(interactions.edges)

@@ -22,4 +22,4 @@ types = Dict(
     "3utr"=>threeutr_type
 )
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, address, port)
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, address, port)

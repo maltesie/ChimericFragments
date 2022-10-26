@@ -21,7 +21,7 @@ isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data
 
 using ChimericAnalysis
 
-fastqs = (is_paired_end & !is_single_file_paired_end) ? 
+fastqs = (is_paired_end & !is_interleaved_paired_end) ?
     PairedSingleTypeFiles([(joinpath(data_folder, sname*suffix_read1*file_type), joinpath(data_folder, sname*suffix_read2*file_type)) for (sname, _) in samplename_condition]) :
     SingleTypeFiles([joinpath(data_folder, sname*file_type) for (sname, _) in samplename_condition])
 check_files_exist(fastqs)
@@ -45,7 +45,7 @@ end
 
 merge_utrs_and_cds && (features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], cds_type))
 
-bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_single_file_paired_end=is_single_file_paired_end)
+bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_single_file_paired_end=is_interleaved_paired_end)
 
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))

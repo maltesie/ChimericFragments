@@ -9,7 +9,7 @@ Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAna
     f["interactions"]
 end
 
-function load_data(results_path::String, genome_file::String)
+function load_data(results_path::String, genome_file::String, min_reads::Int, max_fdr::Float64)
     interactions_path = realpath(joinpath(results_path, "stats"))
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
@@ -20,6 +20,11 @@ function load_data(results_path::String, genome_file::String)
         end
     end
     for interact in values(interactions)
+        filter!(row -> (row.nb_ints >= min_reads) & (row.fdr <= max_fdr), interact.edges)
+        interact.edges[!, :meanlen1] = Int.(round.(interact.edges[!, :meanlen1]))
+        interact.edges[!, :meanlen2] = Int.(round.(interact.edges[!, :meanlen2]))
+        interact.edges[!, :nms1] = round.(interact.edges[!, :nms1], digits=4)
+        interact.edges[!, :nms2] = round.(interact.edges[!, :nms2], digits=4)
         interact.edges[:, :name1] = interact.nodes[interact.edges[!,:src], :name]
         interact.edges[:, :name2] = interact.nodes[interact.edges[!,:dst], :name]
         interact.edges[:, :ref1] = interact.nodes[interact.edges[!,:src], :ref]

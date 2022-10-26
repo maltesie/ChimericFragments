@@ -1,14 +1,20 @@
-#Necessary parameters
+#File parameters
 
+# If BWA or samtools are not installed systemwide, please provide full paths to the binaries
 bwa_mem2_bin = "bwa-mem2"
 samtools_bin = "samtools"
 
+# If the annotation file, the genome file and the data folder containing the sample files are
+# not located next to the config file, please provide full paths.
 annotation_file = "annotation.gff"
 genome_file = "genome.fa"
 data_folder = "data"
 
+# BWA can handle single end, paired end (2 files) and interleaved paired end (1 file) sequence
+# files. For paired end and interleaved paired end files, the names of read 1 and read 2 hasoverlap
+# to be identical.
 is_paired_end = true
-is_single_file_paired_end = false
+is_interleaved_paired_end = false
 
 suffix_read1 = "_1"
 suffix_read2 = "_2"
@@ -33,7 +39,7 @@ min_distance=1000
 is_reverse_complement=true
 allow_self_chimeras=false
 max_ligation_distance=5
-position_distribution_bins = 50
+position_distribution_bins=50
 
 #Annotation parameters
 
