@@ -12,5 +12,5 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     click_table_button_callback!(app, interactions)
     click_add_node_callback!(app)
 
-    run_server(app, address, port, debug=false)
+    run_server(app, address, port, debug=true)
 end

@@ -57,7 +57,7 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     return @view df[filtered_index, :]
 end
 
-function get_positions(g::SimpleGraph; xmax=1100, ymax=5000, mean_distance=100, scaling_factor=0.1)
+function get_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_distance=100, scaling_factor=0.1)
     pos = Vector{Point2}(undef, nv(g))
     components = sort([component for component in connected_components(g)], by=length, rev=true)
     packed_rectangles = GuillotinePacker(xmax, ymax)
@@ -79,8 +79,8 @@ function get_positions(g::SimpleGraph; xmax=1100, ymax=5000, mean_distance=100, 
     for (component, rect) in zip(components, packed_rectangles.used_rectangles)
         pos[component] .+= Point2(rect.origin[1], rect.origin[2])
     end
-    maxx = maximum(first(p) for p in pos)
-    ((xmax-mean_distance) / maxx) > 1.5 && (pos .*= ((xmax-mean_distance) / maxx))
+    #maxx = maximum(first(p) for p in pos)
+    #((xmax-mean_distance) / maxx) > 1.5 && (pos .*= ((xmax-mean_distance) / maxx))
     return pos
 end
 function clustered_positions(df::SubDataFrame)
@@ -95,6 +95,7 @@ node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[(df.name1 .=== no
 nb_partner(df::SubDataFrame, node_name::String) = Set(df.name1[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
 function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     total_ints = sum(df.nb_ints)
+    max_ints = maximum(df.nb_ints)
     srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
     pos = layout_value == "random" ? gene_name_position : clustered_positions(df)
     edges = [Dict(
@@ -103,7 +104,7 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "source"=>row.name1,
             "target"=>row.name2,
             "current_total"=>total_ints,
-            "current_ratio"=>round(row.nb_ints/total_ints; digits=2),
+            "current_ratio"=>round(row.nb_ints/max_ints; digits=2),
             "interactions"=>row.nb_ints,
             "strand1"=>row.strand1,
             "strand2"=>row.strand2,

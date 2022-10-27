@@ -36,20 +36,22 @@ callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_ca
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
-mapvalue(value::Float64; to_min=0, to_max=110) = Int(floor(to_min + value * (to_max-to_min)))
-function css_gradient_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool)
+mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
+function css_gradient_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
     arrows = [
-        m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className="colorbar-arrow mean", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, isnegative)))%")),
-        m2==0 ? html_div(className="colorbar-arrow mode empty") : html_div(className="colorbar-arrow mode", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, isnegative)))%"))
+        m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow interaction-left" : "colorbar-arrow interaction-right",
+                                            style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
+        m2==0 ? html_div(className="colorbar-arrow mode empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow ligation-left" : "colorbar-arrow ligation-right",
+                                            style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
     ]
     return html_div(children=[
         #html_p("$m1, $(mapvalue(normalize(m1, left, right, isnegative))), $m2, $(mapvalue(normalize(m2, left, right, isnegative)))"),
-        html_p(m2 == 0 ? "no ligation data." : "ligation points mode: $m2", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"-3px", "color"=>"DarkSalmon")),
+        html_p(m2 == 0 ? "no ligation data." : "ligation points mode: $m2", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"12px", "color"=>"DarkSalmon")),
         html_div(className="horizontal deflate", children=[
-            html_p(["5'", html_br(), isnegative ? "$right" : "$left"], className="cb-left"),
-            html_div(id="colorbar-edges", className="controls-block horizontal", children=arrows),
-            html_p(["3'", html_br(), isnegative ? "$left" : "$right"], className="cb-right")
-        ], style=Dict("margin-top"=>"10px")),
+            html_p(["$left"], className="cb-left"),
+            html_div(id=isnegative ? "pointer-left" : "pointer-right", children=arrows),#className="controls-block horizontal", children=arrows),
+            html_p(["$right"], className="cb-right")
+        ]),
         html_p(m1 == 0 ? "no interaction data." : "interaction points mode: $m1", style=Dict("margin-top"=>"3px", "border-bottom"=>"1px solid #7fafdf"))
     ])
 end
@@ -57,10 +59,12 @@ end
 function edge_info(edge_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"]) ($(edge_data["strand1"]))"),
-        css_gradient_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-"),
+        css_gradient_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
+        #css_gradient_and_means(edge_data["left1"], edge_data["right1"], edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
         html_br(),
         html_p("RNA2: $(edge_data["target"]) on $(edge_data["ref2"]) ($(edge_data["strand2"]))"),
-        css_gradient_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-"),
+        css_gradient_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
+        #css_gradient_and_means(edge_data["left2"], edge_data["right2"], edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         html_br(),
         html_p("interactions: $(edge_data["interactions"])")
     ])]

@@ -584,6 +584,72 @@ input[type="button"]:hover {
     height:0px;
 }
 
+#pointer-right {
+  z-index:1;
+  width: 170px;
+  height: 30px;
+  position: relative;
+  background: grey;
+  opacity: 0.7;
+  margin-right: 15px;
+  margin-left: 15px;
+}
+#pointer-right:after {
+  content: "";
+  position: absolute;
+  left: -15px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-top: 15px solid grey;
+  border-bottom: 15px solid grey;
+}
+#pointer-right:before {
+  content: "";
+  position: absolute;
+  right: -15px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 15px solid grey;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+}
+
+#pointer-left {
+  z-index:1;
+  width: 170px;
+  height: 30px;
+  position: relative;
+  background: grey;
+  opacity: 0.7;
+  margin-left: 15px;
+  margin-right: 15px;
+}
+#pointer-left:after {
+  content: "";
+  position: absolute;
+  left: -15px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-right: 15px solid grey;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+}
+#pointer-left:before {
+  content: "";
+  position: absolute;
+  right: -15px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-right: 15px solid transparent;
+  border-top: 15px solid grey;
+  border-bottom: 15px solid grey;
+}
+
 /*
 .float-right {
     text-align: right;
@@ -597,14 +663,14 @@ input[type="button"]:hover {
 */
 
 .cb-right {
-    padding-top:7px;
+    padding-top:5px;
     padding-left:5px;
     text-align:left;
     
 }
 
 .cb-left {
-    padding-top:7px;
+    padding-top:5px;
     padding-right:5px;
     text-align:right;
 }
@@ -619,14 +685,28 @@ input[type="button"]:hover {
     width:500px;
 }
 
-.mean {
-    border-bottom: 10px solid #7fafdf;
-    margin-top: 10px;
+.interaction-right {
+    border-left: 10px solid #7fafdf;
+    z-index:2;
 }
 
-.mode {
-    border-top: 10px solid DarkSalmon;
-    margin-top: -20px;
+.interaction-left {
+    border-right: 10px solid #7fafdf;
+    margin-left: -10px;
+    z-index:2;
+}
+
+.ligation-right {
+    border-left: 10px solid DarkSalmon;
+    margin-top:-20px !important;
+    z-index:3;
+}
+
+.ligation-left {
+    border-right: 10px solid DarkSalmon;
+    margin-top:-20px !important;
+    margin-left: -10px;
+    z-index:3;
 }
 
 .empty {
@@ -635,10 +715,10 @@ input[type="button"]:hover {
 }
 
 .colorbar-arrow {
+    margin-top: 5px;
     width: 0; 
     height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
     position:relative;
-    margin-left: -20px;
 }

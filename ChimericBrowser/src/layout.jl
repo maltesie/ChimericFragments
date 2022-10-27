@@ -53,7 +53,7 @@ reads_selection_layout() = html_div(
                 style=Dict("padding-top"=>"5px", "margin-left"=>"15px"),
                 children=[
                     html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-interactions", type="number", value=150, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             )
         ])

@@ -43,7 +43,7 @@ const base_edge_style = Dict(
         "opacity"=> "0.4",
         "target-arrow-shape"=> "triangle",
         "line-color"=> "#aaa",
-        "width"=> "mapData(current_ratio, 0, 0.7, 2, 20)",
+        "width"=> "mapData(current_ratio, 0, 1, 2, 12)",
         "z-index"=>"1",
         "overlay-padding"=> "3px"
     )
