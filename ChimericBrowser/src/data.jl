@@ -91,8 +91,10 @@ function clustered_positions(df::SubDataFrame)
     pos = get_positions(g)
     return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
 end
-node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
-nb_partner(df::SubDataFrame, node_name::String) = Set(df.name1[(df.name1 .=== node_name) .| (df.name2 .=== node_name)])
+node_index(df::SubDataFrame, node_name::String) = (df.name1 .=== node_name) .| (df.name2 .=== node_name)
+node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[node_index(df, node_name)])
+count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name1 .=== node_name, column_name]))
+count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
 function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
@@ -128,7 +130,9 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "interactions"=>node_sum(df, n),
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
             "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
-            "current_total"=>total_ints
+            "current_total"=>total_ints,
+            "lig_as_rna1"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna1(df, n, :modelig1), by=x->x[2], rev=true) if !isnan(k)),
+            "lig_as_rna2"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna2(df, n, :modelig2), by=x->x[2], rev=true) if !isnan(k)),
         ),
         "classes"=>gene_name_type[n],
         "position"=>pos[n]) for n in Set(vcat(df.name1, df.name2))]

@@ -129,7 +129,7 @@ cytoscape_layout(stylesheet::Vector{Dict{String,Any}}) = html_div(
         cytoscape(
             id="graph",
             elements=[],
-            autoRefreshLayout=false,
+            autoRefreshLayout=true,
             stylesheet=stylesheet,
             responsive=true,
             layout=Dict("name"=>"preset", "animate"=>false),

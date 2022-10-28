@@ -70,6 +70,27 @@ function edge_info(edge_data::Dash.JSON3.Object)
     ])]
 end
 
+ligation_modes_table(ligation_points::Dash.JSON3.Object) =
+    return html_div([
+        html_tr([
+            html_td("$k:"),
+            html_td("$v"),
+        ]) for (k,v) in sort(collect(ligation_points), by=x->x[2], rev=true)
+    ])
+function node_info(node_data::Dash.JSON3.Object)
+    return [html_div(id="edge-info", children=[
+        html_p("$(node_data["id"]) has $(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
+        html_br(),
+        html_p("Ligation point modes as RNA1:"),
+        ligation_modes_table(node_data["lig_as_rna1"]),
+        html_br(),
+        html_p("Ligation point modes as RNA2:"),
+        ligation_modes_table(node_data["lig_as_rna2"]),
+        html_br(),
+        html_p("interactions: $(node_data["interactions"])")
+    ])]
+end
+
 function circos_description(circos_data::Dash.JSON3.Object)
     data = circos_data["data"]
     html_div([
@@ -105,7 +126,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_node_data = isnothing(node_data) || isempty(node_data)
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information."]
-        no_edge_data && return ["$(node_data[1]["id"]) has $(node_data[1]["nb_partners"]) partner" * (node_data[1]["nb_partners"]>1 ? "s" : "") * " in the current selection."]
+        no_edge_data && return node_info(node_data[1])
         return edge_info(edge_data[1])
     end
 end
