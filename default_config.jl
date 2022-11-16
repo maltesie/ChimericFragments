@@ -4,8 +4,8 @@
 bwa_mem2_bin = "bwa-mem2"
 samtools_bin = "samtools"
 
-# If the annotation file, the genome file and the data folder containing the sample files are
-# not located next to the config file, please provide full paths.
+# If the annotation file, the genome file and the data folder containing the sample files are not
+# located next to the config file, please provide full paths.
 annotation_file = "annotation.gff"
 genome_file = "genome.fa"
 data_folder = "data"
@@ -13,6 +13,9 @@ data_folder = "data"
 # BWA can handle single end, paired end (2 files) and interleaved paired end (1 file) sequence
 # files. For paired end and interleaved paired end files, the names of the first and the second
 # read have to be identical.
+#
+# WARNING: Interleaved sequence files from NCBI have different names for first and second read as
+# of November, 2022 and are not supported by bwa-mem2 right now.
 is_paired_end = true
 is_interleaved_paired_end = false
 
