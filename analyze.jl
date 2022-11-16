@@ -28,7 +28,7 @@ check_files_exist(fastqs)
 
 genome = Genome(genome_file)
 
-types = vcat([srna_type, cds_type, rrna_type, trna_type], additional_types)
+types = vcat([srna_type, cds_type], filter_types, additional_types)
 features = Features(annotation_file, types; name_keys=name_keys)
 if autocomplete_utrs
     add5utrs!(features; cds_type=cds_type, utr_type=fiveutr_type, utr_length=autocomplete_utr_length)
@@ -51,4 +51,4 @@ results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))
 chimeric_analysis(features, bams, results_path, conditions; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
     overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_ligation_distance=max_ligation_distance,
-    include_read_identity=include_read_identity, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
+    include_read_identity=include_orientation, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

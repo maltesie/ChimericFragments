@@ -32,89 +32,44 @@ The workflow can be split into the following steps:
 1. create a project folder
 3. copy default config.jl to the folder and edit as necessary
 4. run analyze.jl on the config file to analyze your experiment
-5. run visualize.jl ont the config file to visualize the results
+5. run visualize.jl on the config file to visualize the results
 
 ### edit config.jl
 
 IT IS IMPORTANT TO KEEP THE STRUCTURE OF config.jl INTACT. PLEASE ONLY EDIT TEXT BETWEEN "", NUMBERS
 OR EXCHANGE true AND false.
 
-All relevant analysis parameter and the dependencies can be set in the config.jl file. Some 
-parameters have to be set, others are optional and affect the analysis outcome.
+All relevant analysis parameters and the paths to the binaries can be set in the config.jl file. Some 
+parameters have to be set, others are optional and affect the analysis outcome. You can find detailed
+descriptions of every parameter in the config file.
 
-#### Necessary parameters:
-
-If bwa-mem2 and samtools are installed systemwide, the options bwa\_mem2\_bin and samtools\_bin can be
-left unchanged, otherwise they should point to the executables of bwa-mem2 and samtools.
-
-read1\_file, read2\_file, annotation\_file, genome\_file have to be set according to the file names
-of the respective file. The files have to be in the project folder next to the config.jl. The
-annotation file has to be in the GFF3 format (.gff, .gff3), the reference genome sequence has to be
-supplied as a fasta compatible file (.fa, .fasta, .fna). The read files can be eather fasta or fastq
-compatible and can be gzipped or not.
-
-samplename\_condition\_antibarcode defines each sample in the RILseq experiment by assigning the
-corresponding barcode to a sample name and its condition. For every sample, one line in () has to be
-set, providing a sample name, the condition and the antibarcode, each in quotes ("") and separated by 
-comma as in the default config.jl.
-
-#### Chimeric fragments parameters:
-
-Here, the way how alignments are processed and chimeric fragments are classified, can be set.
-min\_distance defines the minimum distance between two aligned fragments on the same strand from to
-be classified as chimeric. is\_reverse\_complement has to be set, if the reads come from complementary
-DNA as in the RIL-Seq experiment.
-
-#### Annotation parameters:
-
-The RILSeq analysis requires a complete annotation of the genome, i.e. all regions without an
-annotation are ignored. The analysis can automatically generate a complete annotation, or expects
-the annotation to be supplied by the annotation\_file. This can be set using the autocomple\_utrs
-option in the config.jl file. If set to false, the types of the supplied UTRs and IGRs have to be
-the same as defined by the options fiveutr\_type, threeutr\_type and igr\_type.
-
-#### Fisher Exact Test parameters:
-
-include\_read\_identity defines, if the test should take the order of the chimeric pair's placement
-on the read(s) into account and include\_singles the addition of single transcripts of each partner.
-max\_fdr sets the maximum false discovery rate and min\_reads defines a cut off for the output into
-the final tables.
-
-#### Visualization parameters:
-
-The visualization of the results is implemented as a Dash web application. When it runs, it can be
-accessed from within your internet browser, or any internet browser within your local network. The
-parameter address and port define where the server runs. The default values will make it possible
-to reach the application by visiting http://localhost:8050 in your browser.
-
-### run analyze.jl and visualize.jl
+### run analyze.jl
 
 The scripts can be executed by passing them to the julia executable. In a terminal, run
 
 >julia path/to/analyze.jl path/to/project_folder/config.jl
 
 To rerun the analysis (e.g. with a different set of parameters), remove the results folder from
-the project folder and rerun the above command. After a successful run of the analysis, the
-visualization can be started by running
+the project folder and rerun the above command. 
+
+In the specified data folder, alignments (.bam, .bam.bai) and alignment stats (.bam.log) are saved. 
+In the results folder, several subfolder are generated and all relevant results are combined in two 
+tables with filenames interactions.xlsx and singles.xlsx
+
+### run visualize.jl
+
+After a successful run of the analysis, the visualization can be started by running
 
 >julia path/to/visualize.jl path/to/project_folder/config.jl
 
-## Analysis results
-
-The script will generate 2 folders called data\_processing and results. In data\_processing, 
-extracted reads (fastq.gz) and alignments (.bam, .bam.bai) are saved. Also alignment stats are 
-generated (.bam.log). In the results folder, several subfolder are generated and all relevant 
-results are combined in two tables with filenames interactions.xlsx and singles.xlsx
-
 ## Example analysis data
 
-To run the analysis on the supplied example data, open a terminal in this folder and run
+To run the analysis on the supplied example toy data, open a terminal in this folder and run
 
 >julia analyze.jl example_data/config.jl
 
 The example analysis will take a minute and the resulting tables will be located in the folder 
-example_data/results. Since this toy data only contains a few thousand reads, the tables should 
-show between 2 and 114 interactions across the 6 conditions. 
+example_data/results. 
 
 ## Copyright notice and disclaimer
 
