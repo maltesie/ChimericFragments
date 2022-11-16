@@ -71,7 +71,9 @@ function edge_info(edge_data::Dash.JSON3.Object)
 end
 
 ligation_modes_table(ligation_points::Dash.JSON3.Object) =
-    return html_div([
+    return isempty(ligation_points) ?
+    html_p("none") :
+    html_div([
         html_tr([
             html_td("$k:"),
             html_td("$v"),
