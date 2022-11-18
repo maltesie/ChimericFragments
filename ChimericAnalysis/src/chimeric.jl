@@ -22,6 +22,12 @@ Load Interactions struct from jld2 file.
 Interactions(filepath::String) = load(filepath, "interactions")
 
 Base.length(interactions::Interactions) = nrow(interactions.edges)
+function Base.empty!(interactions::Interactions)
+    empty!(interactions.nodes)
+    empty!(interactions.edges)
+    empty!(interactions.edgestats)
+    empty!(interactions.replicate_ids)
+end
 
 """
 Method of write function which saves the Interactions struct in a jld2 file.
@@ -376,6 +382,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         isdir(joinpath(results_path, "interactions")) || mkpath(joinpath(results_path, "interactions"))
         isdir(joinpath(results_path, "stats")) || mkpath(joinpath(results_path, "stats"))
         isdir(joinpath(results_path, "singles")) || mkpath(joinpath(results_path, "singles"))
+        interactions = Interactions()
         for (condition, r) in conditions
             @info "Collecting $(length(r)) samples for condition $condition:"
             if !overwrite_existing &&
@@ -386,6 +393,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 continue
             end
             replicate_ids = Vector{Symbol}()
+            empty!(interactions)
             interactions = Interactions()
             for (i, bam) in enumerate(bams[r])
                 replicate_id = Symbol("$(condition)_$i")
