@@ -38,7 +38,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)).+0.5) .* 800
         sort!(interact.edges, :nb_ints; rev=true)
     end
-    gene_name_type = Dict(dname=>merge(Dict(zip(interact.edges.name1, interact.edges.type1)), Dict(zip(interact.edges.name2, interact.edges.type2))) for (dname,interact) in interactions)
+    gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r) for (n,t,l,r,rr) in interact.nodes[!, [:name, :type, :left, :right, :ref]]) for (dname,interact) in interactions)
     gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in zip(interact.nodes.name, interact.nodes.x, interact.nodes.y)) for (dname,interact) in interactions)
     return interactions, gene_name_type, gene_name_position, genome_info
 end
@@ -95,7 +95,7 @@ node_index(df::SubDataFrame, node_name::String) = (df.name1 .=== node_name) .| (
 node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[node_index(df, node_name)])
 count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name1 .=== node_name, column_name]))
 count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
-function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
+function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String,String}, gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
     srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
@@ -127,6 +127,7 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
         "data"=>Dict(
             "id"=>n,
             "label"=>replace(n, ":"=>"\n"),
+            "left"=>
             "interactions"=>node_sum(df, n),
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
             "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
@@ -134,7 +135,7 @@ function cytoscape_elements(df::SubDataFrame, gene_name_type::Dict{String,String
             "lig_as_rna1"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna1(df, n, :modelig1), by=x->x[2], rev=true) if !isnan(k)),
             "lig_as_rna2"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna2(df, n, :modelig2), by=x->x[2], rev=true) if !isnan(k)),
         ),
-        "classes"=>gene_name_type[n],
+        "classes"=>gene_name_info[n][1],
         "position"=>pos[n]) for n in Set(vcat(df.name1, df.name2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end

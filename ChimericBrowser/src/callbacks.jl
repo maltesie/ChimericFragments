@@ -66,7 +66,7 @@ function edge_info(edge_data::Dash.JSON3.Object)
         css_gradient_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         #css_gradient_and_means(edge_data["left2"], edge_data["right2"], edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         html_br(),
-        html_p("interactions: $(edge_data["interactions"])")
+        html_p("total reads: $(edge_data["interactions"])")
     ])]
 end
 
@@ -79,6 +79,8 @@ ligation_modes_table(ligation_points::Dash.JSON3.Object) =
             html_td("$v"),
         ]) for (k,v) in sort(collect(ligation_points), by=x->x[2], rev=true)
     ])
+function ligation_modes_arrow_with_tooltip(ligation_points::Dash.JSON3.Object)
+end
 function node_info(node_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
         html_p("$(node_data["id"]) has $(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),

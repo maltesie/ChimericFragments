@@ -293,6 +293,11 @@ function addpositions!(interactions::Interactions, features::Features)
         edge_row[[:left1, :right1, :left2, :right2, :modeint1, :rel_int1, :modeint2, :rel_int2, :modelig1, :rel_lig1, :modelig2, :rel_lig2]] =
             round.((feature1_left, feature1_right, feature2_left, feature2_right, modeint1, rel_int1, modeint2, rel_int2, modelig1, rel_lig1, modelig2, rel_lig2); digits=4)
     end
+    interactions.nodes[:, :left] = Vector{Int}(undef, nrow(interactions.nodes))
+    interactions.nodes[:, :right] = Vector{Int}(undef, nrow(interactions.nodes))
+    for nodes_row in eachrow(interactions.nodes)
+        nodes_row[[:left, :right]] = tus[nodes_row[:hash]]
+    end
     return interactions
 end
 
@@ -428,7 +433,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_sig_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
             total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
             above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
-            infotable = DataFrame(""=>["total:", "pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
+            infotable = DataFrame(""=>["reads:", "pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
             CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
