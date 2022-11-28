@@ -127,7 +127,7 @@ function align_mem(in_file1::String, in_file2::Union{String,Nothing}, genome_fil
     cmd = pipeline(`$bwa_bin index $genome_file`)
     run(cmd)
     params = ["-A", match, "-B", mismatch, "-O", gap_open, "-E", gap_extend, "-T", min_score, "-L", clipping_penalty, "-r", reseeding_factor, "-k", min_seed_len, "-t", threads]
-    isnothing(in_file2) || append!(params, ["-U", unpair_penalty])
+    (isnothing(in_file2) && !is_single_file_paired_end) || append!(params, ["-U", unpair_penalty])
     is_ont && append!(params, ["-x", "ont2d"])
     unpair_rescue && push!(params, "-P")
     is_single_file_paired_end && push!(params, "-p")
@@ -186,67 +186,3 @@ function align_mem(read_files::T, genome::Genome; min_score=20, match=1, mismatc
     end
     return SingleTypeFiles(outfiles)
 end
-
-"""
-    Helper dispatch of align_mem, which is a wrapper for bwa-mem2. Runs align_mem on `reads::T` where T
-    is a SequenceContainer and aligns it against `genomes::Vector{Genome}`. This enables easy handling
-    of Sequences and their alignment against multiple genomes.
-"""
-function align_mem(reads::Sequences, genomes::Vector{Genome}, out_file::String; min_score=20, match=1, mismatch=4, gap_open=6, gap_extend=1,
-    clipping_penalty=5, unpair_penalty=9, unpair_rescue=false, min_seed_len=18, reseeding_factor=1.4, is_ont=false, is_single_file_paired_end=false, threads=6,
-    bwa_bin="bwa-mem2", sam_bin="samtools", overwrite_existing=false)
-
-    (isfile(out_file) && !overwrite_existing) && return
-    tmp_reads = tempname()
-    tmp_reads2 = tempname()
-    tmp_genome = tempname()
-    ispaired = reads.seqnames[1:2:end] == reads.seqnames[2:2:end]
-    if ispaired
-        write(tmp_reads, tmp_reads2, reads)
-    else
-        write(tmp_reads, reads)
-    end
-    for (i,genome) in enumerate(genomes)
-        write(tmp_genome, genome)
-        this_out_file = out_file
-        length(genomes) > 1 && (this_out_file = joinpath(dirname(out_file), "$(i)_" * basename(out_file)))
-
-        !ispaired ?
-        align_mem(tmp_reads, tmp_genome, this_out_file;
-            min_score=min_score, match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend,
-            clipping_penalty=clipping_penalty, min_seed_len=min_seed_len, reseeding_factor=reseeding_factor,
-            is_single_file_paired_end=is_single_file_paired_end, is_ont=is_ont, threads=threads, bwa_bin=bwa_bin, sam_bin=sam_bin) :
-        align_mem(tmp_reads, tmp_reads2, tmp_genome, this_out_file;
-            min_score=min_score, match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend,
-            clipping_penalty=clipping_penalty, unpair_penalty=unpair_penalty, unpair_rescue=unpair_rescue,
-            min_seed_len=min_seed_len, reseeding_factor=reseeding_factor, is_ont=is_ont, threads=threads,
-            bwa_bin=bwa_bin, sam_bin=sam_bin)
-
-        rm(tmp_genome)
-    end
-    rm(tmp_reads)
-    for ending in [".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac"]
-        rm(tmp_genome * ending)
-    end
-    if length(genomes) > 1
-        bam_files = []
-        bai_files = []
-        for i in 1:length(genomes)
-            push!(bam_files, joinpath(dirname(out_file), "$(i)_" * basename(out_file)))
-            push!(bai_files, joinpath(dirname(out_file), "$(i)_" * basename(out_file) * ".bai"))
-        end
-        run(`$sam_bin merge -X $out_file $bam_files $bai_files`)
-        run(`$sam_bin index $out_file`)
-        for (bam_file, bai_file) in zip(bam_files, bai_files)
-            rm(bam_file)
-            rm(bai_file)
-        end
-    end
-end
-align_mem(reads::T, genome::Genome, out_file::String;
-    min_score=20, match=1, mismatch=4, gap_open=6, gap_extend=1, unpair_penalty=9, min_seed_len=18, reseeding_factor=1.4,
-    unpair_rescue=false, is_ont=false, is_single_file_paired_end=false, threads=6, bwa_bin="bwa-mem2", sam_bin="samtools", overwrite_existing=false) where {T<:Sequences} =
-    align_mem(reads, [genome], out_file;
-        min_score=min_score, match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend, unpair_penalty=unpair_penalty,
-        unpair_rescue=unpair_rescue, min_seed_len=min_seed_len, reseeding_factor=reseeding_factor, is_ont=is_ont, threads=threads,
-        is_single_file_paired_end=is_single_file_paired_end, bwa_bin=bwa_bin, sam_bin=sam_bin, overwrite_existing=overwrite_existing)
