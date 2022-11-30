@@ -129,7 +129,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
     elseif tab_value == "graph"
         no_node_data = isnothing(node_data) || isempty(node_data)
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
-        no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information."]
+        no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
         no_edge_data && return node_info(node_data[1])
         return edge_info(edge_data[1])
     elseif tab_value == "summary"
