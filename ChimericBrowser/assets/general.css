@@ -566,8 +566,12 @@ input[type="button"]:hover {
 /* About Area
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 
-#about-container {
-    padding-top:30px;
+#summary-container {
+	color: #1f2630;
+	padding:100px;
+	background-color: #ffffff;
+	width: 100%;
+	height:900px;
 }
 
 #colorbar-edges {

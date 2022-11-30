@@ -12,13 +12,13 @@ const update_selection_inputs = [
 const update_selection_states = [
     State("dropdown-update-dataset", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_type::Dict{String, Dict{String, String}},
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
     table_output = table_data(df)
-    cytoscape_output = cytoscape_elements(df, gene_name_type[dataset], gene_name_position[dataset], sRNA_type, layout_value)
+    cytoscape_output = cytoscape_elements(df, gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
     return table_output, cytoscape_output, circos_output
 end
@@ -30,9 +30,9 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options")
 ]
-update_dataset_callback!(app::Dash.DashApp, gene_name_type::Dict{String,Dict{String,String}}) =
+update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char}}}) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return 1, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_type[dataset])))]
+    return 1, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_info[dataset])))]
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
@@ -83,7 +83,7 @@ function ligation_modes_arrow_with_tooltip(ligation_points::Dash.JSON3.Object)
 end
 function node_info(node_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
-        html_p("$(node_data["id"]) has $(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
+        html_p("$(node_data["id"]) on $(node_data["ref"]) ($(node_data["strand"])) has $(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
         html_br(),
         html_p("Ligation point modes as RNA1:"),
         ligation_modes_table(node_data["lig_as_rna1"]),
@@ -132,6 +132,8 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information."]
         no_edge_data && return node_info(node_data[1])
         return edge_info(edge_data[1])
+    elseif tab_value == "summary"
+        return ["Change the dataset or selection criteria to update the summary."]
     end
 end
 

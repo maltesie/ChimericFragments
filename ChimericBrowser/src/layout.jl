@@ -227,6 +227,19 @@ table_layout() = html_div(
     ]
 )
 
+summary_layout() = html_div(
+    id="summary-container",
+    className="container",
+    children=[
+        html_h3("analysis summary:"),
+        html_div(id="analysis-summary", children=["test"]),
+        html_h3("dataset summary:"),
+        html_div(id="dataset-summary", children=["test2"]),
+        html_h3("selection summary:"),
+        html_div(id="selection-summary", children=["test3"]),
+    ]
+)
+
 astab(div_component::Component, tab_id::String) = dcc_tab(
     id=lowercasefirst(tab_id) * "-tab",
     className="custom-tab",
@@ -248,6 +261,7 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
                 astab(cytoscape_layout(stylesheet), "graph"),
                 astab(circos_layout(genome_info), "circos"),
                 astab(table_layout(), "table"),
+                astab(summary_layout(), "summary"),
             ]
         )
     ]
