@@ -97,6 +97,7 @@ count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = co
 count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
 function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char}},
                             gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
+    isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
     srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
