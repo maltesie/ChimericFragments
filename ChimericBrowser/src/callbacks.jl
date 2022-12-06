@@ -1,7 +1,8 @@
 const update_selection_outputs = [
     Output("table", "data"),
     Output("graph", "elements"),
-    Output("my-dashbio-circos", "tracks")
+    Output("my-dashbio-circos", "tracks"),
+    Output("summary-container", "children")
 ]
 const update_selection_inputs = [
     Input("min-reads", "value"),
@@ -12,7 +13,7 @@ const update_selection_inputs = [
 const update_selection_states = [
     State("dropdown-update-dataset", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char}}},
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
@@ -20,7 +21,8 @@ callback!(app, update_selection_outputs, update_selection_inputs, update_selecti
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df, gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
-    return table_output, cytoscape_output, circos_output
+    summary_output = summary_statistics(interactions[dataset], df)
+    return table_output, cytoscape_output, circos_output, summary_output
 end
 
 const update_dataset_inputs = [
@@ -30,14 +32,14 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options")
 ]
-update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char}}}) =
+update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}}) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
     return 1, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_info[dataset])))]
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
 mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
-function css_gradient_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
+function gene_arrow_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
     arrows = [
         m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow interaction-left" : "colorbar-arrow interaction-right",
                                             style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
@@ -59,28 +61,27 @@ end
 function edge_info(edge_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"]) ($(edge_data["strand1"]))"),
-        css_gradient_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
-        #css_gradient_and_means(edge_data["left1"], edge_data["right1"], edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
+        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
+        #gene_arrow_and_means(edge_data["left1"], edge_data["right1"], edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
         html_br(),
         html_p("RNA2: $(edge_data["target"]) on $(edge_data["ref2"]) ($(edge_data["strand2"]))"),
-        css_gradient_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
-        #css_gradient_and_means(edge_data["left2"], edge_data["right2"], edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
+        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
+        #gene_arrow_and_means(edge_data["left2"], edge_data["right2"], edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         html_br(),
         html_p("total reads: $(edge_data["interactions"])")
     ])]
 end
 
-ligation_modes_table(ligation_points::Dash.JSON3.Object) =
+ligation_modes_table(ligation_points::Dash.JSON3.Object; ncolumns=4) =
     return isempty(ligation_points) ?
     html_p("none") :
-    html_div([
-        html_tr([
-            html_td("$k:"),
-            html_td("$v"),
-        ]) for (k,v) in sort(collect(ligation_points), by=x->x[2], rev=true)
-    ])
-function ligation_modes_arrow_with_tooltip(ligation_points::Dash.JSON3.Object)
-end
+    html_div(
+        children=[
+            html_p(title="$d", "$k: $v") for (k,(v,d)) in sort(collect(ligation_points), by=x->x[1])
+        ],
+        style=Dict("display"=>"grid", "grid-template-columns"=>repeat("1fr ", ncolumns))
+    )
+
 function node_info(node_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
         html_p("$(node_data["id"]) on $(node_data["ref"]) ($(node_data["strand"])) has $(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
@@ -91,7 +92,7 @@ function node_info(node_data::Dash.JSON3.Object)
         html_p("Ligation point modes as RNA2:"),
         ligation_modes_table(node_data["lig_as_rna2"]),
         html_br(),
-        html_p("interactions: $(node_data["interactions"])")
+        html_p("read counts: $(node_data["interactions"]) (selection), $(node_data["nb_ints_total"]) (total), $(node_data["nb_single"]) (single)")
     ])]
 end
 
@@ -136,11 +137,6 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         return ["Change the dataset or selection criteria to update the summary."]
     end
 end
-
-#update_layout_callback!(app::Dash.DashApp) =
-#callback!(app, Output("graph", "layout"), Input("dropdown-update-layout", "value"); prevent_initial_call=true) do layout_value
-#    return Dict("name"=>layout_value == "random" ? "preset" : layout_value, "animate"=>false)
-#end
 
 click_cyto_button_callback!(app::Dash.DashApp) =
 callback!(app, Output("graph", "generateImage"), Input("save-svg", "n_clicks"), State("dropdown-update-dataset", "value"); prevent_initial_call=true) do clicks, dataset

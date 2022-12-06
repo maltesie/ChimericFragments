@@ -232,11 +232,11 @@ summary_layout() = html_div(
     className="container",
     children=[
         html_h3("analysis summary:"),
-        html_div(id="analysis-summary", children=["test"]),
+        html_div(id="analysis-summary", children=["loading..."]),
         html_h3("dataset summary:"),
-        html_div(id="dataset-summary", children=["test2"]),
+        html_div(id="dataset-summary", children=["loading..."]),
         html_h3("selection summary:"),
-        html_div(id="selection-summary", children=["test3"]),
+        html_div(id="selection-summary", children=["loading..."]),
     ]
 )
 

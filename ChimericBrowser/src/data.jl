@@ -38,7 +38,8 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)).+0.5) .* 800
         sort!(interact.edges, :nb_ints; rev=true)
     end
-    gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r,s) for (n,t,l,r,rr,s) in eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand]])) for (dname, interact) in interactions)
+    gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r,s,nsingle,nint) for (n,t,l,r,rr,s,nsingle,nint) in
+        eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand, :nb_single, :nb_ints]])) for (dname, interact) in interactions)
     gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in eachrow(interact.nodes[!, [:name, :x, :y]])) for (dname, interact) in interactions)
     return interactions, gene_name_info, gene_name_position, genome_info
 end
@@ -95,7 +96,9 @@ node_index(df::SubDataFrame, node_name::String) = (df.name1 .=== node_name) .| (
 node_sum(df::SubDataFrame, node_name::String) = sum(df.nb_ints[node_index(df, node_name)])
 count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name1 .=== node_name, column_name]))
 count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
-function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char}},
+joint_targets_rna1(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name1 .=== node_name) .& (df.modelig1 .=== mode_lig), :name2], delim)
+joint_targets_rna2(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name2 .=== node_name) .& (df.modelig2 .=== mode_lig), :name1], delim)
+function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}},
                             gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
@@ -133,12 +136,14 @@ function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
             "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
             "current_total"=>total_ints,
-            "lig_as_rna1"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna1(df, n, :modelig1), by=x->x[2], rev=true) if !isnan(k)),
-            "lig_as_rna2"=>Dict("$(Int(k))"=>v for (k,v) in sort(count_values_rna2(df, n, :modelig2), by=x->x[2], rev=true) if !isnan(k)),
+            "lig_as_rna1"=>Dict("$(Int(k))"=>(v, joint_targets_rna1(df, n, k)) for (k,v) in count_values_rna1(df, n, :modelig1) if !isnan(k)),
+            "lig_as_rna2"=>Dict("$(Int(k))"=>(v, joint_targets_rna2(df, n, k)) for (k,v) in count_values_rna2(df, n, :modelig2) if !isnan(k)),
             "left"=>gene_name_info[n][3],
             "right"=>gene_name_info[n][4],
             "ref"=>gene_name_info[n][2],
-            "strand"=>gene_name_info[n][5]
+            "strand"=>gene_name_info[n][5],
+            "nb_single"=>gene_name_info[n][6],
+            "nb_ints_total"=>gene_name_info[n][7],
         ),
         "classes"=>gene_name_info[n][1],
         "position"=>pos[n]) for n in Set(vcat(df.name1, df.name2))]
@@ -180,4 +185,23 @@ end
 
 function table_data(df::SubDataFrame)
     Dict.(pairs.(eachrow(df[!, ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]])))
+end
+
+function interaction_matrix(df::Union{DataFrame, SubDataFrame}, types::Vector{String})
+    types_counter = zeros(Int, (length(types), length(types)))
+    type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
+    for (t1, t2) in zip(df.type1, df.type2)
+        types_counter[type_trans[t1], type_trans[t2]] += 1
+    end
+    return types_counter
+end
+
+function summary_statistics(interactions::Interactions, df::SubDataFrame)
+    types = unique(interactions.nodes.type)
+    dataset_types_counter = interaction_matrix(interactions.edges, types)
+    selection_types_counter = interaction_matrix(df, types)
+    html_div(children=[
+        join(["$i" for i in dataset_types_counter], ", "),
+        join(["$i" for i in selection_types_counter], ", ")
+    ])
 end
