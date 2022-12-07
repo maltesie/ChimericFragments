@@ -22,4 +22,17 @@ types = Dict(
     "3utr"=>threeutr_type
 )
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, address, port)
+param_dict::Vector{Pair{String,String}} = [
+    "datasets" => join(unique(v[2] for v in samplename_condition), ", "),
+    "min. distance for chimeric classification:" => "$min_distance",
+    "max. ligation distance:"=>"$max_ligation_distance",
+    "min. reads per interaction:" => "$min_reads",
+    "max. fdr:"=>"$max_fdr",
+    "use order on read for fisher's exact test:" => include_orientation ? "yes" : "no",
+    "use non-chimeric count for fisher's exact test:" => include_singles ? "yes" : "no",
+    "self-chimeras included:" => allow_self_chimeras ? "yes" : "no",
+    "autocompleted UTRs" => autocomplete_utrs ? "yes, with $autocomplete_utr_length nt max. length" : "no",
+    "merged UTRs into CDS:" => merge_utrs_and_cds ? "yes" : "no",
+]
+
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, address, port, param_dict)

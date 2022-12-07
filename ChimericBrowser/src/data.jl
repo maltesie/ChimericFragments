@@ -36,10 +36,17 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
         interact.nodes[:, :x] = (rand(rng, nrow(interact.nodes)).+0.5) .* 1200
         interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)).+0.5) .* 800
+        interact.nodes[:, :nb_significant_ints] = zeros(Int, nrow(interact.nodes))
+        interact.nodes[:, :nb_significant_partners] = zeros(Int, nrow(interact.nodes))
+        for (i,row) in enumerate(eachrow(interact.nodes))
+            row[:nb_significant_ints] = sum(interact.edges[(interact.edges.src .== i) .| (interact.edges.dst .== i), :nb_ints])
+            names = Set(hcat(interact.nodes[interact.edges[!,:src], :name],interact.nodes[interact.edges[!,:src], :name])[hcat((interact.edges.src .== i),(interact.edges.dst .== i))])
+            row[:nb_significant_partners] = length(names)
+        end
         sort!(interact.edges, :nb_ints; rev=true)
     end
     gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r,s,nsingle,nint) for (n,t,l,r,rr,s,nsingle,nint) in
-        eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand, :nb_single, :nb_ints]])) for (dname, interact) in interactions)
+        eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
     gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in eachrow(interact.nodes[!, [:name, :x, :y]])) for (dname, interact) in interactions)
     return interactions, gene_name_info, gene_name_position, genome_info
 end
@@ -98,7 +105,9 @@ count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = co
 count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
 joint_targets_rna1(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name1 .=== node_name) .& (df.modelig1 .=== mode_lig), :name2], delim)
 joint_targets_rna2(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name2 .=== node_name) .& (df.modelig2 .=== mode_lig), :name1], delim)
-function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}},
+mode_counts(src::Int, dst::Int, stats::Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}, mode::Int, dict_index::Int) =
+    stats[(src, dst)][dict_index][mode], (mode-1 in keys(stats[(src, dst)][dict_index]) ? stats[(src, dst)][dict_index][mode-1] : 0) + (mode+1 in keys(stats[(src, dst)][dict_index]) ? stats[(src, dst)][dict_index][mode+1] : 0)
+function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}},
                             gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
@@ -125,6 +134,11 @@ function cytoscape_elements(df::SubDataFrame, gene_name_info::Dict{String, Tuple
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
             "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
             "modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
+            "modeintcount1"=>isnan(row.modeint1) ? 0 : interact.edgestats[(row.src, row.dst)][2][row.modeint1],
+            "modeligcount1"=>isnan(row.modelig1) ? 0 : interact.edgestats[(row.src, row.dst)][3][row.modelig1],
+            "modeintcount2"=>isnan(row.modeint2) ? 0 : interact.edgestats[(row.src, row.dst)][4][row.modeint2],
+            "modeligcount2"=>isnan(row.modelig2) ? 0 : interact.edgestats[(row.src, row.dst)][5][row.modelig2],
+            "ligcount"=>isnan(row.modelig1) ? 0 : sum(values(interact.edgestats[(row.src, row.dst)][3])),
             "relpos"=> s2 ? (isnan(row.rel_lig1) ? row.rel_int1 : row.rel_lig1) : (isnan(row.rel_lig2) ? row.rel_int2 : row.rel_lig2)
         ),
         "classes"=>s1 != s2 ? "srna_edge" : "other_edge") for (row, (s1, s2)) in zip(eachrow(df), eachrow(srnaindex))]
@@ -187,21 +201,53 @@ function table_data(df::SubDataFrame)
     Dict.(pairs.(eachrow(df[!, ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]])))
 end
 
-function interaction_matrix(df::Union{DataFrame, SubDataFrame}, types::Vector{String})
+function interaction_table(df::Union{DataFrame, SubDataFrame}, types::Vector{String})
     types_counter = zeros(Int, (length(types), length(types)))
     type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
     for (t1, t2) in zip(df.type1, df.type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
-    return types_counter
+    table = html_table(children=vcat(
+        [html_tr(vcat([html_td("RNA1\\RNA2")], [html_td(h) for h in types]))],
+        [html_tr(vcat([html_td(types[j])],[html_td(types_counter[j, i]) for i in eachindex(types)])) for j in eachindex(types)]
+    ))
+    return table
 end
 
-function summary_statistics(interactions::Interactions, df::SubDataFrame)
-    types = unique(interactions.nodes.type)
-    dataset_types_counter = interaction_matrix(interactions.edges, types)
-    selection_types_counter = interaction_matrix(df, types)
-    html_div(children=[
-        join(["$i" for i in dataset_types_counter], ", "),
-        join(["$i" for i in selection_types_counter], ", ")
-    ])
+pairs_to_table(dict::Vector{Pair{String, String}}) = html_table([html_tr([html_td(k), html_td(v)]) for (k,v) in dict])
+unique_interactions(df::Union{DataFrame, SubDataFrame}) = length(Set(Set((row.src, row.dst)) for row in eachrow(df)))
+function summary_statistics(interactions::Interactions, df::SubDataFrame, param_dict::Vector{Pair{String, String}})
+    types = sort(unique(interactions.nodes.type))
+    dataset_types_table = interaction_table(interactions.edges, types)
+    selection_types_table = interaction_table(df, types)
+    dataset_info = [
+        "total interactions:" => "$(nrow(interactions.edges))",
+        "unique interactions:" => "$(unique_interactions(interactions.edges))",
+        "total annotations" => "$(nrow(interactions.nodes))",
+        "interacting annotations" => "$(sum(interactions.nodes.nb_significant_ints .!= 0))",
+    ]
+    selection_info = [
+        "total interactions:" => "$(nrow(df))",
+        "unique interactions:" => "$(unique_interactions(df))",
+    ]
+    html_div(className="horizontal",
+        children=[
+            html_div([
+                html_h3("dataset summary:"),
+                pairs_to_table(dataset_info),
+                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
+                dataset_types_table
+            ], style=Dict("padding-right"=>"50px")),
+            html_div([
+                html_h3("selection summary:"),
+                pairs_to_table(selection_info),
+                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
+                selection_types_table
+            ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
+            html_div([
+                html_h3("analysis parameter:"),
+                pairs_to_table(param_dict)
+            ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px")),
+        ]
+    )
 end

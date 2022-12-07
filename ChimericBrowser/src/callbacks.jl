@@ -14,14 +14,14 @@ const update_selection_states = [
     State("dropdown-update-dataset", "value")
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
-    gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String) =
+    gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
     table_output = table_data(df)
-    cytoscape_output = cytoscape_elements(df, gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
+    cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
-    summary_output = summary_statistics(interactions[dataset], df)
+    summary_output = summary_statistics(interactions[dataset], df, param_dict)
     return table_output, cytoscape_output, circos_output, summary_output
 end
 
@@ -39,36 +39,36 @@ end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
 mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
-function gene_arrow_and_means(m1::Int, m2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
+function gene_arrow_and_means(m1::Int, count1::Int, m2::Int, count2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
     arrows = [
         m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow interaction-left" : "colorbar-arrow interaction-right",
-                                            style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
+                                            title="$count1 reads", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
         m2==0 ? html_div(className="colorbar-arrow mode empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow ligation-left" : "colorbar-arrow ligation-right",
-                                            style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
+                                            title="$count2 reads", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
     ]
     return html_div(children=[
         #html_p("$m1, $(mapvalue(normalize(m1, left, right, isnegative))), $m2, $(mapvalue(normalize(m2, left, right, isnegative)))"),
-        html_p(m2 == 0 ? "no ligation data." : "ligation points mode: $m2", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"12px", "color"=>"DarkSalmon")),
+        html_p(m2 == 0 ? "no ligation data." : "ligation points mode: $m2 ($count2 reads)", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"12px", "color"=>"DarkSalmon")),
         html_div(className="horizontal deflate", children=[
             html_p(["$left"], className="cb-left"),
             html_div(id=isnegative ? "pointer-left" : "pointer-right", children=arrows),#className="controls-block horizontal", children=arrows),
             html_p(["$right"], className="cb-right")
         ]),
-        html_p(m1 == 0 ? "no interaction data." : "interaction points mode: $m1", style=Dict("margin-top"=>"3px", "border-bottom"=>"1px solid #7fafdf"))
+        html_p(m1 == 0 ? "no alignment end data." : "alignment end points mode: $m1 ($count1 reads)", style=Dict("margin-top"=>"3px", "border-bottom"=>"1px solid #7fafdf"))
     ])
 end
 
 function edge_info(edge_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"]) ($(edge_data["strand1"]))"),
-        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modelig1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
-        #gene_arrow_and_means(edge_data["left1"], edge_data["right1"], edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
+        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), Int(edge_data["modelig1"]),
+            Int(edge_data["modeligcount1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
         html_br(),
         html_p("RNA2: $(edge_data["target"]) on $(edge_data["ref2"]) ($(edge_data["strand2"]))"),
-        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modelig2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
-        #gene_arrow_and_means(edge_data["left2"], edge_data["right2"], edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
+        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), Int(edge_data["modelig2"]),
+            Int(edge_data["modeligcount2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         html_br(),
-        html_p("total reads: $(edge_data["interactions"])")
+        html_p("total reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) ligation points)")
     ])]
 end
 
@@ -92,7 +92,12 @@ function node_info(node_data::Dash.JSON3.Object)
         html_p("Ligation point modes as RNA2:"),
         ligation_modes_table(node_data["lig_as_rna2"]),
         html_br(),
-        html_p("read counts: $(node_data["interactions"]) (selection), $(node_data["nb_ints_total"]) (total), $(node_data["nb_single"]) (single)")
+        html_div(children=[
+            html_p("read counts for $(node_data["id"]):"),
+            html_p("$(node_data["interactions"]) in current network"),
+            html_p("$(node_data["nb_ints_total"]) in dataset"),
+            html_p("$(node_data["nb_single"]) non-chimeric")
+        ])
     ])]
 end
 

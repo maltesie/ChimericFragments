@@ -231,12 +231,7 @@ summary_layout() = html_div(
     id="summary-container",
     className="container",
     children=[
-        html_h3("analysis summary:"),
-        html_div(id="analysis-summary", children=["loading..."]),
-        html_h3("dataset summary:"),
-        html_div(id="dataset-summary", children=["loading..."]),
-        html_h3("selection summary:"),
-        html_div(id="selection-summary", children=["loading..."]),
+        html_h3("loading...")
     ]
 )
 
