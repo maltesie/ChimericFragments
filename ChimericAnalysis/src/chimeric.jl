@@ -149,16 +149,17 @@ function Base.append!(interactions::Interactions, alignments::Alignments, replic
             interactions.edges[iindex, :nb_ints] += 1
             interactions.edges[iindex, :nb_multi] += is_multi
             interactions.edges[iindex, replicate_id] += 1
-            leftpos = alignments.rightpos[last(pair1)]
-            rightpos = alignments.leftpos[first(pair2)]
+            leftpos = alignments.strands[last(pair1)] === STRAND_NEG ? alignments.leftpos[last(pair1)] : alignments.rightpos[last(pair1)]
+            rightpos = alignments.strands[first(pair2)] === STRAND_NEG ? alignments.rightpos[first(pair2)] : alignments.leftpos[first(pair2)]
             leftcounter, rightcounter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ?
                                             (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
             leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
             rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
             for (s,v) in zip((:meanlen1, :meanlen2, :nms1, :nms2),
-                (leftpos-alignments.leftpos[first(pair1)], alignments.rightpos[last(pair2)]-rightpos,
-                    max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
-                    max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
+                            (alignments.rightpos[last(pair1)]-alignments.leftpos[first(pair1)],
+                            alignments.rightpos[last(pair2)]-alignments.leftpos[first(pair2)],
+                            max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
+                            max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
                 interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
             end
         end
