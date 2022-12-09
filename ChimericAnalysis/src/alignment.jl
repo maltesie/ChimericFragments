@@ -74,7 +74,7 @@ function readpositions(cigar::AbstractString)
         else
             seqlen += n
             op = BioAlignments.Operation(c)
-            if BioAlignments.isinsertop(op)
+            if BioAlignments.isinsertop(op) || (op == BioAlignments.OP_HARD_CLIP)
                 inseq || (seqstart += n)
                 pending_seqstop += n
             elseif BioAlignments.isdeleteop(op)
@@ -110,7 +110,7 @@ function readpositions(record::BAM.Record)
         op = BioAlignments.Operation(x & 0x0F)
         n = x >> 4
         seqlen += n
-        if BioAlignments.isinsertop(op)
+        if BioAlignments.isinsertop(op) || (op == BioAlignments.OP_HARD_CLIP)
             inseq || (seqstart += n)
             pending_seqstop += n
         elseif BioAlignments.isdeleteop(op)
@@ -710,7 +710,7 @@ function annotate!(alns::Alignments, features::Features{Annotation}; prioritize_
         myiterator = myiterators[alns.refnames[i]]
         myiterator.query = Interval(alns.refnames[i], alns.leftpos[i], alns.rightpos[i], alns.strands[i])
         for feature_interval in myiterator
-            olp = round(UInt8, (min(feature_interval.last, alns.rightpos[i]) - max(feature_interval.first, alns.leftpos[i])) /
+            olp = round(UInt8, (min(feature_interval.last, alns.rightpos[i]) - max(feature_interval.first, alns.leftpos[i]) + 1) /
                                 (alns.rightpos[i] - alns.leftpos[i] + 1) * 100)
 
             priority = !isnothing(prioritize_type) && (type(feature_interval) === prioritize_type) && (olp > min_prioritize_overlap)
