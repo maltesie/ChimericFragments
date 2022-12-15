@@ -12,7 +12,7 @@ function Interactions()
     Interactions(nodes, edges, edgestats, Symbol[])
 end
 
-Interactions(alignments::Alignments; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
+Interactions(alignments::AlignedReads; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
     append!(Interactions(), alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                 filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
 
@@ -50,7 +50,7 @@ MergedAlignedRead(alnread::AlignedRead) = MergedAlignedRead(alnread, Tuple{Int, 
 
 Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 
-canmerge(alns::Alignments, i1::Int, i2::Int; min_distance=1000) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
+canmerge(alns::AlignedReads, i1::Int, i2::Int; min_distance=1000) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
 (alns.leftpos[i1]<alns.leftpos[i2]) && (alns.leftpos[i2]-alns.rightpos[i1]<min_distance)
 
 function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_distance=1000)
@@ -80,6 +80,13 @@ function hasligationpoint(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, 
     return (alns.reads[first(pair2)]!==alns.reads[last(pair1)]) ? false : alns.read_leftpos[first(pair2)]-alns.read_rightpos[last(pair1)] <= max_distance
 end
 
+function distance(l1::Int, r1::Int, l2::Int, r2::Int; check_order=false)::Float64
+    check_order && l1 > l2 && return Inf
+    l2>r1 && return l2-r1+1
+    l1>r2 && return l1-r2+1
+    return 0
+end
+
 function ischimeric(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; min_distance=1000, check_annotation=true, check_order=false)
     check_annotation && (mergedread.alnread.alns.annames[first(pair1)] == mergedread.alnread.alns.annames[first(pair2)]) && return false
     return distance(
@@ -97,11 +104,11 @@ function ischimeric(mergedread::MergedAlignedRead; min_distance=1000, check_anno
     return false
 end
 
-function myhash(alns::Alignments, i::Int; use_type=true)
+function myhash(alns::AlignedReads, i::Int; use_type=true)
     return use_type ? hash(alns.annames[i], hash(alns.antypes[i])) : hash(alns.annames[i])
 end
 
-function Base.append!(interactions::Interactions, alignments::Alignments, replicate_id::Symbol;
+function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
                         min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=true)
     if !(String(replicate_id) in interactions.replicate_ids)
         interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
@@ -373,6 +380,42 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
     end
 end
 
+function mergetypes(features::Features, types::Vector{String}, mergetype::String)
+    merged_features = Interval{Annotation}[]
+    feature_collector = Dict{String,Vector{Interval{Annotation}}}(name(feature)=>Interval{Annotation}[] for feature in features if type(feature) in types)
+    for feature in features
+        if type(feature) in types
+            push!(feature_collector[name(feature)], feature)
+        else
+            push!(merged_features, feature)
+        end
+    end
+    for (n, fs) in feature_collector
+        any((refname(f)!=refname(fs[1])) || (strand(f)!=strand(fs[1])) for f in fs) &&
+            throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
+        left = minimum(leftposition(f) for f in fs)
+        right = maximum(rightposition(f) for f in fs)
+        inbetweens = sort([rightposition(f) for f in fs if rightposition(f)!=right])
+        relinbetweens = (inbetweens .- left) ./ (right-left)
+        ann = Dict("Name"=>n, "inbetween"=>join(",", inbetweens), "relinbetweens"=>join(",", round.(relinbetweens; digits=4)))
+        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n, ann)))
+    end
+    return Features(merged_features)
+end
+
+function Base.write(fname::String, files::SingleTypeFiles)
+    files.type in (".csv",) || throw(AssertionError("File type has to be .csv"))
+    if files.type == ".csv"
+        tables = Vector{Tuple{String,Vector{Any},Vector{String}}}()
+        for file in files
+            sheetname = basename(file)[1:end-length(files.type)]
+            dataframe = DataFrame(CSV.File(file; stringtype=String))
+            push!(tables,(sheetname,collect(eachcol(dataframe)), names(dataframe)))
+        end
+        XLSX.writetable(fname, tables; overwrite=true)
+    end
+end
+
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}};
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true,
@@ -405,7 +448,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 replicate_id = Symbol("$(condition)_$i")
                 push!(replicate_ids, replicate_id)
                 @info "Reading $bam"
-                alignments = Alignments(bam; include_secondary_alignments=include_secondary_alignments,
+                alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
                                         include_alternative_alignments=include_alternative_alignments,
                                         is_reverse_complement=is_reverse_complement)
                 @info "Annotating alignments..."
