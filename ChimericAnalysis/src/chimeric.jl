@@ -51,7 +51,7 @@ MergedAlignedRead(alnread::AlignedRead) = MergedAlignedRead(alnread, Tuple{Int, 
 Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 
 canmerge(alns::AlignedReads, i1::Int, i2::Int; min_distance=1000) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
-(alns.leftpos[i1]<alns.leftpos[i2]) && (alns.leftpos[i2]-alns.rightpos[i1]<min_distance)
+(alns.leftpos[i1]<=alns.leftpos[i2]) && (alns.leftpos[i2]-alns.rightpos[i1]<min_distance)
 
 function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_distance=1000)
     alns = alnread.alns
@@ -77,7 +77,8 @@ end
 
 function hasligationpoint(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; max_distance=5)
     alns = mergedread.alnread.alns
-    return (alns.reads[first(pair2)]!==alns.reads[last(pair1)]) ? false : alns.read_leftpos[first(pair2)]-alns.read_rightpos[last(pair1)] <= max_distance
+    return ((alns.reads[first(pair1)]==alns.reads[first(pair2)]) && (alns.read_leftpos[first(pair2)]-alns.read_rightpos[first(pair1)] <= max_distance)) ||
+    ((alns.reads[last(pair1)]==alns.reads[last(pair2)]) && (alns.read_leftpos[last(pair2)]-alns.read_rightpos[last(pair1)] <= max_distance))
 end
 
 function distance(l1::Int, r1::Int, l2::Int, r2::Int; check_order=false)::Float64
@@ -89,6 +90,7 @@ end
 
 function ischimeric(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; min_distance=1000, check_annotation=true, check_order=false)
     check_annotation && (mergedread.alnread.alns.annames[first(pair1)] == mergedread.alnread.alns.annames[first(pair2)]) && return false
+    (mergedread.alnread.alns.strands[first(pair1)] != mergedread.alnread.alns.strands[first(pair2)]) && return true
     return distance(
         mergedread.alnread.alns.leftpos[first(pair1)],
         mergedread.alnread.alns.rightpos[last(pair1)],
@@ -337,9 +339,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
-        out_columns = [:name1, :type1, :ref1, :strand1, :name2, :type2, :ref2, :strand2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,
-        :left1, :right1, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1,
-        :left2, :right2, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,
+        :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
         return sort!(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
@@ -477,7 +478,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_sig_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
             total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
             above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
-            infotable = DataFrame(""=>["reads:", "pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
+            infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
             CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))

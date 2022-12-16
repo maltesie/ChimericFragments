@@ -1,7 +1,7 @@
 isempty(ARGS) && throw(AssertionError("Please provide the path to your config.jl."))
 length(ARGS) > 1 && throw(AssertionError("Please provide only one path to your config.jl."))
 
-config_file = ARGS[1]
+config_file = abspath(ARGS[1])
 
 isfile(config_file) || throw(AssertionError("Cannot find a file at $config_file."))
 
