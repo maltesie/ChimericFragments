@@ -78,6 +78,8 @@ unpair_rescue=true
 # Does not affect this analysis.
 sort_and_index_bam=false
 
+# set number of threads for bwa-mem2
+threads=8
 
 # CHIMERIC FRAGMENTS PARAMETERS
 

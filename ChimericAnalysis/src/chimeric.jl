@@ -50,8 +50,8 @@ MergedAlignedRead(alnread::AlignedRead) = MergedAlignedRead(alnread, Tuple{Int, 
 
 Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 
-canmerge(alns::AlignedReads, i1::Int, i2::Int; min_distance=1000) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
-(alns.leftpos[i1]<=alns.leftpos[i2]) && (alns.leftpos[i2]-alns.rightpos[i1]<min_distance)
+canmerge(alns::AlignedReads, i1::Int, i2::Int) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
+((alns.strands[i1] == RNASeqTools.STRAND_POS) ? (alns.leftpos[i1]<=alns.leftpos[i2]) : (alns.rightpos[i1]>=alns.rightpos[i2]))
 
 function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_distance=1000)
     alns = alnread.alns
@@ -63,7 +63,7 @@ function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_di
     for (i::Int, ii::Int) in enumerate(index)
         (mergedread.merged[i] || !alns.annotated[ii]) && continue
         c += 1
-        nextolpi = findnext(x->canmerge(alns, ii, x; min_distance=min_distance), index, i+1)
+        nextolpi = findnext(x->canmerge(alns, ii, x), index, i+1)
         if isnothing(nextolpi)
             mergedread.pindexpairs[c] = (ii, ii)
         else

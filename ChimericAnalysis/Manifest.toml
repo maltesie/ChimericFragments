@@ -516,9 +516,9 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RNASeqTools]]
 deps = ["BGZFStreams", "BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CSV", "CodecZlib", "Combinatorics", "CubicSplines", "DataFrames", "DelimitedFiles", "Distributions", "FASTX", "GFF3", "GLM", "GenomicFeatures", "HypothesisTests", "IterTools", "MultipleTesting", "NormalizeQuantiles", "Random", "Statistics", "StatsBase", "XAM"]
-git-tree-sha1 = "741abc9d6b5d24f19316e793dcf1c2f61cc10a16"
+git-tree-sha1 = "6758f0894628d7566e78248b0f99b0993bbc49b7"
 repo-rev = "master"
-repo-url = "https://github.com/maltesie/RNASeqTools"
+repo-url = "https://github.com/maltesie/RNASeqTools#master"
 uuid = "c929925e-1c85-4562-9573-d68085edd19a"
 version = "0.2.0"
 

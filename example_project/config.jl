@@ -50,6 +50,37 @@ samplename_condition = [
 ]
 
 
+# BWA-MEM PARAMETERS
+
+# bwa-mem seeding parameter. No alignments shorter than min_seed_length can be found, can effect
+# performance if set to lower values. reseeding_factor can be used to tune accuracy vs performance
+# with lower values leading to higher accuracy.
+min_seed_len=18
+reseeding_factor=1.4
+
+# Smith-Waterman extension paramerter. Only alignments with scores greater or equal to min_score are saved.
+# The score of an alignment is the number of matches times match_score minus the number of mismatches, gaps,
+# the length of the gaps and clipping at both ends times the respective penalty.
+min_alignment_score=20
+match_score=1
+mismatch_penalty=4
+gap_open_penalty=6
+gap_extend_penalty=1
+clipping_penalty=5
+
+# unpair_penalty and unpair_rescue determine if PE reads get paired or not. If the penalty of the insert
+# between the reads is higher than unpair_penalty, the reads get unpaired. unpair_rescue determines, if
+# pairing should only be attempted, if one read has no hit or always.
+unpair_penalty=15
+unpair_rescue=true
+
+# set true, if the alignment files need to be sorted and indexed with a .bai for further processing. 
+# Does not affect this analysis.
+sort_and_index_bam=false
+
+# set number of threads for bwa-mem2
+threads=8
+
 # CHIMERIC FRAGMENTS PARAMETERS
 
 # The minimum distance between two alignments on the same strand to be called chimeric. The distance
@@ -63,7 +94,7 @@ min_distance=1000
 # orientation of the first.
 is_reverse_complement=true
 
-# If two alignments are classified as chimeric (see min_distance), but both get assigned to the same 
+# If two alignments are classified as chimeric (see min_distance), but both get assigned to the same
 # annotation, this is considered a self chimera.
 allow_self_chimeras=false
 
@@ -93,7 +124,7 @@ min_prioritize_overlap=0.9
 
 # The cds_type is important if UTRs should be autocompleted or merged and for visualization purposes.
 # All additional_type types are also loaded from the annotation file, if found, but not further processed.
-# filter_types are also loaded without further processing and interactions with at least one partner 
+# filter_types are also loaded without further processing and interactions with at least one partner
 # belonging to one of the filter_types are excluded from the results.
 cds_type="CDS"
 additional_types=["MySpecialType"]
@@ -110,7 +141,7 @@ threeutr_type="3UTR"
 # All information on relative positions are with respect to the merged annotation then.
 merge_utrs_and_cds=true
 
-# All space on the genome without annotation is annotated as IGR of type igr_type with the closest upstream 
+# All space on the genome without annotation is annotated as IGR of type igr_type with the closest upstream
 # and downstream annotation on the same strand used to name the IGR by separating them by a colon.
 autocomplete_igrs=true
 igr_type="IGR"
@@ -118,7 +149,7 @@ igr_type="IGR"
 
 #FISHER EXACT TEST PARAMETERS
 
-# For the test, a contingency table is created for every interaction. include_orientation toggles, if the 
+# For the test, a contingency table is created for every interaction. include_orientation toggles, if the
 # order of the two alignments on the insert (RNA1 and RNA2) should be considered. If false, the counts of
 # 2 interactions with the same partners but different orientation will be pooled together and both will
 # have the same p-value assinged. include_singles decides, if non-chimeric reads assinged to an annotation
@@ -131,9 +162,10 @@ include_singles=true
 max_fdr=0.05
 min_reads=1
 
+
 #VISUALIZATION PARAMETERS
 
-# Set the ip address and port the web server will be bound to. 0.0.0.0 will make it listen on the local 
+# Set the ip address and port the web server will be bound to. 0.0.0.0 will make it listen on the local
 # network IP. To access the visualization, visit http://localhost:8050 in an internet browser.
 address="0.0.0.0"
 port=8050

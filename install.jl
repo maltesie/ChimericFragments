@@ -1,6 +1,7 @@
 using Pkg
 
 Pkg.activate("ChimericAnalysis")
+Pkg.add(url="https://github.com/maltesie/RNASeqTools#master")
 Pkg.instantiate()
 Pkg.build()
 Pkg.activate("ChimericBrowser")
