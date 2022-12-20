@@ -13,6 +13,8 @@ isdir(joinpath(project_path, "results")) || throw(AssertionError("Cannot find re
 
 isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
 
+using Pkg
+Pkg.activate("ChimericBrowser")
 using ChimericBrowser
 
 types = Dict(

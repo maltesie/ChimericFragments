@@ -17,6 +17,8 @@ isfile(genome_file) || throw(AssertionError("Cannot find $genome_file. Please ed
 isdir(data_folder) || (data_folder = joinpath(project_path, data_folder))
 isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data_folder. Please edit config.jl."))
 
+using Pkg
+Pkg.activate("ChimericAnalysis")
 using ChimericAnalysis, RNASeqTools
 
 fastqs = (is_paired_end & !is_interleaved_paired_end) ?
@@ -43,7 +45,9 @@ end
 
 merge_utrs_and_cds && (features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], cds_type))
 
-bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_interleaved_paired_end=is_interleaved_paired_end)
+bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_interleaved_paired_end=is_interleaved_paired_end, min_score=min_alignment_score,
+    match=match_score, mismatch=mismatch_penalty, gap_open=gap_open_penalty, gap_extend=gap_extend_penalty, clipping_penalty=clipping_penalty, unpair_penalty=unpair_penalty,
+    unpair_rescue=unpair_rescue, min_seed_len=min_seed_len, reseeding_factor=reseeding_factor, sort_bam=sort_and_index_bam)
 
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))
