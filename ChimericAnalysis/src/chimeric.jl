@@ -110,6 +110,10 @@ function myhash(alns::AlignedReads, i::Int; use_type=true)
     return use_type ? hash(alns.annames[i], hash(alns.antypes[i])) : hash(alns.annames[i])
 end
 
+reflen(alns::AlignedReads, pindexpair::Tuple{Int,Int}) =
+    max(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)]) -
+    min(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)])
+
 function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
                         min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=true)
     if !(String(replicate_id) in interactions.replicate_ids)
@@ -165,8 +169,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
             rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
             for (s,v) in zip((:meanlen1, :meanlen2, :nms1, :nms2),
-                            (alignments.rightpos[last(pair1)]-alignments.leftpos[first(pair1)],
-                            alignments.rightpos[last(pair2)]-alignments.leftpos[first(pair2)],
+                            (reflen(alignments, pair1), reflen(alignments, pair2),
                             max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
                             max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
                 interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
