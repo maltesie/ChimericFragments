@@ -14,9 +14,11 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
     genome_info = Pair{String,Int}[]
+    genome = Dict{String, LongDNA{4}}()
     FASTA.Reader(open(genome_file)) do reader
         for record in reader
-            push!(genome_info, identifier(record)=>length(sequence(record)))
+            push!(genome_info, identifier(record)=>length(FASTX.sequence(record)))
+            push!(genome, identifier(record)=>LongDNA{4}(FASTX.sequence(record)))
         end
     end
     for interact in values(interactions)
@@ -48,7 +50,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
     gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r,s,nsingle,nint) for (n,t,l,r,rr,s,nsingle,nint) in
         eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
     gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in eachrow(interact.nodes[!, [:name, :x, :y]])) for (dname, interact) in interactions)
-    return interactions, gene_name_info, gene_name_position, genome_info
+    return interactions, gene_name_info, gene_name_position, genome_info, genome
 end
 
 nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
@@ -130,6 +132,8 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "right2"=>row.right2,
             "ref1"=>row.ref1,
             "ref2"=>row.ref2,
+            "len1"=>row.meanlen1,
+            "len2"=>row.meanlen2,
             "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
             "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
@@ -150,8 +154,10 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
             "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
             "current_total"=>total_ints,
-            "lig_as_rna1"=>Dict("$(Int(k))"=>(v, joint_targets_rna1(df, n, k)) for (k,v) in count_values_rna1(df, n, :modelig1) if !isnan(k)),
-            "lig_as_rna2"=>Dict("$(Int(k))"=>(v, joint_targets_rna2(df, n, k)) for (k,v) in count_values_rna2(df, n, :modelig2) if !isnan(k)),
+            "lig_as_rna1"=>Dict("$(Int(gene_name_info[n][5] === '-' ?  gene_name_info[n][4] - k + 1 : k - gene_name_info[n][3] + 1))"=>(
+                v, joint_targets_rna1(df, n, k)) for (k,v) in count_values_rna1(df, n, :modelig1) if !isnan(k)),
+            "lig_as_rna2"=>Dict("$(Int(gene_name_info[n][5] === '-' ?  gene_name_info[n][4] - k + 1 : k - gene_name_info[n][3] + 1))"=>(
+                v, joint_targets_rna2(df, n, k)) for (k,v) in count_values_rna2(df, n, :modelig2) if !isnan(k)),
             "left"=>gene_name_info[n][3],
             "right"=>gene_name_info[n][4],
             "ref"=>gene_name_info[n][2],

@@ -1,6 +1,8 @@
 module ChimericBrowser
 
 using Dash, DataFrames, Random, CSV, FASTX, JLD2, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures
+using BioAlignments: pairalign, AffineGapScoreModel, LocalAlignment, count_matches, alignment
+using BioSequences: reverse_complement, LongDNA
 
 export chimeric_browser
 
