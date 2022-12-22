@@ -62,18 +62,81 @@ function gene_arrow_and_means(m1::Int, count1::Int, m2::Int, count2::Int, left::
     ])
 end
 
-function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String,LongDNA{4}})
-    alnscore = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0)
+const dna_complement = Dict('A'=>'T', 'T'=>'A', 'G'=>'C', 'C'=>'G')
+
+function baisepairing_string(aln::PairwiseAlignment; width::Integer=60)
+    seq = aln.a.seq
+    ref = aln.b
+    anchors = aln.a.aln.anchors
+    # width of position numbers
+    posw = ndigits(max(anchors[end].seqpos, anchors[end].refpos)) + 1
+    outstring = ""
+    i = 0
+    seqpos = anchors[1].seqpos
+    refpos = anchors[1].refpos
+    seqbuf = IOBuffer()
+    refbuf = IOBuffer()
+    matbuf = IOBuffer()
+    next_xy = iterate(aln)
+    while next_xy !== nothing
+        (x, y), s = next_xy
+        next_xy = iterate(aln ,s)
+
+        i += 1
+        if x != gap(eltype(seq))
+            seqpos += 1
+        end
+        if y != gap(eltype(ref))
+            refpos += 1
+        end
+
+        if i % width == 1
+            print(seqbuf, " RNA1:", lpad(seqpos, posw), ' ')
+            print(refbuf, " RNA2:", lpad(refpos, posw), ' ')
+            print(matbuf, " "^(posw + 7))
+        end
+
+        print(seqbuf, x)
+        print(refbuf, dna_complement[Char(y)])
+        print(matbuf, x==y ? '|' : ' ')
+
+        if i % width == 0
+            print(seqbuf, lpad(seqpos, posw))
+            print(refbuf, lpad(refpos, posw))
+            print(matbuf)
+
+            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n"
+
+            if next_xy !== nothing
+                seek(seqbuf, 0)
+                seek(matbuf, 0)
+                seek(refbuf, 0)
+                return outstring
+            end
+        end
+    end
+
+    if i % width != 0
+        print(seqbuf, lpad(seqpos, posw))
+        print(refbuf, lpad(refpos, posw))
+        print(matbuf)
+
+        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n"
+    end
+end
+
+function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String,LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int)
+    alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0) && (Float64(edge_data["pred_pvalue"]) <= max_interaction_pvalue)
         s1 = edge_data["strand1"]=="+" ?
-        genome[edge_data["ref1"]][(Int(edge_data["modelig1"])-Int(edge_data["len1"])+1):Int(edge_data["modelig1"])] :
-        reverse_complement(genome[edge_data["ref1"]][Int(edge_data["modelig1"]):(Int(edge_data["modelig1"])+Int(edge_data["len1"])+1)])
+        genome[edge_data["ref1"]][(Int(edge_data["modelig1"])-check_interaction_distance):Int(edge_data["modelig1"])] :
+        reverse_complement(genome[edge_data["ref1"]][Int(edge_data["modelig1"]):(Int(edge_data["modelig1"])+check_interaction_distance)])
         s2 = edge_data["strand2"]=="-" ?
-        genome[edge_data["ref2"]][(Int(edge_data["modelig2"])-Int(edge_data["len2"])+1):Int(edge_data["modelig2"])] :
-        reverse_complement(genome[edge_data["ref2"]][Int(edge_data["modelig2"]):(Int(edge_data["modelig2"])+Int(edge_data["len2"])+1)])
+        genome[edge_data["ref2"]][(Int(edge_data["modelig2"])-check_interaction_distance):Int(edge_data["modelig2"])] :
+        reverse_complement(genome[edge_data["ref2"]][Int(edge_data["modelig2"]):(Int(edge_data["modelig2"])+check_interaction_distance)])
         p = pairalign(LocalAlignment(), s1, s2, AffineGapScoreModel(match=1, mismatch=-1, gap_open=-1, gap_extend=-2))
-        count_matches(alignment(p))
+        baisepairing_string(alignment(p))
     else
-        -1
+        "no significant basepairing found."
     end
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"])"),
@@ -84,7 +147,9 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String,LongDNA{4}}
         gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), Int(edge_data["modelig2"]),
             Int(edge_data["modeligcount2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
         html_br(),
-        html_p("total reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) ligation points), $alnscore")
+        html_p(children=alnstring, style=Dict("white-space" => "pre-wrap", "font-family" => "monospace")),
+        html_br(),
+        html_p("total reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) ligation points)")
     ])]
 end
 
@@ -143,7 +208,7 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,LongDNA{4}}) =
+update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value
     if tab_value == "circos"
         (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
@@ -155,7 +220,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
         no_edge_data && return node_info(node_data[1])
-        return edge_info(edge_data[1], genome)
+        return edge_info(edge_data[1], genome, max_interaction_pvalue, check_interaction_distance)
     elseif tab_value == "summary"
         return ["Change the dataset or selection criteria to update the summary."]
     end

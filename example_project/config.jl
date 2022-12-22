@@ -169,3 +169,9 @@ min_reads=1
 # network IP. To access the visualization, visit http://localhost:8050 in an internet browser.
 address="0.0.0.0"
 port=8050
+
+# Simple basepairing predictions based on alignments are performed within check_interaction_distance of the
+# most frequent ligation points and the predictions with a pvalue lower than max_interaction_pvalue are
+# visualized in the browser.
+max_interaction_pvalue=0.05
+check_interaction_distance=30

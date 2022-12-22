@@ -2,7 +2,7 @@
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "4d4bc667b8dcccaf32b3ed800e360caf00679a6d"
+project_hash = "9e0bcb68727e32f64adbfee69dad239ee78e2846"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -516,7 +516,7 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RNASeqTools]]
 deps = ["BGZFStreams", "BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CSV", "CodecZlib", "Combinatorics", "CubicSplines", "DataFrames", "DelimitedFiles", "Distributions", "FASTX", "GFF3", "GLM", "GenomicFeatures", "HypothesisTests", "IterTools", "MultipleTesting", "NormalizeQuantiles", "Random", "Statistics", "StatsBase", "XAM"]
-git-tree-sha1 = "6758f0894628d7566e78248b0f99b0993bbc49b7"
+git-tree-sha1 = "d75e14fcca6eebb2bbcb82c6492bca6dd55795d1"
 repo-rev = "master"
 repo-url = "https://github.com/maltesie/RNASeqTools#master"
 uuid = "c929925e-1c85-4562-9573-d68085edd19a"

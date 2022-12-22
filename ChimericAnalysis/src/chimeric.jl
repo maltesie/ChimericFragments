@@ -243,10 +243,9 @@ function checktops(interactions::Interactions; top_cut=20, check=:singles)
     return filtered_edges
 end
 
-function addpvalues!(interactions::Interactions; method=:fisher, fisher_tail=:right, include_read_identity=true, include_singles=true)
-    @assert method in (:disparity, :fisher)
-    pvalues = ones(nrow(interactions.edges))
-
+function addpvalues!(interactions::Interactions, genome::Genome; fisher_tail=:right, include_read_identity=true, include_singles=true, 
+        check_interaction_distance=30, match=1, mismatch=-1, gap_open=-1, gap_extend=-2)
+    
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
         other_source = interactions.nodes[interactions.edges[!, :src], :nb_ints_src] .- ints_between
@@ -264,17 +263,38 @@ function addpvalues!(interactions::Interactions; method=:fisher, fisher_tail=:ri
 
     odds_ratio = (ints_between .* total_other) ./ (other_target .* other_source)
 
-    if method === :fisher
-        tests = FisherExactTest.(ints_between, other_target, other_source, total_other)
-        pvalues = pvalue.(tests; tail=fisher_tail)
-    else
-        throw(AssertionError("$method not supported!"))
-    end
+    tests = FisherExactTest.(ints_between, other_target, other_source, total_other)
+    pvalues_fisher = pvalue.(tests; tail=fisher_tail)
 
-    adjp = adjust(PValues(pvalues), BenjaminiHochberg())
+    adjp_fisher = adjust(PValues(pvalues_fisher), BenjaminiHochberg())
     interactions.edges[:, :odds_ratio] = odds_ratio
-    interactions.edges[:, :p_value] = pvalues
-    interactions.edges[:, :fdr] = adjp
+    interactions.edges[:, :pvalue] = pvalues_fisher
+    interactions.edges[:, :fdr] = adjp_fisher
+
+    interactions.edges[:, :pred_matches] = zeros(Int, nrow(interactions.edges))
+    interactions.edges[:, :pred_pvalue] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
+
+    am = AffineGapScoreModel(match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend)
+    lm = LocalAlignment()
+    random_model_ecdf = ecdf([BioAlignments.score(pairalign(lm, 
+        i1 % 2 == 0 ? genome.seq[i1:i1+check_interaction_distance] : reverse_complement(genome.seq[i1:i1+check_interaction_distance]), 
+        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+check_interaction_distance]) : complement(genome.seq[i2:i2+check_interaction_distance]), am; score_only=true)) 
+            for (i1, i2) in eachrow(rand(1:length(genome.seq)-check_interaction_distance, (50000,2)))])
+    
+    for edge_row in eachrow(interactions.edges)
+         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
+            i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
+            strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
+            ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
+            s1 = strand1==STRAND_POS ? genome[ref1][i1-check_interaction_distance:i1] : reverse_complement(genome[ref1][i1:i1+check_interaction_distance])
+            s2 = strand2==STRAND_NEG ? genome[ref2][i2-check_interaction_distance:i2] : reverse_complement(genome[ref2][i2:i2+check_interaction_distance])
+            aln = pairalign(lm, s1, s2, am)
+            edge_row.pred_matches, edge_row.pred_pvalue = count_matches(alignment(aln)), 1-random_model_ecdf(BioAlignments.score(aln))
+        end
+    end
+    nan_index = (!).(isnan.(interactions.edges.pred_pvalue))
+    interactions.edges.pred_fdr[nan_index] = adjust(PValues(interactions.edges.pred_pvalue[nan_index]), BenjaminiHochberg())
     return interactions
 end
 
@@ -310,31 +330,6 @@ function addpositions!(interactions::Interactions, features::Features)
     return interactions
 end
 
-function addbpas!(interactions::Interactions, genome::Genome; check_distance=30, match=1, mismatch=-1, gap_open=-1, gap_extend=-2)
-    for colname in (:interaction_left1, :interaction_right1, :interaction_left2, :interaction_right2, :interaction_matches, :interaction_pvalue, :interaction_fdr)
-        interactions.edges[:, colname] = Vector{Float64}(undef, length(interactions))
-    end
-    am = AffineGapScoreModel(match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend)
-    lm = LocalAlignment()
-    random_model_ecdf = ecdf([count_matches(alignment(pairalign(lm, 
-        i1 % 2 == 0 ? genome.seq[i1:i1+check_distance] : reverse_complement(genome.seq[i1:i1+check_distance]), 
-        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+check_distance]) : complement(genome.seq[i2:i2+check_distance]), am))) 
-            for (i1, i2) in rand(1:length(genome.seq)-check_distance)])
-    
-    for edge_row in eachrow(interactions.edges)
-        (int_left, int_right, int_lef2, int_right2, int_matches, int_p) = if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
-            i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
-            s1 = edge_row.strand1==STRAND_POS ? genome[edge_row.ref1][i1-check_distance:i1] : reverse_complement(genome[edge_row.ref1][i1:i1+check_distance])
-            s2 = edge_row.strand2==STRAND_NEG ? genome[edge_row.ref2][i2-check_distance:i2] : reverse_complement(genome[edge_row.ref2][i2:i2+check_distance])
-            aln = alignment(pairalign(lm, s1, s2, am))
-            seqstart, seqstop, relrefstop, seqlen = RNASeqTools.readpositions(cigar(aln))
-            count_matches(aln)
-        else
-            NaN, NaN, NaN, NaN, NaN
-        end
-    end
-end
-
 function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
     h = zeros(Int, nbins)
     dbin = (ma-mi+1)/nbins
@@ -363,8 +358,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
-        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,
-        :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs, :pvalue, :fdr,
+        :pred_pvalue, :pred_fdr, :pred_matches, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
         return sort!(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
@@ -441,10 +436,10 @@ function Base.write(fname::String, files::SingleTypeFiles)
     end
 end
 
-function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}};
+function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true,
-                            include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
+                            include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05,
                             overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
@@ -492,8 +487,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             end
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Computing significance levels..."
-            addpvalues!(interactions; method=model, include_singles=include_singles, include_read_identity=include_read_identity)
             addpositions!(interactions, features)
+            addpvalues!(interactions, genome; include_singles=include_singles, include_read_identity=include_read_identity)
             total_reads = sum(interactions.edges[!, :nb_ints])
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             total_ints = nrow(interactions.edges)
@@ -520,13 +515,13 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         @info "Done."
     end
 end
-chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String; conditions=conditionsdict(bams),
+chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, genome::Genome; conditions=conditionsdict(bams),
     filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
-    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, model=:fisher, min_reads=5, max_fdr=0.05,
+    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05,
     overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=false, position_distribution_bins=50) =
-chimeric_analysis(features, bams, results_path, conditions;
+chimeric_analysis(features, bams, results_path, conditions, genome;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
     overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
-    include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments, model=model,
+    include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments,
     min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
     include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

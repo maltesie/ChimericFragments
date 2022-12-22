@@ -134,6 +134,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "ref2"=>row.ref2,
             "len1"=>row.meanlen1,
             "len2"=>row.meanlen2,
+            "pred_pvalue"=>isnan(row.pred_pvalue) ? 2.0 : isnan(row.pred_pvalue),
             "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
             "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
