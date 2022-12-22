@@ -291,10 +291,6 @@ function addpositions!(interactions::Interactions, features::Features)
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
         stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        #meanint1 = length(stats[2]) > 0 ? sum(v*p for (v,p) in stats[2]) / sum(v for v in values(stats[2])) : NaN64
-        #meanlig1 = length(stats[3]) > 0 ? sum(v*p for (v,p) in stats[3]) / sum(v for v in values(stats[3])) : NaN64
-        #meanint2 = length(stats[4]) > 0 ? sum(v*p for (v,p) in stats[4]) / sum(v for v in values(stats[4])) : NaN64
-        #meanlig2 = length(stats[5]) > 0 ? sum(v*p for (v,p) in stats[5]) / sum(v for v in values(stats[5])) : NaN64
         modeint1 = length(stats[2]) > 0 ? argmax(stats[2]) : NaN64
         modelig1 = length(stats[3]) > 0 ? argmax(stats[3]) : NaN64
         modeint2 = length(stats[4]) > 0 ? argmax(stats[4]) : NaN64
@@ -312,6 +308,31 @@ function addpositions!(interactions::Interactions, features::Features)
         nodes_row[[:left, :right]] = tus[nodes_row[:hash]]
     end
     return interactions
+end
+
+function addbpas!(interactions::Interactions, genome::Genome; check_distance=30, match=1, mismatch=-1, gap_open=-1, gap_extend=-2)
+    for colname in (:interaction_left1, :interaction_right1, :interaction_left2, :interaction_right2, :interaction_matches, :interaction_pvalue, :interaction_fdr)
+        interactions.edges[:, colname] = Vector{Float64}(undef, length(interactions))
+    end
+    am = AffineGapScoreModel(match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend)
+    lm = LocalAlignment()
+    random_model_ecdf = ecdf([count_matches(alignment(pairalign(lm, 
+        i1 % 2 == 0 ? genome.seq[i1:i1+check_distance] : reverse_complement(genome.seq[i1:i1+check_distance]), 
+        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+check_distance]) : complement(genome.seq[i2:i2+check_distance]), am))) 
+            for (i1, i2) in rand(1:length(genome.seq)-check_distance)])
+    
+    for edge_row in eachrow(interactions.edges)
+        (int_left, int_right, int_lef2, int_right2, int_matches, int_p) = if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
+            i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
+            s1 = edge_row.strand1==STRAND_POS ? genome[edge_row.ref1][i1-check_distance:i1] : reverse_complement(genome[edge_row.ref1][i1:i1+check_distance])
+            s2 = edge_row.strand2==STRAND_NEG ? genome[edge_row.ref2][i2-check_distance:i2] : reverse_complement(genome[edge_row.ref2][i2:i2+check_distance])
+            aln = alignment(pairalign(lm, s1, s2, am))
+            seqstart, seqstop, relrefstop, seqlen = RNASeqTools.readpositions(cigar(aln))
+            count_matches(aln)
+        else
+            NaN, NaN, NaN, NaN, NaN
+        end
+    end
 end
 
 function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
