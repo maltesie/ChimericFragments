@@ -2,7 +2,8 @@ const update_selection_outputs = [
     Output("table", "data"),
     Output("graph", "elements"),
     Output("my-dashbio-circos", "tracks"),
-    Output("summary-container", "children")
+    Output("summary-container", "children"),
+    Output("data-tabs", "value")
 ]
 const update_selection_inputs = [
     Input("min-reads", "value"),
@@ -11,18 +12,19 @@ const update_selection_inputs = [
     Input("dropdown-update-layout", "value")
 ]
 const update_selection_states = [
-    State("dropdown-update-dataset", "value")
+    State("dropdown-update-dataset", "value"),
+    State("data-tabs", "value")
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
-callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset
+callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
     summary_output = summary_statistics(interactions[dataset], df, param_dict)
-    return table_output, cytoscape_output, circos_output, summary_output
+    return table_output, cytoscape_output, circos_output, summary_output, tab_value
 end
 
 const update_dataset_inputs = [
