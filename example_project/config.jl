@@ -174,4 +174,4 @@ port=8050
 # most frequent ligation points and the predictions with a pvalue lower than max_interaction_pvalue are
 # visualized in the browser.
 max_interaction_pvalue=0.05
-check_interaction_distance=30
+check_interaction_distance=50

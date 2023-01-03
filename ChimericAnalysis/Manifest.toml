@@ -135,12 +135,6 @@ git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.1"
 
-[[deps.CubicSplines]]
-deps = ["Random", "Test"]
-git-tree-sha1 = "4875023d456ea37c581f406b8b1bc35bea95ae67"
-uuid = "9c784101-8907-5a6d-9be6-98f00873c89b"
-version = "0.2.1"
-
 [[deps.DataAPI]]
 git-tree-sha1 = "46d2680e618f8abd007bce0c3026cb0c4a8f2032"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -176,10 +170,6 @@ deps = ["InverseFunctions", "Test"]
 git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
 uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 version = "0.4.0"
-
-[[deps.Distributed]]
-deps = ["Random", "Serialization", "Sockets"]
-uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.Distributions]]
 deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
@@ -252,12 +242,6 @@ deps = ["Automa", "BGZFStreams", "BioGenerics", "FASTX", "GenomicFeatures", "Ind
 git-tree-sha1 = "c88fbcfe5b9ee631531c4312c3604d5dcd9c1040"
 uuid = "af1dc308-cb6b-11e8-32f0-31192efa90f6"
 version = "0.2.2"
-
-[[deps.GLM]]
-deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
-git-tree-sha1 = "884477b9886a52a84378275737e2823a5c98e349"
-uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
-version = "1.8.1"
 
 [[deps.GenomicFeatures]]
 deps = ["BioGenerics", "DataStructures", "IntervalTrees"]
@@ -434,12 +418,6 @@ version = "1.0.1"
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
-[[deps.NormalizeQuantiles]]
-deps = ["Distributed", "Random", "SharedArrays", "Statistics"]
-git-tree-sha1 = "ce6816d53dfd685c5332527e582e8352188785ca"
-uuid = "d366530f-4af1-5ff1-9928-73bf22b88830"
-version = "1.2.2"
-
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
@@ -515,8 +493,8 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RNASeqTools]]
-deps = ["BGZFStreams", "BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CSV", "CodecZlib", "Combinatorics", "CubicSplines", "DataFrames", "DelimitedFiles", "Distributions", "FASTX", "GFF3", "GLM", "GenomicFeatures", "HypothesisTests", "IterTools", "MultipleTesting", "NormalizeQuantiles", "Random", "Statistics", "StatsBase", "XAM"]
-git-tree-sha1 = "d75e14fcca6eebb2bbcb82c6492bca6dd55795d1"
+deps = ["BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CodecZlib", "FASTX", "GFF3", "GenomicFeatures", "IterTools", "XAM"]
+git-tree-sha1 = "0f4959a2c71d7e2ffe5ba2847c84cf076401f1b4"
 repo-rev = "master"
 repo-url = "https://github.com/maltesie/RNASeqTools#master"
 uuid = "c929925e-1c85-4562-9573-d68085edd19a"
@@ -585,15 +563,6 @@ git-tree-sha1 = "e2cc6d8c88613c05e1defb55170bf5ff211fbeac"
 uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 version = "1.1.1"
 
-[[deps.SharedArrays]]
-deps = ["Distributed", "Mmap", "Random", "Serialization"]
-uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
-
-[[deps.ShiftedArrays]]
-git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
-uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
-version = "2.0.0"
-
 [[deps.SnoopPrecompile]]
 git-tree-sha1 = "f604441450a3c0569830946e5b33b78c928e1a85"
 uuid = "66db9d55-30c0-4569-8b51-7e840670fc0c"
@@ -644,12 +613,6 @@ deps = ["ChainRulesCore", "HypergeometricFunctions", "InverseFunctions", "Irrati
 git-tree-sha1 = "5783b877201a82fc0014cbf381e7e6eb130473a4"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "1.0.1"
-
-[[deps.StatsModels]]
-deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsBase", "StatsFuns", "Tables"]
-git-tree-sha1 = "a5e15f27abd2692ccb61a99e0854dfb7d48017db"
-uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
-version = "0.6.33"
 
 [[deps.StringEncodings]]
 deps = ["Libiconv_jll"]

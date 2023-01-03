@@ -1,7 +1,7 @@
 module ChimericBrowser
 
-using Dash, DataFrames, Random, CSV, FASTX, JLD2, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures, BioAlignments
-using BioSequences: reverse_complement, complement!, LongDNA, gap
+using Dash, DataFrames, Random, CSV, FASTX, JLD2, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures, BioAlignments, BioSymbols
+import BioSequences
 
 export chimeric_browser
 

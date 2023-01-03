@@ -14,11 +14,11 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
     genome_info = Pair{String,Int}[]
-    genome = Dict{String, LongDNA{4}}()
+    genome = Dict{String, BioSequences.LongDNA{4}}()
     FASTA.Reader(open(genome_file)) do reader
         for record in reader
             push!(genome_info, identifier(record)=>length(FASTX.sequence(record)))
-            push!(genome, identifier(record)=>LongDNA{4}(FASTX.sequence(record)))
+            push!(genome, identifier(record)=>BioSequences.LongDNA{4}(FASTX.sequence(record)))
         end
     end
     for interact in values(interactions)
@@ -134,7 +134,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "ref2"=>row.ref2,
             "len1"=>row.meanlen1,
             "len2"=>row.meanlen2,
-            "pred_pvalue"=>isnan(row.pred_pvalue) ? 2.0 : isnan(row.pred_pvalue),
+            "pred_pvalue"=>(isnan(row.pred_pvalue) ? 2.0 : row.pred_pvalue),
             "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
             "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,

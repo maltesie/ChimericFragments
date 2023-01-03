@@ -62,18 +62,24 @@ function gene_arrow_and_means(m1::Int, count1::Int, m2::Int, count2::Int, left::
     ])
 end
 
-const dna_complement = Dict('A'=>'T', 'T'=>'A', 'G'=>'C', 'C'=>'G')
-
-function baisepairing_string(aln::PairwiseAlignment; width::Integer=60)
+alnchar(x::DNA, y::DNA) =
+    if (x == DNA_A && y == DNA_T) || (x == DNA_T && y == DNA_A) || (x == DNA_C && y == DNA_G) || (x == DNA_G && y == DNA_C)
+        '|'
+    elseif (x == DNA_G && y == DNA_T) || (x == DNA_T && y == DNA_G)
+        '⋅'
+    else
+        ' '
+    end
+function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=20)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
     # width of position numbers
-    posw = ndigits(max(anchors[end].seqpos, anchors[end].refpos)) + 1
+    posw = ndigits(max(offset1 + anchors[end].seqpos, offset2 - anchors[1].refpos)) + 1
     outstring = ""
     i = 0
-    seqpos = anchors[1].seqpos
-    refpos = anchors[1].refpos
+    seqpos = offset1 + anchors[1].seqpos - 1
+    refpos = offset2 - anchors[1].refpos + 1
     seqbuf = IOBuffer()
     refbuf = IOBuffer()
     matbuf = IOBuffer()
@@ -87,7 +93,7 @@ function baisepairing_string(aln::PairwiseAlignment; width::Integer=60)
             seqpos += 1
         end
         if y != gap(eltype(ref))
-            refpos += 1
+            refpos -= 1
         end
 
         if i % width == 1
@@ -96,22 +102,21 @@ function baisepairing_string(aln::PairwiseAlignment; width::Integer=60)
             print(matbuf, " "^(posw + 7))
         end
 
-        print(seqbuf, x)
-        print(refbuf, dna_complement[Char(y)])
-        print(matbuf, x==y ? '|' : ' ')
+        print(seqbuf, RNA(x))
+        print(refbuf, RNA(y))
+        print(matbuf, alnchar(x, y))
 
         if i % width == 0
             print(seqbuf, lpad(seqpos, posw))
             print(refbuf, lpad(refpos, posw))
             print(matbuf)
 
-            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n"
+            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n\n"
 
             if next_xy !== nothing
                 seek(seqbuf, 0)
                 seek(matbuf, 0)
                 seek(refbuf, 0)
-                return outstring
             end
         end
     end
@@ -121,22 +126,31 @@ function baisepairing_string(aln::PairwiseAlignment; width::Integer=60)
         print(refbuf, lpad(refpos, posw))
         print(matbuf)
 
-        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n"
+        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n\n"
     end
+    outstring
 end
 
-function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String,LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int)
+const scores = Dict((DNA_A, DNA_T)=>4, (DNA_T, DNA_A)=>4, (DNA_C, DNA_G)=>5, (DNA_G, DNA_C)=>5, (DNA_G, DNA_T)=>1, (DNA_T, DNA_G)=>1)
+const model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-5, default_mismatch=-5); gap_open=-6, gap_extend=-5)
+function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int)
     alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0) && (Float64(edge_data["pred_pvalue"]) <= max_interaction_pvalue)
         s1 = edge_data["strand1"]=="+" ?
-        genome[edge_data["ref1"]][(Int(edge_data["modelig1"])-check_interaction_distance):Int(edge_data["modelig1"])] :
-        reverse_complement(genome[edge_data["ref1"]][Int(edge_data["modelig1"]):(Int(edge_data["modelig1"])+check_interaction_distance)])
+            genome[edge_data["ref1"]][(Int(edge_data["modelig1"])-check_interaction_distance):Int(edge_data["modelig1"])] :
+            BioSequences.reverse_complement(genome[edge_data["ref1"]][Int(edge_data["modelig1"]):(Int(edge_data["modelig1"])+check_interaction_distance)])
         s2 = edge_data["strand2"]=="-" ?
-        genome[edge_data["ref2"]][(Int(edge_data["modelig2"])-check_interaction_distance):Int(edge_data["modelig2"])] :
-        reverse_complement(genome[edge_data["ref2"]][Int(edge_data["modelig2"]):(Int(edge_data["modelig2"])+check_interaction_distance)])
-        p = pairalign(LocalAlignment(), s1, s2, AffineGapScoreModel(match=1, mismatch=-1, gap_open=-1, gap_extend=-2))
-        baisepairing_string(alignment(p))
+            BioSequences.complement(genome[edge_data["ref2"]][(Int(edge_data["modelig2"])-check_interaction_distance):Int(edge_data["modelig2"])]) :
+            BioSequences.reverse(genome[edge_data["ref2"]][Int(edge_data["modelig2"]):(Int(edge_data["modelig2"])+check_interaction_distance)])
+        p = pairalign(LocalAlignment(), s1, s2, model)
+        baisepairing_string(alignment(p),
+            (edge_data["strand1"]=="+" ?
+                (Int(edge_data["modelig1"])-check_interaction_distance-Int(edge_data["left1"])+1) :
+                Int(edge_data["right1"])-Int(edge_data["modelig1"])-check_interaction_distance),
+            (edge_data["strand2"]=="-" ?
+                (Int(edge_data["right2"]-Int(edge_data["modelig2"])+check_interaction_distance)) :
+                Int(edge_data["modelig2"])-Int(edge_data["left2"])+check_interaction_distance)+1)
     else
-        "no significant basepairing found."
+        "no significant basepairing prediction found."
     end
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"])"),
@@ -208,7 +222,7 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int) =
+update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value
     if tab_value == "circos"
         (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
