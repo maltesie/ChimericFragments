@@ -245,7 +245,8 @@ end
 
 const scores = Dict((DNA_A, DNA_T)=>4, (DNA_T, DNA_A)=>4, (DNA_C, DNA_G)=>5, (DNA_G, DNA_C)=>5, (DNA_G, DNA_T)=>1, (DNA_T, DNA_G)=>1)
 const model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-5, default_mismatch=-5); gap_open=-6, gap_extend=-5)
-function addpvalues!(interactions::Interactions, genome::Genome; fisher_tail=:right, include_read_identity=true, include_singles=true, check_interaction_distance=30)
+function addpvalues!(interactions::Interactions, genome::Genome; fisher_tail=:right, include_read_identity=true, include_singles=true,
+                        check_interaction_distances=(50,20))
 
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
@@ -276,18 +277,28 @@ function addpvalues!(interactions::Interactions, genome::Genome; fisher_tail=:ri
     interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_score] = fill(NaN, nrow(interactions.edges))
 
+    seq_length = sum(check_interaction_distances)
     random_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
-        i1 % 2 == 0 ? genome.seq[i1:i1+check_interaction_distance] : reverse_complement(genome.seq[i1:i1+check_interaction_distance]),
-        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+check_interaction_distance]) : complement(genome.seq[i2:i2+check_interaction_distance]),
-        model; score_only=true)) for (i1, i2) in eachrow(rand(1:length(genome.seq)-check_interaction_distance, (200000,2)))])
+        i1 % 2 == 0 ? genome.seq[i1:i1+seq_length] : reverse_complement(genome.seq[i1:i1+seq_length]),
+        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length]) : complement(genome.seq[i2:i2+seq_length]),
+        model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (200000,2)))])
 
     for edge_row in eachrow(interactions.edges)
-         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
+        if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
             i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
             strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
             ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
-            s1 = strand1=='+' ? genome[ref1][(i1-check_interaction_distance):i1] : reverse_complement(genome[ref1][i1:(i1+check_interaction_distance)])
-            s2 = strand2=='-' ? complement(genome[ref2][(i2-check_interaction_distance):i2]) : reverse(genome[ref2][i2:(i2+check_interaction_distance)])
+            if ((i1 + maximum(check_interaction_distances)) > length(genome.chroms[ref1])) || ((i2 + maximum(check_interaction_distances)) > length(genome.chroms[ref2])) ||
+                ((i1 - maximum(check_interaction_distances)) < 1) || ((i2 - maximum(check_interaction_distances)) < 1)
+                edge_row.pred_pvalue, edge_row.pred_score = 1.0, 0
+                continue
+            end
+            s1 = strand1=='+' ?
+                genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
+                reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+            s2 = strand2=='-' ?
+                complement(genome[ref2][(i2-check_interaction_distances[1]):(i2+check_interaction_distances[2])]) :
+                reverse(genome[ref2][(i2-check_interaction_distances[2]):(i2+check_interaction_distances[1])])
             sco = BioAlignments.score(pairalign(LocalAlignment(), s1, s2, model; score_only=true))
             edge_row.pred_pvalue, edge_row.pred_score = 1-random_model_ecdf(sco), sco
         end
@@ -437,7 +448,7 @@ end
 
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
-                            overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distance=30,
+                            overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distances=(50,20),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05,
                             overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50)
 
@@ -487,7 +498,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Computing significance levels..."
             addpositions!(interactions, features)
-            addpvalues!(interactions, genome; include_singles=include_singles, include_read_identity=include_read_identity, check_interaction_distance=check_interaction_distance)
+            addpvalues!(interactions, genome; include_singles=include_singles, include_read_identity=include_read_identity, check_interaction_distances=check_interaction_distances)
             total_reads = sum(interactions.edges[!, :nb_ints])
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             total_ints = nrow(interactions.edges)
@@ -515,12 +526,13 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
     end
 end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, genome::Genome; conditions=conditionsdict(bams),
-    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR", max_ligation_distance=5,
-    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, check_interaction_distance=30,
-    overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=false, position_distribution_bins=50) =
+    filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR",
+    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05,
+    check_interaction_distances=(50,20), overwrite_existing=false, include_read_identity=true,
+    include_singles=true, allow_self_chimeras=false, position_distribution_bins=50, max_ligation_distance=5) =
 chimeric_analysis(features, bams, results_path, conditions, genome;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
-    overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement, check_interaction_distance=check_interaction_distance,
-    include_secondary_alignments=include_secondary_alignments, include_alternative_alignments=include_alternative_alignments,
-    min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing, include_read_identity=include_read_identity,
-    include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
+    overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
+    check_interaction_distances=check_interaction_distances, include_secondary_alignments=include_secondary_alignments,
+    include_alternative_alignments=include_alternative_alignments, min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing,
+    include_read_identity=include_read_identity, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

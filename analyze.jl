@@ -52,5 +52,6 @@ bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))
 chimeric_analysis(features, bams, results_path, conditions, genome; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
-    overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_ligation_distance=max_ligation_distance, check_interaction_distance=check_interaction_distance,
-    include_read_identity=include_orientation, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
+    overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_ligation_distance=max_ligation_distance,
+    check_interaction_distances=(bp_distance_behind, bp_distance_before), include_read_identity=include_orientation, include_singles=include_singles,
+    allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

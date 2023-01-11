@@ -80,8 +80,8 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
     posw = ndigits(max(offset1 + anchors[end].seqpos, offset2 - anchors[1].refpos)) + 1
     outstring = ""
     i = 0
-    seqpos = offset1 + anchors[1].seqpos - 1
-    refpos = offset2 - anchors[1].refpos + 1
+    seqpos = offset1 + anchors[1].seqpos
+    refpos = offset2 - anchors[1].refpos + 2
     seqbuf = IOBuffer()
     refbuf = IOBuffer()
     matbuf = IOBuffer()
@@ -135,33 +135,31 @@ end
 
 const scores = Dict((DNA_A, DNA_T)=>4, (DNA_T, DNA_A)=>4, (DNA_C, DNA_G)=>5, (DNA_G, DNA_C)=>5, (DNA_G, DNA_T)=>1, (DNA_T, DNA_G)=>1)
 const model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-5, default_mismatch=-5); gap_open=-6, gap_extend=-5)
-function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int)
+function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distances::Tuple{Int,Int})
+    i1, i2 = Int(edge_data["modelig1"]), Int(edge_data["modelig2"])
+    ref1, ref2 = edge_data["ref1"], edge_data["ref2"]
+    strand1, strand2 = edge_data["strand1"], edge_data["strand2"]
+    l1, l2, r1, r2 = Int(edge_data["left1"]), Int(edge_data["left2"]), Int(edge_data["right1"]), Int(edge_data["right2"])
     alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0) && (Float64(edge_data["pred_pvalue"]) <= max_interaction_pvalue)
-        s1 = edge_data["strand1"]=="+" ?
-            genome[edge_data["ref1"]][(Int(edge_data["modelig1"])-check_interaction_distance):Int(edge_data["modelig1"])] :
-            BioSequences.reverse_complement(genome[edge_data["ref1"]][Int(edge_data["modelig1"]):(Int(edge_data["modelig1"])+check_interaction_distance)])
-        s2 = edge_data["strand2"]=="-" ?
-            BioSequences.complement(genome[edge_data["ref2"]][(Int(edge_data["modelig2"])-check_interaction_distance):Int(edge_data["modelig2"])]) :
-            BioSequences.reverse(genome[edge_data["ref2"]][Int(edge_data["modelig2"]):(Int(edge_data["modelig2"])+check_interaction_distance)])
+        s1 = strand1=="+" ?
+            genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
+            BioSequences.reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+        s2 = strand2=="-" ?
+            BioSequences.complement(genome[ref2][(i2-check_interaction_distances[1]):(i2+check_interaction_distances[2])]) :
+            BioSequences.reverse(genome[ref2][(i2-check_interaction_distances[2]):(i2+check_interaction_distances[1])])
         p = pairalign(LocalAlignment(), s1, s2, model)
         baisepairing_string(alignment(p),
-            (edge_data["strand1"]=="+" ?
-                (Int(edge_data["modelig1"])-check_interaction_distance-Int(edge_data["left1"])+1) :
-                Int(edge_data["right1"])-Int(edge_data["modelig1"])-check_interaction_distance),
-            (edge_data["strand2"]=="-" ?
-                (Int(edge_data["right2"]-Int(edge_data["modelig2"])+check_interaction_distance)) :
-                Int(edge_data["modelig2"])-Int(edge_data["left2"])+check_interaction_distance)+1)
+            (strand1=="+" ? ((i1-check_interaction_distances[1])-l1) : (r1-(i1+check_interaction_distances[1]))),
+            (strand2=="-" ? (r2-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-l2)))
     else
         "no significant basepairing prediction found."
     end
     return [html_div(id="edge-info", children=[
-        html_p("RNA1: $(edge_data["source"]) on $(edge_data["ref1"])"),
-        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), Int(edge_data["modelig1"]),
-            Int(edge_data["modeligcount1"]), edge_data["left1"], edge_data["right1"], edge_data["strand1"]=="-", true),
+        html_p("RNA1: $(edge_data["source"]) on $ref1"),
+        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), i1, Int(edge_data["modeligcount1"]), l1, r1, strand1=="-", true),
         html_br(),
-        html_p("RNA2: $(edge_data["target"]) on $(edge_data["ref2"])"),
-        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), Int(edge_data["modelig2"]),
-            Int(edge_data["modeligcount2"]), edge_data["left2"], edge_data["right2"], edge_data["strand2"]=="-", false),
+        html_p("RNA2: $(edge_data["target"]) on $ref2"),
+        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), i2, Int(edge_data["modeligcount2"]), l2, r2, strand2=="-", false),
         html_br(),
         html_p(children=alnstring, style=Dict("white-space" => "pre-wrap", "font-family" => "monospace")),
         html_br(),
@@ -224,7 +222,7 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distance::Int) =
+update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distances::Tuple{Int,Int}) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value
     if tab_value == "circos"
         (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
@@ -236,7 +234,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
         no_edge_data && return node_info(node_data[1])
-        return edge_info(edge_data[1], genome, max_interaction_pvalue, check_interaction_distance)
+        return edge_info(edge_data[1], genome, max_interaction_pvalue, check_interaction_distances)
     elseif tab_value == "summary"
         return ["Change the dataset or selection criteria to update the summary."]
     end

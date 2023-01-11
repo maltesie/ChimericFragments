@@ -74,7 +74,7 @@ clipping_penalty=5
 unpair_penalty=15
 unpair_rescue=true
 
-# set true, if the alignment files need to be sorted and indexed with a .bai for further processing. 
+# set true, if the alignment files need to be sorted and indexed with a .bai for further processing.
 # Does not affect this analysis.
 sort_and_index_bam=false
 
@@ -163,15 +163,19 @@ max_fdr=0.05
 min_reads=1
 
 
+#BASEPAIRING PREDICTION PARAMETERS
+
+# Simple basepairing predictions based on alignments are performed within check_interaction_distance_on
+# behind and check_interaction_distance_off in front of of the most frequent ligation points and the
+# predictions with a pvalue lower than max_interaction_pvalue are visualized in the browser.
+max_bp_pvalue=0.05
+bp_distance_behind=45
+bp_distance_before=10
+
+
 #VISUALIZATION PARAMETERS
 
 # Set the ip address and port the web server will be bound to. 0.0.0.0 will make it listen on the local
 # network IP. To access the visualization, visit http://localhost:8050 in an internet browser.
 address="0.0.0.0"
 port=8050
-
-# Simple basepairing predictions based on alignments are performed within check_interaction_distance of the
-# most frequent ligation points and the predictions with a pvalue lower than max_interaction_pvalue are
-# visualized in the browser.
-max_interaction_pvalue=0.05
-check_interaction_distance=50
