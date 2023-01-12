@@ -288,11 +288,8 @@ function addpvalues!(interactions::Interactions, genome::Genome; fisher_exact_ta
             i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
             strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
             ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
-            if ((i1 + maximum(check_interaction_distances)) > length(genome.chroms[ref1])) || ((i2 + maximum(check_interaction_distances)) > length(genome.chroms[ref2])) ||
-                ((i1 - maximum(check_interaction_distances)) < 1) || ((i2 - maximum(check_interaction_distances)) < 1)
-                edge_row.pred_pvalue, edge_row.pred_score = 1.0, 0
-                continue
-            end
+            (((i1 + maximum(check_interaction_distances)) > length(genome.chroms[ref1])) || ((i2 + maximum(check_interaction_distances)) > length(genome.chroms[ref2])) ||
+                ((i1 - maximum(check_interaction_distances)) < 1) || ((i2 - maximum(check_interaction_distances)) < 1)) && continue
             s1 = strand1=='+' ?
                 genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
                 reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
@@ -350,10 +347,10 @@ function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
     end
     return h
 end
-function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, hist_bins=100)
-    out_df = copy(interactions.edges)
-    filter_index = (out_df[!, :nb_ints] .>= min_reads) .& (out_df[!, :fdr] .<= max_fdr)
-    out_df = out_df[filter_index, :]
+function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, max_bp_fdr=0.05, hist_bins=100)
+    filter_index = (interactions.edges[!, :nb_ints] .>= min_reads) .& (interactions.edges[!, :fdr] .<= max_fdr) .&
+                        ((interactions.edges[!, :pred_fdr] .<= max_bp_fdr) .| isnan.(interactions.edges.pred_fdr))
+    out_df = interactions.edges[filter_index, :]
     if output === :edges
         out_df[!, :meanlen1] = Int.(round.(out_df[!, :meanlen1]))
         out_df[!, :meanlen2] = Int.(round.(out_df[!, :meanlen2]))
@@ -447,7 +444,7 @@ function Base.write(fname::String, files::SingleTypeFiles)
 end
 
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
-                            filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8,
+                            filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distances=(50,20),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
                             overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50)
@@ -501,20 +498,34 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             addpvalues!(interactions, genome; include_singles=include_singles, include_read_identity=include_read_identity,
                 fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances)
             total_reads = sum(interactions.edges[!, :nb_ints])
-            above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             total_ints = nrow(interactions.edges)
+
+            above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
+
             total_sig_reads = sum(interactions.edges[interactions.edges.fdr .<= max_fdr, :nb_ints])
-            above_min_sig_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
             total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
-            above_min_sig_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
+
+            both_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
+            both_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
+
+            above_min_bp_reads = sum(interactions.edges[interactions.edges.pred_fdr .<= max_bp_fdr, :nb_ints])
+            above_min_bp_ints = sum(interactions.edges.pred_fdr .<= max_bp_fdr)
+
+            combined_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& (interactions.edges.pred_fdr .<= max_bp_fdr), :nb_ints])
+            combined_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& (interactions.edges.pred_fdr .<= max_bp_fdr))
+
             infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
-                "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints] , "both"=>[above_min_sig_reads, above_min_sig_ints])
+                "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "both"=>[both_reads, both_ints], "bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints],
+                "combined"=>[combined_reads, combined_ints])
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
-            CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr))
-            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, hist_bins=position_distribution_bins))
+            odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
+            CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), odf)
+            odf = asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, hist_bins=position_distribution_bins)
+            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), odf)
             write(joinpath(results_path, "stats", "$(condition).jld2"), interactions)
-            CSV.write(joinpath(results_path, "singles", "$(condition).csv"), asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr))
+            odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
+            CSV.write(joinpath(results_path, "singles", "$(condition).csv"), odf)
         end
         if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
             @info "Writing tables..."
@@ -528,12 +539,12 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 end
 chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, genome::Genome; conditions=conditionsdict(bams),
     filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, overwrite_type="IGR",
-    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05,
+    is_reverse_complement=true, include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, max_bp_fdr=0.05,
     check_interaction_distances=(50,20), overwrite_existing=false, include_read_identity=true, fisher_exact_tail="right",
     include_singles=true, allow_self_chimeras=false, position_distribution_bins=50, max_ligation_distance=5) =
 chimeric_analysis(features, bams, results_path, conditions, genome;
     filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
-    overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement,
+    overwrite_type=overwrite_type, max_ligation_distance=max_ligation_distance, is_reverse_complement=is_reverse_complement, max_bp_fdr=max_bp_fdr,
     check_interaction_distances=check_interaction_distances, include_secondary_alignments=include_secondary_alignments, fisher_exact_tail=fisher_exact_tail,
     include_alternative_alignments=include_alternative_alignments, min_reads=min_reads, max_fdr=max_fdr, overwrite_existing=overwrite_existing,
     include_read_identity=include_read_identity, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)

@@ -9,7 +9,7 @@ Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAna
     f["interactions"]
 end
 
-function load_data(results_path::String, genome_file::String, min_reads::Int, max_fdr::Float64)
+function load_data(results_path::String, genome_file::String, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64)
     interactions_path = realpath(joinpath(results_path, "stats"))
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
@@ -22,7 +22,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         end
     end
     for interact in values(interactions)
-        filter!(row -> (row.nb_ints >= min_reads) & (row.fdr <= max_fdr), interact.edges)
+        filter!(row -> (row.nb_ints >= min_reads) & (row.fdr <= max_fdr) & (isnan(row.pred_fdr) || (row.pred_fdr .<= max_bp_fdr)), interact.edges)
         interact.edges[!, :meanlen1] = Int.(round.(interact.edges[!, :meanlen1]))
         interact.edges[!, :meanlen2] = Int.(round.(interact.edges[!, :meanlen2]))
         interact.edges[!, :nms1] = round.(interact.edges[!, :nms1], digits=4)
@@ -54,7 +54,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
 end
 
 nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
-function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int)
+function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int, max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool)
     filtered_index = zeros(Bool, nrow(df))
     first_below_min_reads = findfirst(x->x<min_reads, df.nb_ints)
     min_reads_range = 1:(isnothing(first_below_min_reads) ? nrow(df) : first_below_min_reads-1)
@@ -62,6 +62,8 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     for search_string in search_strings
         search_string_index .|= ((df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string))
     end
+    search_string_index .&= ((df.fdr[min_reads_range] .<= max_fdr) .&
+        ((df.pred_fdr[min_reads_range] .<= max_bp_fdr) .| (ligation ? isnan.(df.pred_fdr[min_reads_range]) : zeros(Bool, length(min_reads_range)))))
     n = nthindex(search_string_index, max_interactions)
     isnothing(n) || (filtered_index[1:n] .= search_string_index[1:n])
     return @view df[filtered_index, :]

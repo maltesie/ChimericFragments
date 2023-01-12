@@ -8,6 +8,9 @@ const update_selection_outputs = [
 const update_selection_inputs = [
     Input("min-reads", "value"),
     Input("max-interactions", "value"),
+    Input("max-fdr", "value"),
+    Input("max-bp-fdr", "value"),
+    Input("ligation", "value"),
     Input("gene-multi-select", "value"),
     Input("dropdown-update-layout", "value")
 ]
@@ -17,9 +20,9 @@ const update_selection_states = [
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
-callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, search_strings, layout_value, dataset, tab_value
+callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, ligation, search_strings, layout_value, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
-    df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions)
+    df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation)
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
@@ -34,9 +37,9 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options")
 ]
-update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}}) =
+update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}}, min_reads::Int) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return 1, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_info[dataset])))]
+    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_info[dataset])))]
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
@@ -135,12 +138,12 @@ end
 
 const scores = Dict((DNA_A, DNA_T)=>4, (DNA_T, DNA_A)=>4, (DNA_C, DNA_G)=>5, (DNA_G, DNA_C)=>5, (DNA_G, DNA_T)=>1, (DNA_T, DNA_G)=>1)
 const model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-5, default_mismatch=-5); gap_open=-6, gap_extend=-5)
-function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distances::Tuple{Int,Int})
+function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int})
     i1, i2 = Int(edge_data["modelig1"]), Int(edge_data["modelig2"])
     ref1, ref2 = edge_data["ref1"], edge_data["ref2"]
     strand1, strand2 = edge_data["strand1"], edge_data["strand2"]
     l1, l2, r1, r2 = Int(edge_data["left1"]), Int(edge_data["left2"]), Int(edge_data["right1"]), Int(edge_data["right2"])
-    alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0) && (Float64(edge_data["pred_pvalue"]) <= max_interaction_pvalue)
+    alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0)
         s1 = strand1=="+" ?
             genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
             BioSequences.reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
@@ -152,7 +155,7 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
             (strand1=="+" ? ((i1-check_interaction_distances[1])-l1) : (r1-(i1+check_interaction_distances[1]))),
             (strand2=="-" ? (r2-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-l2)))
     else
-        "no significant basepairing prediction found."
+        "no ligation data."
     end
     return [html_div(id="edge-info", children=[
         html_p("RNA1: $(edge_data["source"]) on $ref1"),
@@ -222,7 +225,7 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, max_interaction_pvalue::Float64, check_interaction_distances::Tuple{Int,Int}) =
+update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value
     if tab_value == "circos"
         (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
@@ -234,7 +237,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
         no_edge_data && return node_info(node_data[1])
-        return edge_info(edge_data[1], genome, max_interaction_pvalue, check_interaction_distances)
+        return edge_info(edge_data[1], genome, check_interaction_distances)
     elseif tab_value == "summary"
         return ["Change the dataset or selection criteria to update the summary."]
     end

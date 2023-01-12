@@ -38,22 +38,50 @@ dataset_and_postioning_layout(datasets::Vector{String}) = html_div(
     children=[dataset_control_layout(datasets), positioning_control_layout()]
 )
 
-reads_selection_layout() = html_div(
+reads_selection_layout(min_reads::Int) = html_div(
     className="controls-block",
     children=[
         html_div(className="horizontal", children=[
             html_div(
-                style=Dict("padding-top"=>"5px"),
+                style=Dict("padding-top"=>"2px"),
                 children=[
                     html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="min-reads", type="number", value=1, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    dcc_input(id="min-reads", type="number", value=min_reads, min=min_reads, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             ),
             html_div(
-                style=Dict("padding-top"=>"5px", "margin-left"=>"15px"),
+                style=Dict("padding-top"=>"2px", "margin-left"=>"15px"),
                 children=[
                     html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
                     dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                ]
+            )
+        ]),
+        dcc_checklist(
+            id="ligation",
+            style=Dict("padding-top"=>"15px"),
+            options = [Dict("label" => "include interactions without ligation data", "value" => "ligation")],
+            value = ["ligation"]
+        )
+    ]
+)
+
+significance_selection_layout(max_fdr::Float64, max_bp_fdr::Float64) = html_div(
+    className="controls-block",
+    children=[
+        html_div(className="horizontal", children=[
+            html_div(
+                style=Dict("padding-top"=>"2px"),
+                children=[
+                    html_p(id="max-fdr-text", children=["max. fisher fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                    dcc_input(id="max-fdr", type="number", value=0.05, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                ]
+            ),
+            html_div(
+                style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
+                children=[
+                    html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                    dcc_input(id="max-bp-fdr", type="number", value=0.9, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             )
         ])
@@ -106,7 +134,7 @@ info_area_layout() = html_div(
     children=[html_p(id="info-output", children=["No interaction selected."])]
 )
 
-control_column_layout(datasets::Vector{String}) = html_div(
+control_column_layout(datasets::Vector{String}, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
     id="left-column",
     children=[
         headline_layout(),
@@ -114,7 +142,8 @@ control_column_layout(datasets::Vector{String}) = html_div(
             className="container",
             children=[
                 dataset_and_postioning_layout(datasets),
-                reads_selection_layout(),
+                reads_selection_layout(min_reads),
+                significance_selection_layout(max_fdr, max_bp_fdr),
                 search_layout(),
                 info_area_layout()
             ]
@@ -262,12 +291,13 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
     ]
 )
 
-browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}}) = html_div(
+browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}},
+                min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
     id="root",
     children=[html_div(
         id="app-container",
         children=[
-            control_column_layout(datasets),
+            control_column_layout(datasets, min_reads, max_fdr, max_bp_fdr),
             tabs_layout(genome_info, stylesheet)
         ]
     )]

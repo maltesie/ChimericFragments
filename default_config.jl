@@ -50,6 +50,7 @@ samplename_condition = [
     ("conditionC_rep3", "conditionC"),
 ]
 
+
 # BWA-MEM PARAMETERS
 
 # bwa-mem seeding parameter. No alignments shorter than min_seed_length can be found, can effect
@@ -81,6 +82,7 @@ sort_and_index_bam=false
 # set number of threads for bwa-mem2
 threads=8
 
+
 # CHIMERIC FRAGMENTS PARAMETERS
 
 # The minimum distance between two alignments on the same strand to be called chimeric. The distance
@@ -102,7 +104,7 @@ allow_self_chimeras=false
 # from different reads have a distance of infinity.
 max_ligation_distance=3
 
-# ChimericFragments outputs a position histogram of the ligation points. This sets the number of bins.
+# ChimericFragments outputs a position histogram of the ligation points. This sets the number of bins in it.
 position_distribution_bins=50
 
 
@@ -156,11 +158,7 @@ igr_type="IGR"
 # will be included in the contingency table
 include_orientation=true
 include_singles=true
-
-# The method of Benjamini-Hochberg is applied to compute the false discovery rate. Set the max_fdr to filter
-# the results. Also, interactions with a read count less than min_reads will be excluded from the results.
-max_fdr=0.05
-min_reads=1
+fisher_exact_tail="right"
 
 
 #BASEPAIRING PREDICTION PARAMETERS
@@ -168,12 +166,22 @@ min_reads=1
 # Simple basepairing predictions based on alignments are performed within check_interaction_distance_on
 # behind and check_interaction_distance_off in front of of the most frequent ligation points and the
 # predictions with a pvalue lower than max_interaction_pvalue are visualized in the browser.
-max_bp_pvalue=0.05
 bp_distance_behind=45
 bp_distance_before=10
 
 
-#VISUALIZATION PARAMETERS
+#DATA FILTER PARAMETERS
+
+# For large datasets, these parameters can be used to limit the results saved to the tables or loaded into
+# the visualization. The method of Benjamini-Hochberg is applied to compute the false discovery rate.
+# Set the max_fdr to filter the results by fisher's exact test. max_bp_fdr can be used to filter by the
+# significance of the basepairing predictions. And interactions with a read count less than or equal to
+# min_reads will be excluded from the results.
+max_fdr=1.0
+max_bp_fdr=1.0
+min_reads=1
+
+#DASH APP PARAMETERS
 
 # Set the ip address and port the web server will be bound to. 0.0.0.0 will make it listen on the local
 # network IP. To access the visualization, visit http://localhost:8050 in an internet browser.
