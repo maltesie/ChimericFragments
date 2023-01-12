@@ -54,4 +54,4 @@ conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if in
 chimeric_analysis(features, bams, results_path, conditions, genome; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
     overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_ligation_distance=max_ligation_distance,
     check_interaction_distances=(bp_distance_behind, bp_distance_before), include_read_identity=include_orientation, include_singles=include_singles,
-    allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
+    fisher_exact_tail=fisher_exact_tail, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
