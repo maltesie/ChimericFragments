@@ -194,9 +194,7 @@ function node_info(node_data::Dash.JSON3.Object)
         html_br(),
         html_div(children=[
             html_p("read counts for $(node_data["id"]):"),
-            html_p("$(node_data["interactions"]) in current network"),
-            html_p("$(node_data["nb_ints_total"]) in dataset"),
-            html_p("$(node_data["nb_single"]) non-chimeric")
+            html_p("$(node_data["interactions"]) (selection), $(node_data["nb_ints_total"]) (total), $(node_data["nb_single"]) (single)"),
         ])
     ])]
 end

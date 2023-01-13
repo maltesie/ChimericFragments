@@ -173,7 +173,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
-function circos_data(df::SubDataFrame; min_thickness=2000, max_thickness=5000)
+function circos_data(df::SubDataFrame; min_thickness=1000, max_thickness=3000)
     current_total = sum(df.nb_ints)
     tracks = [chords_track([Dict{String,Any}(
         "source"=>Dict("id"=>row.ref1,
@@ -242,19 +242,21 @@ function summary_statistics(interactions::Interactions, df::SubDataFrame, param_
     html_div(className="horizontal",
         children=[
             html_div([
-                html_h3("dataset summary:"),
-                pairs_to_table(dataset_info),
-                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
-                dataset_types_table
-            ], style=Dict("padding-right"=>"50px")),
-            html_div([
                 html_h3("selection summary:"),
                 pairs_to_table(selection_info),
                 html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
                 selection_types_table
-            ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
+            ], style=Dict("padding-right"=>"50px")),
+
             html_div([
-                html_h3("analysis parameter:"),
+                html_h3("dataset summary:"),
+                pairs_to_table(dataset_info),
+                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
+                dataset_types_table
+            ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
+
+            html_div([
+                html_h3("dataset parameter:"),
                 pairs_to_table(param_dict)
             ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px")),
         ]

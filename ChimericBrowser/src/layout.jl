@@ -74,14 +74,14 @@ significance_selection_layout(max_fdr::Float64, max_bp_fdr::Float64) = html_div(
                 style=Dict("padding-top"=>"2px"),
                 children=[
                     html_p(id="max-fdr-text", children=["max. fisher fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-fdr", type="number", value=0.05, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    dcc_input(id="max-fdr", type="number", value=max_fdr, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             ),
             html_div(
                 style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
                 children=[
                     html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-bp-fdr", type="number", value=0.9, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             )
         ])

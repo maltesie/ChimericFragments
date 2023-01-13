@@ -512,8 +512,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_bp_reads = sum(interactions.edges[interactions.edges.pred_fdr .<= max_bp_fdr, :nb_ints])
             above_min_bp_ints = sum(interactions.edges.pred_fdr .<= max_bp_fdr)
 
-            combined_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& (interactions.edges.pred_fdr .<= max_bp_fdr), :nb_ints])
-            combined_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& (interactions.edges.pred_fdr .<= max_bp_fdr))
+            combined_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& ((interactions.edges.pred_fdr .<= max_bp_fdr) .| isnan.(interactions.edges.pred_fdr)), :nb_ints])
+            combined_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads) .& ((interactions.edges.pred_fdr .<= max_bp_fdr) .| isnan.(interactions.edges.pred_fdr)))
 
             infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "both"=>[both_reads, both_ints], "bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints],
