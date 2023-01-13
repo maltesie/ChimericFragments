@@ -158,6 +158,11 @@ igr_type="IGR"
 # will be included in the contingency table
 include_orientation=true
 include_singles=true
+
+# Fisher's exact test uses the hypergeometric distribution to determine p-values from a contingency table
+# fisher_exact_tail can be set to "left", "both" or "right". This determines, if significance is assigned
+# to interactions with less occurance than to be expected ("left"), more occurence than to be expected
+# ("right"), or both ("both").
 fisher_exact_tail="right"
 
 
