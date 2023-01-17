@@ -494,7 +494,7 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RNASeqTools]]
 deps = ["BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CodecZlib", "FASTX", "GFF3", "GenomicFeatures", "IterTools", "XAM"]
-git-tree-sha1 = "d5693065f5014770afb19fe3bd92f51c27a699a7"
+git-tree-sha1 = "25b3d9fa8d1a14c7842677d9d8db5858c80e33fc"
 repo-rev = "master"
 repo-url = "https://github.com/maltesie/RNASeqTools#master"
 uuid = "c929925e-1c85-4562-9573-d68085edd19a"
