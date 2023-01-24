@@ -53,7 +53,7 @@ Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 canmerge(alns::AlignedReads, i1::Int, i2::Int) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
 ((alns.strands[i1] == RNASeqTools.STRAND_POS) ? (alns.leftpos[i1]<=alns.leftpos[i2]) : (alns.rightpos[i1]>=alns.rightpos[i2]))
 
-function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead; min_distance=1000)
+function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead)
     alns = alnread.alns
     index = @view alns.pindex[alnread.range]
     length(mergedread.pindexpairs) >= length(index) || resize!(mergedread.pindexpairs, length(index))
@@ -131,8 +131,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     for alignment in alignments
         total_count += 1
         !isempty(filter_types) && typein(alignment, filter_types) && (exclude_count += 1; continue)
-        mergeparts!(mergedread, alignment; min_distance=min_distance)
-        is_chimeric = ischimeric(mergedread)
+        mergeparts!(mergedread, alignment)
+        is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
         is_chimeric ? chimeric_count += 1 : single_count +=1
 
         is_multi = is_chimeric ? length(mergedread)>2 : false

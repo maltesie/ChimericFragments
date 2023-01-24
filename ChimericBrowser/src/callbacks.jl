@@ -10,9 +10,10 @@ const update_selection_inputs = [
     Input("max-interactions", "value"),
     Input("max-fdr", "value"),
     Input("max-bp-fdr", "value"),
-    Input("ligation", "value"),
     Input("gene-multi-select", "value"),
-    Input("dropdown-update-layout", "value")
+    Input("dropdown-update-layout", "value"),
+    Input("ligation", "value"),
+    Input("exclusive-search", "value"),
 ]
 const update_selection_states = [
     State("dropdown-update-dataset", "value"),
@@ -20,9 +21,9 @@ const update_selection_states = [
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
-callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, ligation, search_strings, layout_value, dataset, tab_value
+callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, layout_value, ligation, exclusive, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
-    df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation)
+    df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
@@ -177,7 +178,7 @@ ligation_modes_table(ligation_points::Dash.JSON3.Object; ncolumns=5) =
         children=[
             html_p(title="$d", String(k)[1] === '-' ? "$k: $v" : "+$k: $v") for (k,(v,d)) in sort(collect(ligation_points), by=x->parse(Int, String(x[1])))
         ],
-        style=Dict("display"=>"grid", "grid-template-columns"=>repeat("1fr ", ncolumns))
+        style=Dict("display"=>"grid", "grid-template-columns"=>repeat("1fr ", ncolumns), "max-height"=>"100px", "overflow"=>"scroll")
     )
 
 function node_info(node_data::Dash.JSON3.Object)
@@ -257,17 +258,21 @@ const click_table_button_states = [
     State("radio-options-csv", "value"),
     State("min-reads", "value"),
     State("max-interactions", "value"),
+    State("max-fdr", "value"),
+    State("max-bp-fdr", "value"),
     State("gene-multi-select", "value"),
+    State("ligation", "value"),
+    State("exclusive-search", "value"),
 ]
 const table_column_names = [:name1, :type1, :ref1, :strand1, :name2, :type2, :ref2, :strand2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,:left1, :right1, :modeint1,
 :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :left2, :right2, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
 click_table_button_callback!(app::Dash.DashApp, interactions::Dict{String,Interactions}) =
-callback!(app, click_table_button_outputs, click_table_button_inputs, click_table_button_states; prevent_initial_call=true) do clicks, dataset, csv_option, min_reads, max_interactions, search_strings
+callback!(app, click_table_button_outputs, click_table_button_inputs, click_table_button_states; prevent_initial_call=true) do clicks, dataset, csv_option, min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, ligation, exclusive
     if clicks>0
         my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
         df = (csv_option == "full") ?
             interactions[dataset].edges[!, table_column_names] :
-            DataFrame(filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions))[!, table_column_names]
+            DataFrame(filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive))[!, table_column_names]
         csvrowwriteriterator = CSV.RowWriter(df)
         dfstring = join(collect(csvrowwriteriterator))
         return [Dict("filename"=>"$(dataset)_$(csv_option)_table.csv", "content"=>dfstring ,"base64"=>false)]

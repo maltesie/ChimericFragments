@@ -107,6 +107,12 @@ search_layout() = html_div(
                     n_clicks=0,
                     style=Dict("position"=>"relative", "padding"=>"0px", "width"=>"50px", "height"=>"36px", "line-height"=>"0px", "color"=>"#7fafdf"))
             ]
+        ),
+        dcc_checklist(
+            id="exclusive-search",
+            options=[Dict("label"=>"exclusive search", "value"=>"exclusive")],
+            style=Dict("padding-top"=>"12px"),
+            value=["exclusive"]
         )
     ]
 )

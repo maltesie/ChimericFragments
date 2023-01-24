@@ -53,17 +53,24 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
     return interactions, gene_name_info, gene_name_position, genome_info, genome
 end
 
-nthindex(a::Vector{Bool}, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
-function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int, max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool)
-    filtered_index = zeros(Bool, nrow(df))
+nthindex(a::BitVector, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
+function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_reads::Int, max_interactions::Int,
+                            max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool, exclusive::Bool)
+    filtered_index = falses(nrow(df))
     first_below_min_reads = findfirst(x->x<min_reads, df.nb_ints)
     min_reads_range = 1:(isnothing(first_below_min_reads) ? nrow(df) : first_below_min_reads-1)
-    search_string_index = isempty(search_strings) ? ones(Bool, length(min_reads_range)) : zeros(Bool, length(min_reads_range))
-    for search_string in search_strings
-        search_string_index .|= ((df.name1[min_reads_range] .=== search_string) .| (df.name2[min_reads_range] .=== search_string))
+    search_string_index = if isempty(search_strings)
+        trues(length(min_reads_range))
+    else
+        s1, s2 = falses(length(min_reads_range)), falses(length(min_reads_range))
+        for search_string in search_strings
+            s1 .|= (df.name1[min_reads_range] .=== search_string)
+            s2 .|= (df.name2[min_reads_range] .=== search_string)
+        end
+        (exclusive && (length(search_strings) > 1)) ? (s1 .& s2) : (s1 .| s2)
     end
     search_string_index .&= ((df.fdr[min_reads_range] .<= max_fdr) .&
-        ((df.pred_fdr[min_reads_range] .<= max_bp_fdr) .| (ligation ? isnan.(df.pred_fdr[min_reads_range]) : zeros(Bool, length(min_reads_range)))))
+        ((df.pred_fdr[min_reads_range] .<= max_bp_fdr) .| (ligation ? isnan.(df.pred_fdr[min_reads_range]) : falses(length(min_reads_range)))))
     n = nthindex(search_string_index, max_interactions)
     isnothing(n) || (filtered_index[1:n] .= search_string_index[1:n])
     return @view df[filtered_index, :]
