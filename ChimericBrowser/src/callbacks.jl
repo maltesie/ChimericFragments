@@ -117,7 +117,7 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
             print(refbuf, lpad(refpos, posw))
             print(matbuf)
 
-            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n\n"
+            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n⋅⋅⋅\n"
 
             if next_xy !== nothing
                 seek(seqbuf, 0)
@@ -132,7 +132,7 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
         print(refbuf, lpad(refpos, posw))
         print(matbuf)
 
-        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n\n"
+        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf))
     end
     outstring
 end
@@ -165,7 +165,7 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
         html_p("RNA2: $(edge_data["target"]) on $ref2"),
         gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), i2, Int(edge_data["modeligcount2"]), l2, r2, strand2=="-", false),
         html_br(),
-        html_p(children=alnstring, style=Dict("white-space" => "pre-wrap", "font-family" => "monospace")),
+        html_p(children=alnstring, style=Dict("white-space" => "pre-wrap", "font-family" => "monospace", "max-height"=>"70px", "overflow"=>"scroll")),
         html_br(),
         html_p("total reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) ligation points)")
     ])]
