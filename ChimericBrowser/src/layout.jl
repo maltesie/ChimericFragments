@@ -56,13 +56,7 @@ reads_selection_layout(min_reads::Int) = html_div(
                     dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             )
-        ]),
-        dcc_checklist(
-            id="ligation",
-            style=Dict("padding-top"=>"15px"),
-            options = [Dict("label" => "include interactions without ligation data", "value" => "ligation")],
-            value = ["ligation"]
-        )
+        ])
     ]
 )
 
@@ -84,7 +78,13 @@ significance_selection_layout(max_fdr::Float64, max_bp_fdr::Float64) = html_div(
                     dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                 ]
             )
-        ])
+        ]),
+        dcc_checklist(
+            id="ligation",
+            style=Dict("padding-top"=>"15px"),
+            options = [Dict("label" => "include interactions without ligation data", "value" => "ligation")],
+            value = []
+        )
     ]
 )
 

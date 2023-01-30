@@ -305,8 +305,9 @@ function addpvalues!(interactions::Interactions, genome::Genome; fisher_exact_ta
     return interactions
 end
 
+cdsposition(feature::Interval{Annotation}) = hasparam(feature, "cds") ? param(feature, "cds", Int) : 0
 function addpositions!(interactions::Interactions, features::Features)
-    tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature)) for feature in features)
+    tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature), cdsposition(feature)) for feature in features)
     for (col_featurepos, col_modes, col_rels) in zip([:left1, :right1, :left2, :right2], [:modeint1, :modeint2, :modelig1, :modelig2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
         interactions.edges[:, col_featurepos] = Vector{Int}(undef, length(interactions))
         interactions.edges[:, col_modes] = Vector{Float64}(undef, length(interactions))
@@ -331,8 +332,9 @@ function addpositions!(interactions::Interactions, features::Features)
     end
     interactions.nodes[:, :left] = Vector{Int}(undef, nrow(interactions.nodes))
     interactions.nodes[:, :right] = Vector{Int}(undef, nrow(interactions.nodes))
+    interactions.nodes[:, :cds] = Vector{Int}(undef, nrow(interactions.nodes))
     for nodes_row in eachrow(interactions.nodes)
-        nodes_row[[:left, :right]] = tus[nodes_row[:hash]]
+        nodes_row[[:left, :right, :cds]] = tus[nodes_row[:hash]]
     end
     return interactions
 end
@@ -372,8 +374,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_nodes = copy(interactions.nodes)
         for (i,row) in enumerate(eachrow(out_nodes))
             row[:nb_ints] = sum(out_df[(out_df.src .== i) .| (out_df.dst .== i), :nb_ints])
-            names = Set(hcat(interactions.nodes[out_df[!,:src], :name],interactions.nodes[out_df[!,:src], :name])[hcat((out_df.src .== i),(out_df.dst .== i))])
-            row[:nb_partners] = length(names)
+            partners = union!(Set(out_df[out_df.src .== i, :dst]), Set(out_df[out_df.dst .== i, :src]))
+            row[:nb_partners] = length(partners)
         end
         return sort!(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints, :nb_partners]], :nb_single; rev=true)
     elseif output === :stats
@@ -407,7 +409,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
     end
 end
 
-function mergetypes(features::Features, types::Vector{String}, mergetype::String)
+function mergetypes(features::Features, cds_type::String, five_type::String, three_type::String, mergetype::String)
+    types = (cds_type, five_type, three_type)
     merged_features = Interval{Annotation}[]
     feature_collector = Dict{String,Vector{Interval{Annotation}}}(name(feature)=>Interval{Annotation}[] for feature in features if type(feature) in types)
     for feature in features
@@ -418,14 +421,15 @@ function mergetypes(features::Features, types::Vector{String}, mergetype::String
         end
     end
     for (n, fs) in feature_collector
-        any((refname(f)!=refname(fs[1])) || (strand(f)!=strand(fs[1])) for f in fs) &&
+        s = strand(fs[1])
+        ref = refname(fs[1])
+        any((refname(f)!=ref) || (strand(f)!=s) for f in fs) &&
             throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
         left = minimum(leftposition(f) for f in fs)
         right = maximum(rightposition(f) for f in fs)
-        inbetweens = sort([rightposition(f) for f in fs if rightposition(f)!=right])
-        relinbetweens = (inbetweens .- left) ./ (right-left)
-        ann = Dict("Name"=>n, "inbetween"=>join(",", inbetweens), "relinbetweens"=>join(",", round.(relinbetweens; digits=4)))
-        push!(merged_features, Interval(refname(fs[1]), left, right, strand(fs[1]), Annotation(mergetype, n, ann)))
+        cds = first((s == STRAND_POS ? leftposition : rightposition)(f) for f in fs if type(f) == cds_type)
+        ann = Dict("Name"=>n, "cds"=>isnothing(cds) ? "NA" : "$cds")
+        push!(merged_features, Interval(ref, left, right, s, Annotation(mergetype, n, ann)))
     end
     return Features(merged_features)
 end

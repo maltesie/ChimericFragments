@@ -43,7 +43,7 @@ else
     merge!(features, Features(annotation_file, [igr_type]; name_keys=name_keys))
 end
 
-merge_utrs_and_cds && (features = mergetypes(features, [threeutr_type, fiveutr_type, cds_type], cds_type))
+merge_utrs_and_cds && (features = mergetypes(features, cds_type, threeutr_type, fiveutr_type, merge_type))
 
 bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_interleaved_paired_end=is_interleaved_paired_end, min_score=min_alignment_score,
     match=match_score, mismatch=mismatch_penalty, gap_open=gap_open_penalty, gap_extend=gap_extend_penalty, clipping_penalty=clipping_penalty, unpair_penalty=unpair_penalty,

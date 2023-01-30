@@ -19,7 +19,7 @@ const update_selection_states = [
     State("dropdown-update-dataset", "value"),
     State("data-tabs", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}},
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}}},
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, layout_value, ligation, exclusive, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
@@ -38,24 +38,26 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options")
 ]
-update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}}}, min_reads::Int) =
+update_dataset_callback!(app::Dash.DashApp, gene_name_info::Dict{String,Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}}}, min_reads::Int) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(collect(keys(gene_name_info[dataset])))]
+    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(collect(Set(v[9] for v in values(gene_name_info[dataset]))))]
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
 mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
-function gene_arrow_and_means(m1::Int, count1::Int, m2::Int, count2::Int, left::Int, right::Int, isnegative::Bool, isrna1::Bool)
+function gene_arrow_and_means(m1::Int, count1::Int, m2::Int, count2::Int, left::Int, right::Int, cds::Int, isnegative::Bool, isrna1::Bool)
     arrows = [
         m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow interaction-left" : "colorbar-arrow interaction-right",
-                                            title="$count1 reads", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
+                                            title="$m1", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
         m2==0 ? html_div(className="colorbar-arrow mode empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow ligation-left" : "colorbar-arrow ligation-right",
-                                            title="$count2 reads", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
+                                            title="$m2", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
     ]
-    p2 = isnegative ? right-m2+1 : m2-left+1
-    p1 = isnegative ? right-m1+1 : m1-left+1
-    s2 = p2>=0 ? " +" : " "
-    s1 = p1>=0 ? " +" : " "
+    p2 = isnegative ? (cds > 0 ? cds : right)-m2+1 : m2-(cds > 0 ? cds : left)+1
+    p1 = isnegative ? (cds > 0 ? cds : right)-m1+1 : m1-(cds > 0 ? cds : left)+1
+    p2 <= 0 && (p2 -= 1)
+    p1 <= 0 && (p1 -= 1)
+    s2 = p2>0 ? " +" : " "
+    s1 = p1>0 ? " +" : " "
     return html_div(children=[
         #html_p("$m1, $(mapvalue(normalize(m1, left, right, isnegative))), $m2, $(mapvalue(normalize(m2, left, right, isnegative)))"),
         html_p(m2 == 0 ? "no ligation data." : "most frequent ligation point:$s2$p2 ($count2 reads)", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"12px", "color"=>"DarkSalmon")),
@@ -76,12 +78,12 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=20)
+function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=200)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
     # width of position numbers
-    posw = ndigits(max(offset1 + anchors[end].seqpos, offset2 - anchors[1].refpos)) + 1
+    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos))) + 2
     outstring = ""
     i = 0
     seqpos = offset1 + anchors[1].seqpos
@@ -103,9 +105,9 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
         end
 
         if i % width == 1
-            print(seqbuf, " RNA1:", lpad(seqpos, posw), ' ')
-            print(refbuf, " RNA2:", lpad(refpos, posw), ' ')
-            print(matbuf, " "^(posw + 7))
+            print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
+            print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
+            print(matbuf, " "^(posw + 6))
         end
 
         print(seqbuf, RNA(x))
@@ -113,8 +115,8 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
         print(matbuf, alnchar(x, y))
 
         if i % width == 0
-            print(seqbuf, lpad(seqpos, posw))
-            print(refbuf, lpad(refpos, posw))
+            print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
+            print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
             print(matbuf)
 
             outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n⋅⋅⋅\n"
@@ -128,8 +130,8 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
     end
 
     if i % width != 0
-        print(seqbuf, lpad(seqpos, posw))
-        print(refbuf, lpad(refpos, posw))
+        print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
+        print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
         print(matbuf)
 
         outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf))
@@ -143,7 +145,7 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
     i1, i2 = Int(edge_data["modelig1"]), Int(edge_data["modelig2"])
     ref1, ref2 = edge_data["ref1"], edge_data["ref2"]
     strand1, strand2 = edge_data["strand1"], edge_data["strand2"]
-    l1, l2, r1, r2 = Int(edge_data["left1"]), Int(edge_data["left2"]), Int(edge_data["right1"]), Int(edge_data["right2"])
+    l1, l2, r1, r2, c1, c2 = Int(edge_data["left1"]), Int(edge_data["left2"]), Int(edge_data["right1"]), Int(edge_data["right2"]), Int(edge_data["cds1"]), Int(edge_data["cds2"])
     alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0)
         s1 = strand1=="+" ?
             genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
@@ -153,21 +155,20 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
             BioSequences.reverse(genome[ref2][(i2-check_interaction_distances[2]):(i2+check_interaction_distances[1])])
         p = pairalign(LocalAlignment(), s1, s2, model)
         baisepairing_string(alignment(p),
-            (strand1=="+" ? ((i1-check_interaction_distances[1])-l1) : (r1-(i1+check_interaction_distances[1]))),
-            (strand2=="-" ? (r2-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-l2)))
+            (strand1=="+" ? ((i1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]))),
+            (strand2=="-" ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
     else
         "no ligation data."
     end
     return [html_div(id="edge-info", children=[
-        html_p("RNA1: $(edge_data["source"]) on $ref1"),
-        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), i1, Int(edge_data["modeligcount1"]), l1, r1, strand1=="-", true),
+        html_p("RNA1: $(edge_data["name1"]) on $ref1"),
+        gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), i1, Int(edge_data["modeligcount1"]), l1, r1, c1, strand1=="-", true),
         html_br(),
-        html_p("RNA2: $(edge_data["target"]) on $ref2"),
-        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), i2, Int(edge_data["modeligcount2"]), l2, r2, strand2=="-", false),
+        html_p("RNA2: $(edge_data["name2"]) on $ref2"),
+        gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), i2, Int(edge_data["modeligcount2"]), l2, r2, c2, strand2=="-", false),
         html_br(),
-        html_p(children=alnstring, style=Dict("white-space" => "pre-wrap", "font-family" => "monospace", "max-height"=>"70px", "overflow"=>"scroll")),
-        html_br(),
-        html_p("total reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) ligation points)")
+        html_p(children=alnstring, style=Dict("white-space" => "pre", "font-family" => "monospace", "max-width"=>"300px", "overflow"=>"scroll", "padding-bottom"=>"13px")),
+        html_p("supporting reads: $(edge_data["interactions"]) ($(edge_data["ligcount"]) with ligation point)")
     ])]
 end
 
@@ -183,7 +184,7 @@ ligation_modes_table(ligation_points::Dash.JSON3.Object; ncolumns=5) =
 
 function node_info(node_data::Dash.JSON3.Object)
     return [html_div(id="edge-info", children=[
-        html_p("$(node_data["id"])"),
+        html_p("$(node_data["name"])"),
         html_p("On $(node_data["ref"]) ($(node_data["strand"])) from $(node_data["left"]) to $(node_data["right"]) ($(node_data["right"]-node_data["left"]+1)nt)"),
         html_p("$(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
         html_br(),
@@ -203,11 +204,11 @@ end
 function circos_description(circos_data::Dash.JSON3.Object)
     data = circos_data["data"]
     html_div([
-        html_p("RNA1: $(data["source"]) on $(data["ref1"]) ($(data["strand1"]))"),
+        html_p("RNA1: $(data["name1"]) on $(data["ref1"]) ($(data["strand1"]))"),
         html_p("feature left: $(data["left1"])"),
         html_p("feature right: $(data["right1"])"),
         html_br(),
-        html_p("RNA2: $(data["target"]) on $(data["ref2"]) ($(data["strand2"]))"),
+        html_p("RNA2: $(data["name2"]) on $(data["ref2"]) ($(data["strand2"]))"),
         html_p("feature left: $(data["left2"])"),
         html_p("feature right: $(data["right2"])"),
         html_br(),
@@ -292,8 +293,8 @@ click_add_node_callback!(app::Dash.DashApp) =
 callback!(app, click_add_node_outputs, click_add_node_inputs, click_add_node_states; prevent_initial_call=true) do clicks, node_data, search_strings
     if clicks>0 && !isnothing(node_data) && !isempty(node_data)
         my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
-        node_data[1]["id"] in my_search_strings && throw(PreventUpdate())
-        return push!(my_search_strings, node_data[1]["id"])
+        node_data[1]["name"] in my_search_strings && throw(PreventUpdate())
+        return push!(my_search_strings, node_data[1]["name"])
     else
         throw(PreventUpdate())
     end

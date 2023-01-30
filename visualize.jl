@@ -19,7 +19,7 @@ using ChimericBrowser
 
 types = Dict(
     "srna"=>srna_type,
-    "cds"=>cds_type,
+    "cds"=>merge_utrs_and_cds ? merge_type : cds_type,
     "5utr"=>fiveutr_type,
     "3utr"=>threeutr_type
 )
@@ -32,7 +32,7 @@ param_dict::Vector{Pair{String,String}} = [
     "max. basepairing fdr:"=>"$max_bp_fdr",
     "max. Fisher's exact fdr:"=>"$max_fdr",
     "use order on read for Fisher's exact test:" => include_orientation ? "yes" : "no",
-    "use non-chimeric count for Fisher's exact test:" => include_singles ? "yes" : "no",
+    "use single count for Fisher's exact test:" => include_singles ? "yes" : "no",
     "Fisher's test tail:"=>fisher_exact_tail,
     "self-chimeras included:" => allow_self_chimeras ? "yes" : "no",
     "autocompleted UTRs" => autocomplete_utrs ? "yes, with $autocomplete_utr_length nt max. length" : "no",

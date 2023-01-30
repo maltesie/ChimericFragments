@@ -82,15 +82,16 @@ function stylesheet(types::Dict{String,String})
     utr5_node_style = Dict(
         "selector"=> ".$(types["5utr"])",
         "style"=> Dict(
-            "background-color"=> "BurlyWood",
+            "background-color"=> "Brown",
             "font-weight"=>"bold"
         )
     )
     utr3_node_style = Dict(
         "selector"=> ".$(types["3utr"])",
         "style"=> Dict(
-            "background-color"=> "BurlyWood",
-            "font-weight"=>"bold"
+            "background-color"=> "DarkBlue",
+            "font-weight"=>"bold",
+            "color"=>"LightGrey"
         )
     )
     return [core_style, base_node_style, selected_node_style, srna_node_style, cds_node_style, utr5_node_style, utr3_node_style,

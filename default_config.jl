@@ -142,6 +142,7 @@ threeutr_type="3UTR"
 # If true, all annotations of type cds_type, fiveutr_type and threeutr_type are merged to one annotation.
 # All information on relative positions are with respect to the merged annotation then.
 merge_utrs_and_cds=true
+merge_type="CDS_UTRS"
 
 # All space on the genome without annotation is annotated as IGR of type igr_type with the closest upstream
 # and downstream annotation on the same strand used to name the IGR by separating them by a colon.

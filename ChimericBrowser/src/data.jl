@@ -47,9 +47,9 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         end
         sort!(interact.edges, :nb_ints; rev=true)
     end
-    gene_name_info = Dict(dname=>Dict(n=>(t,rr,l,r,s,nsingle,nint) for (n,t,l,r,rr,s,nsingle,nint) in
-        eachrow(interact.nodes[!, [:name, :type, :left, :right, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
-    gene_name_position = Dict(dname=>Dict(n=>Dict("x"=>x, "y"=>y) for (n,x,y) in eachrow(interact.nodes[!, [:name, :x, :y]])) for (dname, interact) in interactions)
+    gene_name_info = Dict(dname=>Dict(n*t=>(t,rr,l,r,s,nsingle,nint,cds,n) for (n,t,l,r, cds, rr,s,nsingle,nint) in
+        eachrow(interact.nodes[!, [:name, :type, :left, :right, :cds, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
+    gene_name_position = Dict(dname=>Dict(n*t=>Dict("x"=>x, "y"=>y) for (n,t,x,y) in eachrow(interact.nodes[!, [:name, :type, :x, :y]])) for (dname, interact) in interactions)
     return interactions, gene_name_info, gene_name_position, genome_info, genome
 end
 
@@ -103,9 +103,10 @@ function get_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_distance=100,
     return pos
 end
 function clustered_positions(df::SubDataFrame)
-    names = collect(Set(vcat(df.name1, df.name2)))
+    i1, i2 = df.name1 .* df.type1, df.name2 .* df.type2
+    names = collect(Set(vcat(i1, i2)))
     name_trans = Dict(n=>i for (i,n) in enumerate(names))
-    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(df.name1, df.name2))
+    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(i1, i2))
     g = Graph(edges)
     pos = get_positions(g)
     return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
@@ -118,7 +119,12 @@ joint_targets_rna1(df::SubDataFrame, node_name::String, mode_lig::Float64; delim
 joint_targets_rna2(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name2 .=== node_name) .& (df.modelig2 .=== mode_lig), :name1], delim)
 mode_counts(src::Int, dst::Int, stats::Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}, mode::Int, dict_index::Int) =
     stats[(src, dst)][dict_index][mode], (mode-1 in keys(stats[(src, dst)][dict_index]) ? stats[(src, dst)][dict_index][mode-1] : 0) + (mode+1 in keys(stats[(src, dst)][dict_index]) ? stats[(src, dst)][dict_index][mode+1] : 0)
-function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int}},
+function ligation_trafo(tup::Tuple{String, String, Int, Int, Char, Int, Int, Int, String}, k::Float64)
+    i = Int(tup[5] === '-' ?  (tup[8] > 0 ? tup[8] : tup[4]) - k + 1 : k - (tup[8] > 0 ? tup[8] : tup[3]) + 1)
+    i <= 0 ? i-1 : i
+end
+relativepos(s::Bool)
+function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}},
                             gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
@@ -127,9 +133,11 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
     pos = layout_value == "random" ? gene_name_position : clustered_positions(df)
     edges = [Dict(
         "data"=>Dict(
-            "id"=>row.name1*row.name2,
-            "source"=>row.name1,
-            "target"=>row.name2,
+            "id"=>row.name1*row.type1*row.name2*row.type2,
+            "source"=>row.name1*row.type1,
+            "target"=>row.name2*row.type2,
+            "name1"=>row.name1,
+            "name2"=>row.name2,
             "current_total"=>total_ints,
             "current_ratio"=>round(row.nb_ints/max_ints; digits=2),
             "interactions"=>row.nb_ints,
@@ -143,6 +151,8 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "ref2"=>row.ref2,
             "len1"=>row.meanlen1,
             "len2"=>row.meanlen2,
+            "cds1"=>gene_name_info[row.name1*row.type1][8],
+            "cds2"=>gene_name_info[row.name2*row.type2][8],
             "pred_pvalue"=>(isnan(row.pred_pvalue) ? 2.0 : row.pred_pvalue),
             "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
             "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
@@ -153,30 +163,40 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_
             "modeintcount2"=>isnan(row.modeint2) ? 0 : interact.edgestats[(row.src, row.dst)][4][row.modeint2],
             "modeligcount2"=>isnan(row.modelig2) ? 0 : interact.edgestats[(row.src, row.dst)][5][row.modelig2],
             "ligcount"=>isnan(row.modelig1) ? 0 : sum(values(interact.edgestats[(row.src, row.dst)][3])),
-            "relpos"=> s2 ? (isnan(row.rel_lig1) ? row.rel_int1 : row.rel_lig1) : (isnan(row.rel_lig2) ? row.rel_int2 : row.rel_lig2)
+            "relpos"=> s2 ?
+                (isnan(row.rel_lig1) ? row.rel_int1 : row.rel_lig1) :
+                (isnan(row.rel_lig2) ? row.rel_int2 : row.rel_lig2)
         ),
         "classes"=>s1 != s2 ? "srna_edge" : "other_edge") for (row, (s1, s2)) in zip(eachrow(df), eachrow(srnaindex))]
     nodes = [Dict(
         "data"=>Dict(
             "id"=>n,
-            "label"=>replace(n, ":"=>"\n"),
-            "interactions"=>node_sum(df, n),
-            "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
-            "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== n]), Set(df.name2[df.name1 .=== n]))),
+            "name"=>gene_name_info[n][9],
+            "label"=>replace(gene_name_info[n][9], ":"=>"\n"),
+            "interactions"=>node_sum(df, gene_name_info[n][9]),
+            "current_ratio"=>round(node_sum(df, gene_name_info[n][9])/total_ints; digits=2),
+            "nb_partners"=>length(union!(Set(df.name1[df.name2 .=== gene_name_info[n][9]]), Set(df.name2[df.name1 .=== gene_name_info[n][9]]))),
             "current_total"=>total_ints,
-            "lig_as_rna1"=>Dict("$(Int(gene_name_info[n][5] === '-' ?  gene_name_info[n][4] - k + 1 : k - gene_name_info[n][3] + 1))"=>(
-                v, joint_targets_rna1(df, n, k)) for (k,v) in count_values_rna1(df, n, :modelig1) if !isnan(k)),
-            "lig_as_rna2"=>Dict("$(Int(gene_name_info[n][5] === '-' ?  gene_name_info[n][4] - k + 1 : k - gene_name_info[n][3] + 1))"=>(
-                v, joint_targets_rna2(df, n, k)) for (k,v) in count_values_rna2(df, n, :modelig2) if !isnan(k)),
+            "lig_as_rna1"=>Dict(
+                "$(ligation_trafo(gene_name_info[n], k))"=>
+                (v, joint_targets_rna1(df, gene_name_info[n][9], k))
+                for (k,v) in count_values_rna1(df, gene_name_info[n][9], :modelig1) if !isnan(k)
+            ),
+            "lig_as_rna2"=>Dict(
+                "$(ligation_trafo(gene_name_info[n], k))"=>
+                (v, joint_targets_rna2(df, gene_name_info[n][9], k))
+                for (k,v) in count_values_rna2(df, gene_name_info[n][9], :modelig2) if !isnan(k)
+            ),
             "left"=>gene_name_info[n][3],
             "right"=>gene_name_info[n][4],
             "ref"=>gene_name_info[n][2],
             "strand"=>gene_name_info[n][5],
             "nb_single"=>gene_name_info[n][6],
             "nb_ints_total"=>gene_name_info[n][7],
+            "cds"=>gene_name_info[n][8],
         ),
         "classes"=>gene_name_info[n][1],
-        "position"=>pos[n]) for n in Set(vcat(df.name1, df.name2))]
+        "position"=>pos[n]) for n in Set(vcat(df.name1 .* df.type1, df.name2 .* df.type2))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
@@ -190,9 +210,11 @@ function circos_data(df::SubDataFrame; min_thickness=1000, max_thickness=3000)
             "start"=>(row.left2 + row.right2)/2 - mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2),
             "end"=>(row.left2 + row.right2)/2 + mapvalue(row.nb_ints/current_total; to_min=min_thickness/2, to_max=max_thickness/2)),
         "data"=>Dict(
-                "id"=>row.name1*row.name2,
-                "source"=>row.name1,
-                "target"=>row.name2,
+                "id"=>row.name1*row.type1*row.name2*row.type2,
+                "source"=>row.name1*row.type1,
+                "target"=>row.name2*row.type2,
+                "name1"=>row.name1,
+                "name2"=>row.name2,
                 "current_total"=>current_total,
                 "current_ratio"=>round(row.nb_ints/current_total; digits=2),
                 "interactions"=>row.nb_ints,
