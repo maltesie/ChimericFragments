@@ -123,7 +123,7 @@ function ligation_trafo(tup::Tuple{String, String, Int, Int, Char, Int, Int, Int
     i = Int(tup[5] === '-' ?  (tup[8] > 0 ? tup[8] : tup[4]) - k + 1 : k - (tup[8] > 0 ? tup[8] : tup[3]) + 1)
     i <= 0 ? i-1 : i
 end
-relativepos(s::Bool)
+
 function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}},
                             gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
