@@ -265,8 +265,9 @@ const click_table_button_states = [
     State("ligation", "value"),
     State("exclusive-search", "value"),
 ]
-const table_column_names = [:name1, :type1, :ref1, :strand1, :name2, :type2, :ref2, :strand2, :nb_ints, :nb_multi, :in_libs, :p_value, :fdr,:left1, :right1, :modeint1,
-:rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :left2, :right2, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+const table_column_names = [:name1, :type1, :ref1, :strand1, :left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2,
+                            :nb_ints, :nb_multi, :in_libs, :pvalue, :fdr, :pred_pvalue, :pred_fdr,
+                            :modeint1, :modelig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
 click_table_button_callback!(app::Dash.DashApp, interactions::Dict{String,Interactions}) =
 callback!(app, click_table_button_outputs, click_table_button_inputs, click_table_button_states; prevent_initial_call=true) do clicks, dataset, csv_option, min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, ligation, exclusive
     if clicks>0
