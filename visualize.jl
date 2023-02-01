@@ -39,5 +39,7 @@ param_dict::Vector{Pair{String,String}} = [
     "merged UTRs into CDS:" => merge_utrs_and_cds ? "yes" : "no",
 ]
 
+bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_penalty, bp_gap_extend_penalty)
+
 chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, max_bp_fdr,
-    address, port, (bp_distance_behind, bp_distance_before), param_dict)
+    address, port, (bp_distance_behind, bp_distance_before), param_dict, bp_parameters)

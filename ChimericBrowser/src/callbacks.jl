@@ -23,6 +23,7 @@ update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interac
     gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, layout_value, ligation, exclusive, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
+    any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df)
     cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
@@ -139,13 +140,18 @@ function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int;
     outstring
 end
 
-const scores = Dict((DNA_A, DNA_T)=>4, (DNA_T, DNA_A)=>4, (DNA_C, DNA_G)=>5, (DNA_G, DNA_C)=>5, (DNA_G, DNA_T)=>1, (DNA_T, DNA_G)=>1)
-const model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-5, default_mismatch=-5); gap_open=-6, gap_extend=-5)
-function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int})
+function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, bp_parameters::NTuple{6,Int})
     i1, i2 = Int(edge_data["modelig1"]), Int(edge_data["modelig2"])
     ref1, ref2 = edge_data["ref1"], edge_data["ref2"]
     strand1, strand2 = edge_data["strand1"], edge_data["strand2"]
     l1, l2, r1, r2, c1, c2 = Int(edge_data["left1"]), Int(edge_data["left2"]), Int(edge_data["right1"]), Int(edge_data["right2"]), Int(edge_data["cds1"]), Int(edge_data["cds2"])
+    scores = Dict(
+        (DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
+        (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
+        (DNA_G, DNA_T)=>bp_parameters[3], (DNA_T, DNA_G)=>bp_parameters[3]
+    )
+    model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
+                                                            gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
     alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0)
         s1 = strand1=="+" ?
             genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
@@ -195,7 +201,7 @@ function node_info(node_data::Dash.JSON3.Object)
         ligation_modes_table(node_data["lig_as_rna2"]),
         html_br(),
         html_div(children=[
-            html_p("read counts for $(node_data["id"]):"),
+            html_p("read counts for $(node_data["name"]):"),
             html_p("$(node_data["interactions"]) (selection), $(node_data["nb_ints_total"]) (total), $(node_data["nb_single"]) (single)"),
         ])
     ])]
@@ -225,7 +231,7 @@ const update_selected_element_inputs = [
 const update_selected_element_outputs = [
     Output("info-output", "children")
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}) =
+update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, bp_parameters::NTuple{6,Int}) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value
     if tab_value == "circos"
         (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
@@ -237,7 +243,7 @@ callback!(app, update_selected_element_outputs, update_selected_element_inputs; 
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
         no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
         no_edge_data && return node_info(node_data[1])
-        return edge_info(edge_data[1], genome, check_interaction_distances)
+        return edge_info(edge_data[1], genome, check_interaction_distances, bp_parameters)
     elseif tab_value == "summary"
         return ["Change the dataset or selection criteria to update the summary."]
     end

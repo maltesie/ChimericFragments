@@ -161,9 +161,9 @@ include_singles=true
 
 # Fisher's exact test uses the hypergeometric distribution to determine p-values from a contingency table
 # fisher_exact_tail can be set to "left", "both" or "right". This determines, if significance is assigned
-# to interactions with less occurance than to be expected ("left"), more occurence than to be expected
-# ("right"), or both ("both").
-fisher_exact_tail="right"
+# to interactions with less occurance than to be expected by chance ("left"), more occurence than to be
+# expected ("right"), or both ("both").
+fisher_exact_tail="both"
 
 
 #BASEPAIRING PREDICTION PARAMETERS
@@ -173,6 +173,20 @@ fisher_exact_tail="right"
 # predictions with a pvalue lower than max_interaction_pvalue are visualized in the browser.
 bp_distance_behind=45
 bp_distance_before=10
+
+# Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
+# null model of the basepairing test.
+n_genome_samples=200000
+
+# Set the parameters for the basepairing prediction. ChimericFragments uses an alignment based approach
+# that can be parameterized. The prediction is based on a substitution matrix that generates scores for
+# possible alignments based on the following nucleotide pairing scores and the mismatch and gapping penalties.
+AU_score=4
+GC_score=5
+GU_score=1
+bp_mismatch_penalty=5
+bp_gap_open_penalty=6
+bp_gap_extend_penalty=4
 
 
 #DATA FILTER PARAMETERS

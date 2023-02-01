@@ -45,6 +45,8 @@ end
 
 merge_utrs_and_cds && (features = mergetypes(features, cds_type, threeutr_type, fiveutr_type, merge_type))
 
+bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_penalty, bp_gap_extend_penalty)
+
 bams = align_mem(fastqs, genome; bwa_bin=bwa_mem2_bin, sam_bin=samtools_bin, is_interleaved_paired_end=is_interleaved_paired_end, min_score=min_alignment_score,
     match=match_score, mismatch=mismatch_penalty, gap_open=gap_open_penalty, gap_extend=gap_extend_penalty, clipping_penalty=clipping_penalty, unpair_penalty=unpair_penalty,
     unpair_rescue=unpair_rescue, min_seed_len=min_seed_len, reseeding_factor=reseeding_factor, sort_bam=sort_and_index_bam, threads=threads)
@@ -54,4 +56,4 @@ conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if in
 chimeric_analysis(features, bams, results_path, conditions, genome; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
     overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, max_ligation_distance=max_ligation_distance,
     check_interaction_distances=(bp_distance_behind, bp_distance_before), include_read_identity=include_orientation, include_singles=include_singles,
-    fisher_exact_tail=fisher_exact_tail, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins)
+    fisher_exact_tail=fisher_exact_tail, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins, bp_parameters=bp_parameters)
