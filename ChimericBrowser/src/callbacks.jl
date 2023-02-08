@@ -154,15 +154,15 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
                                                             gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
     alnstring = if (Int(edge_data["modelig1"]) != 0) && (Int(edge_data["modelig2"]) != 0)
         s1 = strand1=="+" ?
-            genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
-            BioSequences.reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+            genome[ref1][(i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2])] :
+            BioSequences.reverse_complement(genome[ref1][(i1+check_interaction_distances[2]):(i1+check_interaction_distances[1]-1)])
         s2 = strand2=="-" ?
-            BioSequences.complement(genome[ref2][(i2-check_interaction_distances[1]):(i2+check_interaction_distances[2])]) :
-            BioSequences.reverse(genome[ref2][(i2-check_interaction_distances[2]):(i2+check_interaction_distances[1])])
+            BioSequences.complement(genome[ref2][(i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2])]) :
+            BioSequences.reverse(genome[ref2][(i2+check_interaction_distances[2]):(i2+check_interaction_distances[1]-1)])
         p = pairalign(LocalAlignment(), s1, s2, model)
         baisepairing_string(alignment(p),
-            (strand1=="+" ? ((i1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]))),
-            (strand2=="-" ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
+            (strand1=="+" ? ((i1-check_interaction_distances[1]+1)-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]-1))),
+            (strand2=="-" ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1]+1)) : ((i2+check_interaction_distances[1]-1)-(c2>0 ? c2 : l2))))
     else
         "no ligation data."
     end

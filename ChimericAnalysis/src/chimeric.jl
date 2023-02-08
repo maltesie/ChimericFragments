@@ -180,71 +180,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     return interactions
 end
 
-hasfdrvalues(ints::Interactions) = "fdr" in names(ints.edges)
-
-function checkinteractions(ints::Interactions, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05, check_uppercase=true)
-	verified_dict = merge(Dict(pair=>zeros(2) for pair in verified_pairs),
-							Dict(reverse(pair)=>zeros(2) for pair in verified_pairs))
-    check_uppercase && (verified_dict = Dict((uppercase(p[1]), uppercase(p[2]))=>v for (p,v) in verified_dict))
-	df = asdataframe(ints; min_reads=min_reads, max_fdr=max_fdr)
-    for row in eachrow(df)
-        key = (row[:name1], row[:name2])
-        check_uppercase && (key = (uppercase(key[1]), uppercase(key[2])))
-        if key in keys(verified_dict)
-            verified_dict[key][1] = row[:in_libs]
-            verified_dict[key][2] = row[:nb_ints]
-        end
-    end
-
-	sorted_keys = vcat([[pair, reverse(pair)] for pair in verified_pairs]...)
-    check_uppercase && (sorted_keys = [(uppercase(p[1]), uppercase(p[2])) for p in sorted_keys])
-	m = reduce(hcat, [verified_dict[key] for key in sorted_keys])'
-	verified_stats = DataFrame(
-		name1=String[n[1] for n in verified_pairs],
-		name2=String[n[2] for n in verified_pairs],
-		libs=max.(m[:,1][1:2:end], m[:,1][2:2:end]), count=m[:,2][1:2:end] .+ m[:,2][2:2:end]
-		)
-	return verified_stats
-end
-function checkinteractions(conditions::Vector{Interactions}, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05)
-    verified_stats = DataFrame(name1=String[p[1] for p in verified_pairs], name2=String[p[2] for p in verified_pairs])
-    for ints in conditions
-        verified_stats = innerjoin(verified_stats, checkinteractions(ints, verified_pairs; min_reads=min_reads, max_fdr=max_fdr); on=[:name1, :name2], makeunique=true)
-    end
-    return verified_stats
-end
-function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr=0.05)
-    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr=max_fdr)
-end
-function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr=0.05)
-    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-    df = DataFrame(CSV.File(verified_pairs_file; stringtype=String))
-    verified_pairs = [(a,b) for (a,b) in eachrow(df)]
-    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr=max_fdr)
-end
-
-function uniqueinteractions(ints::Interactions; min_reads=5, max_fdr=0.05)
-    df = asdataframe(ints; min_reads=min_reads, max_fdr=max_fdr)
-    Set(Set((a,b)) for (a,b) in zip(df[!, :name1], df[!, :name2]))
-end
-
-function checktops(interactions::Interactions; top_cut=20, check=:singles)
-    check in (:singles, :interactions) || throw(AssertionError("check has to be :singles or :interactions"))
-    hasfdrvalues(interactions) || throw(AssertionError("Assign p-values before running this."))
-    top_nodes = checksortperm(interactions.nodes[!, check === :singles ? :nb_single : :nb_ints]; rev=true)[1:top_cut]
-    filtered_edges = Dict{Tuple{String, String}, Tuple{Float64, Float64}}()
-    for edge in eachrow(interactions.edges)
-        (edge[:src] in top_nodes) && (edge[:dst] in top_nodes) || continue
-        push!(filtered_edges, (interactions.nodes[edge[:src], :name], interactions.nodes[edge[:dst], :name]) => (edge[:fdr], edge[:odds_ratio]))
-    end
-    return filtered_edges
-end
-
-function addpvalues!(interactions::Interactions, genome::Genome; fisher_exact_tail="right", include_read_identity=true, include_singles=true,
-                        check_interaction_distances=(50,20), bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000)
+function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true, include_singles=true,
+                        check_interaction_distances=(50,20), bp_parameters=(4,5,1,5,6,4))
 
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
@@ -274,6 +211,10 @@ function addpvalues!(interactions::Interactions, genome::Genome; fisher_exact_ta
     interactions.edges[:, :pred_pvalue] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_score] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :pred_cl1] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :pred_cr1] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :pred_cl2] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :pred_cr2] = fill(NaN, nrow(interactions.edges))
 
     scores = Dict((DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
                     (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
@@ -281,29 +222,32 @@ function addpvalues!(interactions::Interactions, genome::Genome; fisher_exact_ta
     model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
         gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
-    seq_length = sum(check_interaction_distances)
-    random_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
-        i1 % 2 == 0 ? genome.seq[i1:i1+seq_length] : reverse_complement(genome.seq[i1:i1+seq_length]),
-        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length]) : complement(genome.seq[i2:i2+seq_length]),
-        model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))])
-
-    for edge_row in eachrow(interactions.edges)
+    max_dist = maximum(abs.(check_interaction_distances))
+    for (c, edge_row) in enumerate(eachrow(interactions.edges))
         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
             i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
             strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
             ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
-            (((i1 + maximum(check_interaction_distances)) > length(genome.chroms[ref1])) || ((i2 + maximum(check_interaction_distances)) > length(genome.chroms[ref2])) ||
-                ((i1 - maximum(check_interaction_distances)) < 1) || ((i2 - maximum(check_interaction_distances)) < 1)) && continue
+            (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
+                ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
+
             s1 = strand1=='+' ?
-                genome[ref1][(i1-check_interaction_distances[1]):(i1+check_interaction_distances[2])] :
-                reverse_complement(genome[ref1][(i1-check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+                genome[ref1][(i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2])] :
+                reverse_complement(genome[ref1][(i1+check_interaction_distances[2]):(i1+check_interaction_distances[1]-1)])
             s2 = strand2=='-' ?
-                complement(genome[ref2][(i2-check_interaction_distances[1]):(i2+check_interaction_distances[2])]) :
-                reverse(genome[ref2][(i2-check_interaction_distances[2]):(i2+check_interaction_distances[1])])
-            sco = BioAlignments.score(pairalign(LocalAlignment(), s1, s2, model; score_only=true))
+                complement(genome[ref2][(i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2])]) :
+                reverse(genome[ref2][(i2+check_interaction_distances[2]):(i2+check_interaction_distances[1]-1)])
+
+            paln = pairalign(LocalAlignment(), s1, s2, model)
+            sco = BioAlignments.score(paln)
+            interactions.edges.pred_cl1[c] = paln.aln.a.aln.anchors[1].seqpos
+            interactions.edges.pred_cr1[c] = paln.aln.a.aln.anchors[end].seqpos
+            interactions.edges.pred_cl2[c] = paln.aln.a.aln.anchors[1].refpos
+            interactions.edges.pred_cr2[c] = paln.aln.a.aln.anchors[end].refpos
             edge_row.pred_pvalue, edge_row.pred_score = 1-random_model_ecdf(sco), sco
         end
     end
+
     nan_index = (!).(isnan.(interactions.edges.pred_pvalue))
     interactions.edges.pred_fdr[nan_index] = adjust(PValues(interactions.edges.pred_pvalue[nan_index]), BenjaminiHochberg())
     return interactions
@@ -453,28 +397,49 @@ end
 
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
-                            overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distances=(50,20),
+                            overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distances=(45,-10),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
                             overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50,
-                            bp_parameters=(4,5,1,5,6,4))
+                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
     end
     with_logger(TeeLogger(filelogger, ConsoleLogger())) do
         @info "Starting new analysis..."
+
+        scores = Dict((DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
+                    (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
+                    (DNA_G, DNA_T)=>bp_parameters[3], (DNA_T, DNA_G)=>bp_parameters[3])
+        model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
+            gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
+
+        seq_length = sum(abs.(check_interaction_distances))
+
+        genome_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
+            i1 % 2 == 0 ? genome.seq[i1:i1+seq_length] : reverse_complement(genome.seq[i1:i1+seq_length]),
+            i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length]) : complement(genome.seq[i2:i2+seq_length]),
+            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))])
+
+        randseq_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
+            randdnaseq(seq_length),
+            randdnaseq(seq_length),
+            model; score_only=true)) for i in 1:n_genome_samples])
+
         @info "Using $(summarize(features))"
-        isdir(joinpath(results_path, "interactions")) || mkpath(joinpath(results_path, "interactions"))
-        isdir(joinpath(results_path, "stats")) || mkpath(joinpath(results_path, "stats"))
-        isdir(joinpath(results_path, "singles")) || mkpath(joinpath(results_path, "singles"))
+        isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
+        isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
+        isdir(joinpath(results_path, "plots")) || mkpath(joinpath(results_path, "plots"))
+
         interactions = Interactions()
         for (condition, r) in conditions
             @info "Collecting $(length(r)) samples for condition $condition:"
-            if !overwrite_existing &&
-                isfile(joinpath(results_path, "interactions", "$(condition).csv")) &&
-                isfile(joinpath(results_path, "singles", "$(condition).csv")) &&
-                isfile(joinpath(results_path, "stats", "$(condition).csv"))
-                @info "Found results files. Skipping..."
+            if (!overwrite_existing && isfile(joinpath(results_path, "tables", "genes_$(condition).csv")) &&
+                isfile(joinpath(results_path, "tables", "interactions_$(condition).csv")) &&
+                isfile(joinpath(results_path, "tables", "ligation_points_$(condition).csv")) &&
+                isfile(joinpath(results_path, "jld", "$(condition).jld2")))
+
+                @info "Found results files. Skipping condition $condition..."
                 continue
             end
             replicate_ids = Vector{Symbol}()
@@ -483,6 +448,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             for (i, bam) in enumerate(bams[r])
                 replicate_id = Symbol("$(condition)_$i")
                 push!(replicate_ids, replicate_id)
+                @info "Replicate $replicate_id:"
                 @info "Reading $bam"
                 alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
                                         include_alternative_alignments=include_alternative_alignments,
@@ -490,7 +456,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 @info "Annotating alignments..."
                 annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
                                                 overwrite_type=overwrite_type)
-                @info "Building graph for replicate $replicate_id..."
+                @info "Building graph of interactions..."
                 append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                     filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
                 empty!(alignments)
@@ -502,9 +468,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 correlation_df[:, repid] = correlation_matrix[:, i]
             end
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
-            @info "Computing significance levels..."
+            @info "Running statistical tests..."
             addpositions!(interactions, features)
-            addpvalues!(interactions, genome; include_singles=include_singles, include_read_identity=include_read_identity,
+            addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
                 fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters)
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
@@ -525,19 +491,34 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "both"=>[both_reads, both_ints], "bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+            @info "Saving tables and plots..."
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
-            CSV.write(joinpath(results_path, "interactions", "$(condition).csv"), odf)
+            CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
             odf = asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, hist_bins=position_distribution_bins)
-            CSV.write(joinpath(results_path, "stats", "$(condition).csv"), odf)
-            write(joinpath(results_path, "stats", "$(condition).jld2"), interactions)
+            CSV.write(joinpath(results_path, "tables", "ligation_points_$(condition).csv"), odf)
             odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
-            CSV.write(joinpath(results_path, "singles", "$(condition).csv"), odf)
+            CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
+
+            write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
+
+            p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, max_bp_fdr)
+            save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
+
+            p2, p3 = bp_clipping_dist_plots(interactions, check_interaction_distances, max_fdr, max_bp_fdr)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3)
+
+            p4 = log_chimeric_counts_distribution_plot(interactions, max_fdr, max_bp_fdr)
+            save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)
+
+            p5 = log_odds_ratio_distribution_plot(interactions, max_fdr, max_bp_fdr)
+            save(joinpath(results_path, "plots", "$(condition)_odds_ratio_dist.png"), p5)
         end
         if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
-            @info "Writing tables..."
-            singles = CsvFiles(joinpath(results_path, "singles"))
-            ints = CsvFiles(joinpath(results_path, "interactions"))
-            write(joinpath(results_path, "singles.xlsx"), singles)
+            @info "Finalizing..."
+            singles = CsvFiles(joinpath(results_path, "tables"); prefix="genes")
+            ints = CsvFiles(joinpath(results_path, "tables"); prefix="interactions")
+            write(joinpath(results_path, "genes.xlsx"), singles)
             write(joinpath(results_path, "interactions.xlsx"), ints)
         end
         @info "Done."

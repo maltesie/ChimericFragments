@@ -10,7 +10,7 @@ Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAna
 end
 
 function load_data(results_path::String, genome_file::String, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64)
-    interactions_path = realpath(joinpath(results_path, "stats"))
+    interactions_path = realpath(joinpath(results_path, "jld"))
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
     genome_info = Pair{String,Int}[]
@@ -236,7 +236,12 @@ function circos_data(df::SubDataFrame; min_thickness=1000, max_thickness=3000)
 end
 
 function table_data(df::SubDataFrame)
-    Dict.(pairs.(eachrow(df[!, ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]])))
+    reduced_df = df[:, ["name1", "type1", "name2", "type2", "nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]]
+    replace!(reduced_df.pred_fdr, NaN => -1.0)
+    reduced_df.fdr = floor.(reduced_df.fdr; sigdigits=5)
+    reduced_df.pred_fdr = floor.(reduced_df.pred_fdr; sigdigits=5)
+    reduced_df.odds_ratio = floor.(reduced_df.odds_ratio; sigdigits=5)
+    Dict.(pairs.(eachrow(reduced_df)))
 end
 
 function interaction_table(df::Union{DataFrame, SubDataFrame}, types::Vector{String})

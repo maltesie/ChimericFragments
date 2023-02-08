@@ -233,10 +233,10 @@ table_layout() = html_div(
     children=[
         dash_datatable(
             id="table",
-            columns=[Dict("name"=> n, "id"=> n) for n in ["name1", "type1", "name2", "type2", "nb_ints", "in_libs"]],
+            columns=[Dict("name"=> n, "id"=> n) for n in ["name1", "type1", "name2", "type2", "nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]],
             style_cell=Dict(
                 "height"=> "auto",
-                "minWidth"=> "140px", "width"=> "140px", "maxWidth"=> "140px",
+                "minWidth"=> "100px", "width"=> "100px", "maxWidth"=> "160px",
                 "whiteSpace"=> "normal"
             ),
             style_data_conditional=[
@@ -285,7 +285,7 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
     children=[
         dcc_tabs(
             id="data-tabs",
-            value="graph",
+            value="summary",
             persistence=true,
             children=[
                 astab(cytoscape_layout(stylesheet), "graph"),

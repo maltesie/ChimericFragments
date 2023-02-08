@@ -169,15 +169,17 @@ fisher_exact_tail="both"
 
 #BASEPAIRING PREDICTION PARAMETERS
 
-# Simple basepairing predictions based on alignments are performed within check_interaction_distance_on
-# behind and check_interaction_distance_off in front of of the most frequent ligation points and the
-# predictions with a pvalue lower than max_interaction_pvalue are visualized in the browser.
-bp_distance_behind=45
-bp_distance_before=10
+# Simple basepairing predictions based on alignments are performed within a region around the ligation point.
+# This region is defined by the two values in bp_distance. The first one defines, how far from the ligation
+# point in the direction that is "on" the read of RNA1 (upstream) and RNA2 (downstream). The second value 
+# corresponds to the direction that is cut off by the ligation (downstream for RNA1, upstream for RNA2) and
+# should be negative to increase the distance. (45,-10) spans a region of 55 nucleotides around the ligation
+# point.
+bp_distance=(45,-10)
 
 # Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
 # null model of the basepairing test.
-n_genome_samples=200000
+n_genome_samples=500000
 
 # Set the parameters for the basepairing prediction. ChimericFragments uses an alignment based approach
 # that can be parameterized. The prediction is based on a substitution matrix that generates scores for
