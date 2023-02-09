@@ -23,6 +23,8 @@ https://github.com/bwa-mem2/bwa-mem2/releases
 
 https://github.com/samtools/samtools/releases
 
+### Install
+
 The default parameters of ChimericFragments expect samtools and bwa-mem2 installed systemwide,
 otherwise the paths to the binaries have to be set in the configuration. ChimericFragments depends 
 on a number of Julia packages that have to be installed and precompiled. To do this, run
@@ -31,7 +33,7 @@ on a number of Julia packages that have to be installed and precompiled. To do t
 
 The installation process could take up to a few minutes.
 
-### Updating
+### Update
 
 To update ChimericFragments, download the latest version and run the provided install.jl. In
 general, the analysis and visualization are only compatible within one version and analysis results
@@ -46,7 +48,7 @@ The workflow can be split into the following steps:
 4. run analyze.jl on the config file to analyze your experiment
 5. run visualize.jl on the config file to visualize the results
 
-### edit config.jl
+### Edit config.jl
 
 IT IS IMPORTANT TO KEEP THE STRUCTURE OF config.jl INTACT. PLEASE ONLY EDIT TEXT BETWEEN "",
 NUMBERS OR EXCHANGE true AND false.
@@ -56,7 +58,7 @@ For ChimericFragments to run properly, you have to set the FILE PARAMETERS and t
 PARAMETERS. You can find detailed descriptions of every parameter in the config file. A working
 example project can be found in the example_project folder.
 
-### run analyze.jl
+### Run analyze.jl
 
 The scripts can be executed by passing them to the julia executable. In a terminal, run
 
@@ -69,7 +71,7 @@ In the specified data folder, alignments (.bam, .bam.bai) and alignment stats (.
 In the results folder, several subfolder are generated and all relevant results are combined in two
 tables with filenames interactions.xlsx and genes.xlsx
 
-### run visualize.jl
+### Run visualize.jl
 
 After a successful run of the analysis, the visualization can be started by running
 
