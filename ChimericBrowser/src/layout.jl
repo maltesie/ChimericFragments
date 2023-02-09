@@ -233,7 +233,8 @@ table_layout() = html_div(
     children=[
         dash_datatable(
             id="table",
-            columns=[Dict("name"=> n, "id"=> n) for n in ["name1", "type1", "name2", "type2", "nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]],
+            columns=[n == "fdr" ? Dict("name"=>n, "id"=>n, "format"=>Dict("specifier"=>".3f")) : Dict("name"=>n, "id"=>n)
+                for n in ["name1", "type1", "name2", "type2", "nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]],
             style_cell=Dict(
                 "height"=> "auto",
                 "minWidth"=> "100px", "width"=> "100px", "maxWidth"=> "160px",
@@ -245,7 +246,8 @@ table_layout() = html_div(
                     "backgroundColor"=> "inherit !important",
                     "border"=> "inherit !important",
                 )
-            ]
+            ],
+
         ),
         html_div([
             html_div([

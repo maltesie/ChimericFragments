@@ -6,8 +6,10 @@ struct Interactions
 end
 
 function Interactions()
-    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
-    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
+    nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_selfchimeric=>Int[], :nb_unclassified=>Int[],
+        :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
+    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[],
+        :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
     Interactions(nodes, edges, edgestats, Symbol[])
 end
@@ -106,6 +108,12 @@ function ischimeric(mergedread::MergedAlignedRead; min_distance=1000, check_anno
     return false
 end
 
+isselfchimeric(mergedread::MergedAlignedRead) =
+    (length(mergedread) == 1) &&
+    (mergedread.alnread.alns.leftpos[mergedread.pindexpairs[1][1]] > mergedread.alnread.alns.rightpos[mergedread.pindexpairs[1][2]])
+
+issingle(mergedread::MergedAlignedRead) = (length(mergedread) == 1) && (mergedread.pindexpairs[1][1] != mergedread.pindexpairs[1][2])
+
 function myhash(alns::AlignedReads, i::Int; use_type=true)
     return use_type ? hash(alns.annames[i], hash(alns.antypes[i])) : hash(alns.annames[i])
 end
@@ -142,9 +150,14 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             h = myhash(alignments, i1)
             if !(h in keys(trans))
                 trans[h] = length(trans) + 1
-                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, 0, alignments.strands[i1], h))
+                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, 0, 0, 0, alignments.strands[i1], h))
             end
-            is_chimeric || (interactions.nodes[trans[h], :nb_single] += 1)
+
+            if isselfchimeric(mergedread)
+                (interactions.nodes[trans[h], :nb_selfchimeric] += 1)
+            elseif !is_chimeric
+                issingle(mergedread) ? (interactions.nodes[trans[h], :nb_single] += 1) : (interactions.nodes[trans[h], :nb_unclassified] += 1)
+            end
         end
 
         for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
@@ -180,8 +193,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     return interactions
 end
 
-function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true, include_singles=true,
-                        check_interaction_distances=(50,20), bp_parameters=(4,5,1,5,6,4))
+function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true,
+                        include_singles=true, check_interaction_distances=(50,20), bp_parameters=(4,5,1,5,6,4))
 
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
@@ -194,9 +207,14 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
         other_target = interactions.nodes[interactions.edges[!, :dst], :nb_ints] .- ints_between
     end
 
-    include_singles && (other_source .+= interactions.nodes[interactions.edges[!, :src], :nb_single])
-    include_singles && (other_target .+= interactions.nodes[interactions.edges[!, :dst], :nb_single])
-    total_other = sum(interactions.edges[!, :nb_ints]) .- ints_between .- other_source .- other_target .+ (include_singles ? sum(interactions.nodes[!, :nb_single]) : 0)
+    if include_singles
+        other_source .+= interactions.nodes[interactions.edges[!, :src], :nb_single]
+        other_source .+= interactions.nodes[interactions.edges[!, :src], :nb_selfchimeric]
+        other_target .+= interactions.nodes[interactions.edges[!, :dst], :nb_single]
+        other_target .+= interactions.nodes[interactions.edges[!, :dst], :nb_selfchimeric]
+    end
+    total_other = sum(interactions.edges[!, :nb_ints]) .- ints_between .- other_source .- other_target .+
+        (include_singles ? sum(interactions.nodes[!, :nb_single] .+ interactions.nodes[!, :nb_selfchimeric]) : 0)
 
     odds_ratio = (ints_between .* total_other) ./ (other_target .* other_source)
 
@@ -325,7 +343,7 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
             partners = union!(Set(out_df[out_df.src .== i, :dst]), Set(out_df[out_df.dst .== i, :src]))
             row[:nb_partners] = length(partners)
         end
-        return sort!(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_ints, :nb_partners]], :nb_single; rev=true)
+        return sort!(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_selfchimeric, :nb_unclassified, :nb_ints, :nb_partners]], :nb_single; rev=true)
     elseif output === :stats
         edgestats = interactions.edgestats
         statsmatrix = zeros(nrow(out_df), 4*hist_bins)
