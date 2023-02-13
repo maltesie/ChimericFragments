@@ -190,8 +190,8 @@ n_genome_samples=500000
 AU_score=4
 GC_score=5
 GU_score=1
-bp_mismatch_penalty=5
-bp_gap_open_penalty=6
+bp_mismatch_penalty=7
+bp_gap_open_penalty=8
 bp_gap_extend_penalty=4
 
 # Set the fdr levels for plots involving basepairing predictions
