@@ -92,7 +92,10 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
     randseq_model_pdf = diff(randseq_model_ecdf.(1:(max_score+1)))
     interactions_pdf = diff(interactions_ecdf.(1:(max_score+1)))
 
-    p = plot(1:max_score, randseq_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 1, label = "random", legend = :topright)
+    p = plot(1:max_score, randseq_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 1, label = "random",
+        legend = :topright, size=(600,400))
+    xlabel!(p, "affine gap model score")
+    ylabel!(p, "empirical density")
     plot!(p, 1:max_score, genome_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 2, label = "random, from genome")
     plot!(p, 1:max_score, interactions_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 3, label = "around ligation points")
     vline!(p, [genome_model_fdr_01_score], label="fdr = $max_bp_fdr")
@@ -100,45 +103,40 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
 end
 
 function alignment_histogram(l1::Vector{Float64}, r1::Vector{Float64}, l2::Vector{Float64}, r2::Vector{Float64},
-            bins::AbstractRange, max_fdr::Float64, fdrs::Vector{Float64})
-
-    sig_index = fdrs .<= max_fdr
-    nonsig_index = .!sig_index
+            bins::AbstractRange, max_fdrs::Vector{Float64}, fdrs::Vector{Float64})
 
     h1 = histogram(l1; bins=bins, label="all", legend=:topright)
-    histogram!(h1, l1[nonsig_index]; bins=bins, label="fdr > $max_fdr")
-    histogram!(h1, l1[sig_index]; bins=bins, label="fdr <= $max_fdr")
     title!(h1, "RNA1, left end")
-
+    ylabel!(h1, "count")
     h2 = histogram(r1; bins=bins, label="all", legend=:topleft)
-    histogram!(h2, r1[nonsig_index]; bins=bins, label="fdr > $max_fdr")
-    histogram!(h2, r1[sig_index]; bins=bins, label="fdr <= $max_fdr")
     title!(h2, "RNA1, right end")
-
     h3 = histogram(l2; bins=bins, label="all", legend=:topright)
-    histogram!(h3, l2[nonsig_index]; bins=bins, label="fdr > $max_fdr")
-    histogram!(h3, l2[sig_index]; bins=bins, label="fdr <= $max_fdr")
+    ylabel!(h3, "count")
+    xlabel!(h3, "position in alignment")
     title!(h3, "RNA2, left end")
-
     h4 = histogram(r2; bins=bins, label="all", legend=:topleft)
-    histogram!(h4, r2[nonsig_index]; bins=bins, label="fdr > $max_fdr")
-    histogram!(h4, r2[sig_index]; bins=bins, label="fdr <= $max_fdr")
+    xlabel!(h4, "position in alignment")
     title!(h4, "RNA2, right end")
-
     h5 = histogram(r1 .- l1 .+ 1; bins=bins, label="all", legend=:topright)
-    histogram!(h5, r1[nonsig_index] .- l1[nonsig_index] .+ 1; bins=bins, label="fdr > $max_fdr")
-    histogram!(h5, r1[sig_index] .- l1[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
     title!(h5, "RNA1, length")
-
     h6 = histogram(r2 .- l2 .+ 1; bins=bins, label="all", legend=:topright)
-    histogram!(h6, r2[nonsig_index] .- l2[nonsig_index] .+ 1; bins=bins, label="fdr > $max_fdr")
-    histogram!(h6, r2[sig_index] .- l2[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
+    xlabel!(h6, "position in alignment")
     title!(h6, "RNA2, length")
 
-    plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800))
+    for max_fdr in reverse(max_fdrs)
+        sig_index = fdrs .<= max_fdr
+        histogram!(h1, l1[sig_index]; bins=bins, label="fdr <= $max_fdr")
+        histogram!(h2, r1[sig_index]; bins=bins, label="fdr <= $max_fdr")
+        histogram!(h3, l2[sig_index]; bins=bins, label="fdr <= $max_fdr")
+        histogram!(h4, r2[sig_index]; bins=bins, label="fdr <= $max_fdr")
+        histogram!(h5, r1[sig_index] .- l1[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
+        histogram!(h6, r2[sig_index] .- l2[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
+    end
+
+    plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)#, xlabel="position in alignment", ylabel="count")
 end
 
-function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, max_fisher_fdr::Float64, max_bp_fdr::Float64)
+function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
 
     bins = 0:(bp_distance[1]-bp_distance[2])
     nan_index = .!isnan.(interactions.edges.pred_fdr)
@@ -149,34 +147,50 @@ function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{I
     r2 = interactions.edges.pred_cr2[nan_index]
 
     bp_fdrs = interactions.edges.pred_fdr[nan_index]
-    p1 = alignment_histogram(l1, r1, l2, r2, bins, max_bp_fdr, bp_fdrs)
+    p1 = alignment_histogram(l1, r1, l2, r2, bins, max_bp_fdrs, bp_fdrs)
 
     fisher_fdrs = interactions.edges.fdr[nan_index]
-    p2 = alignment_histogram(l1, r1, l2, r2, bins, max_fisher_fdr, fisher_fdrs)
+    p2 = alignment_histogram(l1, r1, l2, r2, bins, max_fisher_fdrs, fisher_fdrs)
 
     return p1, p2
 end
 
-function log_chimeric_counts_distribution_plot(interactions::Interactions, max_fisher_fdr::Float64, max_bp_fdr::Float64)
+function fisher_pred_histograms(data::Vector{Float64}, fisher_fdrs::Vector{Float64}, bp_fdrs::Vector{Float64},
+        bins::AbstractRange, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64}, title::String)
+
+    h1 = histogram(data; label="all", bins=bins, legend=:topright)
+    #ylabel!(h1, "count")
+    #xlabel!(h1, title)
+    title!(h1, "fisher fdr")
+    for max_fisher_fdr in reverse(max_fisher_fdrs)
+        sigfish_index = fisher_fdrs .<= max_fisher_fdr
+        histogram!(h1, data[sigfish_index]; label="fisher fdr <= $max_fisher_fdr", bins=bins, legend=:topright)
+    end
+
+    h2 = histogram(data; label="all", bins=bins, legend=:topright)
+    #xlabel!(h2, title)
+    title!(h2, "basepairing prediction fdr")
+    for max_bp_fdr in reverse(max_bp_fdrs)
+        sigpred_index = bp_fdrs .<= max_bp_fdr
+        histogram!(h2, data[sigpred_index]; label="bp fdr <= $max_bp_fdr", bins=bins, legend=:topright)
+    end
+
+    plot(h1, h2; layout=(1,2), size=(1200,400), margin=5mm, xlabel=title, ylabel="count")
+end
+
+function log_chimeric_counts_distribution_plot(interactions::Interactions, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
     nan_index = .!isnan.(interactions.edges.pred_fdr)
     counts = log.(interactions.edges.nb_ints[nan_index])
     bins = range(1, maximum(counts), 60)
-    h = histogram(counts; label="all", bins=bins, legend=:topright, fillalpha=0.35)
-    title!("log counts")
-    sigfish_index = interactions.edges.fdr[nan_index] .<= max_fisher_fdr
-    histogram!(h, counts[sigfish_index]; label="fisher fdr <= $max_fisher_fdr", bins=bins, legend=:topright, fillalpha=0.35)
-    sigpred_index = interactions.edges.pred_fdr[nan_index] .<= max_bp_fdr
-    histogram!(h, counts[sigpred_index]; label="bp fdr <= $max_bp_fdr", bins=bins, legend=:topright, fillalpha=0.35)
+
+    fisher_pred_histograms(counts, interactions.edges.fdr[nan_index], interactions.edges.pred_fdr[nan_index], bins, max_fisher_fdrs, max_bp_fdrs, "log read count")
 end
 
-function log_odds_ratio_distribution_plot(interactions::Interactions, max_fisher_fdr::Float64, max_bp_fdr::Float64)
+function log_odds_ratio_distribution_plot(interactions::Interactions, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
     nan_index = .!isnan.(interactions.edges.pred_fdr)
     odds = log.(interactions.edges.odds_ratio[nan_index])
-    bins = range(minimum(odds[.!isinf.(odds)]), maximum(odds[.!isinf.(odds)]), 100)
-    h = histogram(odds; label="all", bins=bins, legend=:topright, fillalpha=0.35)
-    title!("log odds ratio")
-    sigfish_index = interactions.edges.fdr[nan_index] .<= max_fisher_fdr
-    histogram!(h, odds[sigfish_index]; label="fisher fdr <= $max_fisher_fdr", bins=bins, legend=:topright, fillalpha=0.35)
-    sigpred_index = interactions.edges.pred_fdr[nan_index] .<= max_bp_fdr
-    histogram!(h, odds[sigpred_index]; label="bp fdr <= $max_bp_fdr", bins=bins, legend=:topright, fillalpha=0.35)
+    inf_index = .!isinf.(odds)
+    bins = sum(inf_index) > 0 ? range(minimum(odds[inf_index]), maximum(odds[inf_index]), 100) : range(-1,1,100)
+
+    fisher_pred_histograms(odds, interactions.edges.fdr[nan_index], interactions.edges.pred_fdr[nan_index], bins, max_fisher_fdrs, max_bp_fdrs, "log odds ratio")
 end
