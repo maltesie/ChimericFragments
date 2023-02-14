@@ -166,9 +166,6 @@ include_singles=true
 # expected ("right"), or both ("both").
 fisher_exact_tail="both"
 
-# Set the fdr levels for plots involving the Fisher test
-fisher_exact_fdr_levels=[0.05, 0.1, 0.2]
-
 
 #BASEPAIRING PREDICTION PARAMETERS
 
@@ -194,8 +191,11 @@ bp_mismatch_penalty=7
 bp_gap_open_penalty=8
 bp_gap_extend_penalty=4
 
+
+#PLOTTING PARAMETERS
+
 # Set the fdr levels for plots involving basepairing predictions
-bp_fdr_levels=[0.1, 0.2, 0.5]
+plot_fdr_levels=[0.1, 0.2, 0.5]
 
 
 #DATA FILTER PARAMETERS

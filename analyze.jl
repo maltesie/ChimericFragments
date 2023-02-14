@@ -57,4 +57,4 @@ chimeric_analysis(features, bams, results_path, conditions, genome; filter_types
     overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, max_ligation_distance=max_ligation_distance,
     check_interaction_distances=bp_distance, include_read_identity=include_orientation, include_singles=include_singles,
     fisher_exact_tail=fisher_exact_tail, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins, bp_parameters=bp_parameters,
-    n_genome_samples=n_genome_samples, fisher_fdr_levels=fisher_exact_fdr_levels, bp_fdr_levels=bp_fdr_levels)
+    n_genome_samples=n_genome_samples, plot_fdr_levels=plot_fdr_levels)

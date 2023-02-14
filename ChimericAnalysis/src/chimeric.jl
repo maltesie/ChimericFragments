@@ -418,7 +418,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, check_interaction_distances=(45,-10),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
                             overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50,
-                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, fisher_fdr_levels=[0.05,0.1,0.2], bp_fdr_levels=[0.1,0.2,0.5])
+                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, plot_fdr_levels=[0.1,0.2,0.5])
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -519,18 +519,22 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 
-            p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, 0.1)
+            p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
 
-            p2, p3 = bp_clipping_dist_plots(interactions, check_interaction_distances, fisher_fdr_levels, bp_fdr_levels)
+            p2, p3 = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2)
             save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3)
 
-            p4 = log_chimeric_counts_distribution_plot(interactions, fisher_fdr_levels, bp_fdr_levels)
+            p4, p5 = interaction_distribution_plots(interactions, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)
-
-            p5 = log_odds_ratio_distribution_plot(interactions, fisher_fdr_levels, bp_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_odds_ratio_dist.png"), p5)
+
+            p6 = node_distribution_plot(interactions, plot_fdr_levels)
+            save(joinpath(results_path, "plots", "$(condition)_degree_dist.png"), p6)
+
+            p7 = annotation_type_heatmap(interactions)
+            save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
         if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
             @info "Finalizing..."

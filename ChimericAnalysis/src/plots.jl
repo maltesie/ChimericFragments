@@ -71,7 +71,7 @@ function checktops(interactions::Interactions; top_cut=20, check=:singles)
     return filtered_edges
 end
 
-function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, max_bp_fdr::Float64)
+function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_levels::Vector{Float64})
 
     interactions_ecdf = ecdf(Int.(interactions.edges.pred_score[.!isnan.(interactions.edges.pred_score)]))
 
@@ -84,10 +84,6 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
     nan_index = .!isnan.(interactions.edges.pred_fdr)
     si_fdr = sort(collect(enumerate(zip(interactions.edges.pred_fdr[nan_index], interactions.edges.pred_pvalue[nan_index]))), by=x->x[2][2], rev=true)
 
-    fdr01_p_index = findfirst(x->x[2][1]<=max_bp_fdr, si_fdr)
-    fdr01_p = isnothing(fdr01_p_index) ? 1.0 : si_fdr[fdr01_p_index][2][2]
-    genome_model_fdr_01_score = findfirst(x->((1-genome_model_ecdf(x))<fdr01_p), 1:(max_score+1)) - 1
-
     genome_model_pdf = diff(genome_model_ecdf.(1:(max_score+1)))
     randseq_model_pdf = diff(randseq_model_ecdf.(1:(max_score+1)))
     interactions_pdf = diff(interactions_ecdf.(1:(max_score+1)))
@@ -98,7 +94,14 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
     ylabel!(p, "empirical density")
     plot!(p, 1:max_score, genome_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 2, label = "random, from genome")
     plot!(p, 1:max_score, interactions_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 3, label = "around ligation points")
-    vline!(p, [genome_model_fdr_01_score], label="fdr = $max_bp_fdr")
+
+    for max_bp_fdr in plot_fdr_levels
+        fdr_p_index = findfirst(x->x[2][1]<=max_bp_fdr, si_fdr)
+        fdr_p = isnothing(fdr_p_index) ? 1.0 : si_fdr[fdr_p_index][2][2]
+        genome_model_fdr_score = findfirst(x->((1-genome_model_ecdf(x))<fdr_p), 1:(max_score+1)) - 1
+        vline!(p, [genome_model_fdr_score], label="fdr = $max_bp_fdr")
+    end
+
     return p
 end
 
@@ -133,10 +136,10 @@ function alignment_histogram(l1::Vector{Float64}, r1::Vector{Float64}, l2::Vecto
         histogram!(h6, r2[sig_index] .- l2[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
     end
 
-    plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)#, xlabel="position in alignment", ylabel="count")
+    plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)
 end
 
-function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
+function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, plotting_fdr_levels::Vector{Float64})
 
     bins = 0:(bp_distance[1]-bp_distance[2])
     nan_index = .!isnan.(interactions.edges.pred_fdr)
@@ -147,50 +150,120 @@ function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{I
     r2 = interactions.edges.pred_cr2[nan_index]
 
     bp_fdrs = interactions.edges.pred_fdr[nan_index]
-    p1 = alignment_histogram(l1, r1, l2, r2, bins, max_bp_fdrs, bp_fdrs)
+    p1 = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, bp_fdrs)
 
     fisher_fdrs = interactions.edges.fdr[nan_index]
-    p2 = alignment_histogram(l1, r1, l2, r2, bins, max_fisher_fdrs, fisher_fdrs)
+    p2 = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, fisher_fdrs)
 
     return p1, p2
 end
 
+function countdata(data::Vector{Int})
+    counts = zeros(Int, maximum(data; init=1))
+    for d in data[data .> 0]
+        counts[d] += 1
+    end
+    counts
+end
+
 function fisher_pred_histograms(data::Vector{Float64}, fisher_fdrs::Vector{Float64}, bp_fdrs::Vector{Float64},
-        bins::AbstractRange, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64}, title::String)
+        bins::AbstractRange, plotting_fdr_levels::Vector{Float64}, title::String)
 
     h1 = histogram(data; label="all", bins=bins, legend=:topright)
-    #ylabel!(h1, "count")
-    #xlabel!(h1, title)
     title!(h1, "fisher fdr")
-    for max_fisher_fdr in reverse(max_fisher_fdrs)
+    for max_fisher_fdr in reverse(plotting_fdr_levels)
         sigfish_index = fisher_fdrs .<= max_fisher_fdr
-        histogram!(h1, data[sigfish_index]; label="fisher fdr <= $max_fisher_fdr", bins=bins, legend=:topright)
+        histogram!(h1, data[sigfish_index]; label="fisher fdr <= $max_fisher_fdr", bins=bins)
     end
 
-    h2 = histogram(data; label="all", bins=bins, legend=:topright)
-    #xlabel!(h2, title)
+    nan_index = .!isnan.(bp_fdrs)
+    h2 = histogram(data[nan_index]; label="all", bins=bins, legend=:topright)
     title!(h2, "basepairing prediction fdr")
-    for max_bp_fdr in reverse(max_bp_fdrs)
+    for max_bp_fdr in reverse(plotting_fdr_levels)
         sigpred_index = bp_fdrs .<= max_bp_fdr
-        histogram!(h2, data[sigpred_index]; label="bp fdr <= $max_bp_fdr", bins=bins, legend=:topright)
+        histogram!(h2, data[sigpred_index]; label="bp fdr <= $max_bp_fdr", bins=bins)
     end
 
     plot(h1, h2; layout=(1,2), size=(1200,400), margin=5mm, xlabel=title, ylabel="count")
 end
 
-function log_chimeric_counts_distribution_plot(interactions::Interactions, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
-    nan_index = .!isnan.(interactions.edges.pred_fdr)
-    counts = log.(interactions.edges.nb_ints[nan_index])
-    bins = range(1, maximum(counts), 60)
+function fisher_pred_lineplots(data::Vector{Int}, fisher_fdrs::Vector{Float64}, bp_fdrs::Vector{Float64}, plotting_fdr_levels::Vector{Float64}, title::String)
 
-    fisher_pred_histograms(counts, interactions.edges.fdr[nan_index], interactions.edges.pred_fdr[nan_index], bins, max_fisher_fdrs, max_bp_fdrs, "log read count")
+    counts = countdata(data)
+    p1 = plot(counts; label="all", xaxis=:log, fillalpha=0.35, legend=:topright)
+    title!(p1, "fisher fdr")
+    for max_fisher_fdr in reverse(plotting_fdr_levels)
+        sigfish_index = fisher_fdrs .<= max_fisher_fdr
+        counts = countdata(data[sigfish_index])
+        plot!(p1, counts; label="fisher fdr <= $max_fisher_fdr", xaxis=:log, fillalpha=0.35)
+    end
+
+    nan_index = .!isnan.(bp_fdrs)
+    counts = countdata(data[nan_index])
+    p2 = plot(counts; label="all", xaxis=:log, fillalpha=0.35, legend=:topright)
+    title!(p2, "basepairing prediction fdr")
+    for max_bp_fdr in reverse(plotting_fdr_levels)
+        sigpred_index = bp_fdrs .<= max_bp_fdr
+        counts = countdata(data[sigpred_index])
+        plot!(p2, counts; label="bp fdr <= $max_bp_fdr", xaxis=:log, fillalpha=0.35)
+    end
+
+    plot(p1, p2; layout=(1,2), size=(1200,400), margin=5mm, xlabel=title, ylabel="count")
 end
 
-function log_odds_ratio_distribution_plot(interactions::Interactions, max_fisher_fdrs::Vector{Float64}, max_bp_fdrs::Vector{Float64})
-    nan_index = .!isnan.(interactions.edges.pred_fdr)
-    odds = log.(interactions.edges.odds_ratio[nan_index])
+function interaction_distribution_plots(interactions::Interactions, plotting_fdr_levels::Vector{Float64})
+
+    counts = interactions.edges.nb_ints
+    p1 = fisher_pred_lineplots(counts, interactions.edges.fdr, interactions.edges.pred_fdr, plotting_fdr_levels, "log read count")
+
+    odds = log.(interactions.edges.odds_ratio)
     inf_index = .!isinf.(odds)
     bins = sum(inf_index) > 0 ? range(minimum(odds[inf_index]), maximum(odds[inf_index]), 100) : range(-1,1,100)
+    p2 = fisher_pred_histograms(odds, interactions.edges.fdr, interactions.edges.pred_fdr, bins, plotting_fdr_levels, "log odds ratio")
 
-    fisher_pred_histograms(odds, interactions.edges.fdr[nan_index], interactions.edges.pred_fdr[nan_index], bins, max_fisher_fdrs, max_bp_fdrs, "log odds ratio")
+    return p1, p2
+end
+
+function degreecounts(interactions::Interactions; index=trues(nrow(interactions.edges)))
+    src, dst = interactions.edges.src[index], interactions.edges.dst[index]
+    degs = [length(union!(Set(dst[src .== i]), Set(dst[src .== i]))) for i in 1:nrow(interactions.nodes)]
+    countdata(degs)
+end
+
+function node_distribution_plot(interactions::Interactions, plotting_fdr_levels::Vector{Float64})
+
+    counts = degreecounts(interactions)
+    p1 = plot(counts; label="all", xaxis=:log, fillalpha=0.35, legend=:topright)
+    title!(p1, "fisher fdr")
+
+    for max_fisher_fdr in reverse(plotting_fdr_levels)
+        sigfish_index = interactions.edges.fdr .<= max_fisher_fdr
+        counts = degreecounts(interactions; index=sigfish_index)
+        plot!(p1, counts; label="fisher fdr <= $max_fisher_fdr", xaxis=:log, fillalpha=0.35)
+    end
+
+    nan_index = .!isnan.(interactions.edges.pred_fdr)
+    counts = degreecounts(interactions; index=nan_index)
+    p2 = plot(counts; label="all", xaxis=:log, fillalpha=0.35, legend=:topright)
+    title!(p2, "basepairing prediction fdr")
+
+    for max_bp_fdr in reverse(plotting_fdr_levels)
+        sigpred_index = interactions.edges.pred_fdr .<= max_bp_fdr
+        counts = degreecounts(interactions; index=sigpred_index)
+        plot!(p2, counts; label="bp fdr <= $max_bp_fdr", xaxis=:log, fillalpha=0.35)
+    end
+
+    plot(p1, p2; layout=(1,2), size=(1200,400), margin=6mm, xlabel="log degree", ylabel="count")
+end
+
+function annotation_type_heatmap(interactions::Interactions)
+    type1 = interactions.nodes.type[interactions.edges.src]
+    type2 = interactions.nodes.type[interactions.edges.dst]
+    types = collect(union!(Set(type1), Set(type2)))
+    types_counter = zeros(Int, (length(types), length(types)))
+    type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
+    for (t1, t2) in zip(type1, type2)
+        types_counter[type_trans[t1], type_trans[t2]] += 1
+    end
+    heatmap(types, types, types_counter)
 end
