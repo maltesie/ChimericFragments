@@ -8,8 +8,7 @@ end
 function Interactions()
     nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_selfchimeric=>Int[], :nb_unclassified=>Int[],
         :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
-    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[],
-        :nms1=>Float64[], :nms2=>Float64[])
+    edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
     Interactions(nodes, edges, edgestats, Symbol[])
 end
@@ -55,7 +54,7 @@ Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 canmerge(alns::AlignedReads, i1::Int, i2::Int) = alns.annotated[i2] && (alns.reads[i1]!==alns.reads[i2]) && (alns.annames[i1]===alns.annames[i2]) &&
 ((alns.strands[i1] == RNASeqTools.STRAND_POS) ? (alns.leftpos[i1]<=alns.leftpos[i2]) : (alns.rightpos[i1]>=alns.rightpos[i2]))
 
-function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead)
+function mergeparts2!(mergedread::MergedAlignedRead, alnread::AlignedRead)
     alns = alnread.alns
     index = @view alns.pindex[alnread.range]
     length(mergedread.pindexpairs) >= length(index) || resize!(mergedread.pindexpairs, length(index))
@@ -67,6 +66,36 @@ function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead)
         c += 1
         nextolpi = findnext(x->canmerge(alns, ii, x), index, i+1)
         if isnothing(nextolpi)
+            mergedread.pindexpairs[c] = (ii, ii)
+        else
+            mergedread.pindexpairs[c] = (ii, index[nextolpi])
+            mergedread.merged[nextolpi] = true
+        end
+    end
+    resize!(mergedread.pindexpairs, c)
+    return mergedread
+end
+
+function mergeparts!(mergedread::MergedAlignedRead, alnread::AlignedRead)
+    alns = alnread.alns
+    index = @view alns.pindex[alnread.range]
+    length(mergedread.pindexpairs) >= length(index) || resize!(mergedread.pindexpairs, length(index))
+    length(mergedread.merged) >= length(index) || resize!(mergedread.merged, length(index))
+    mergedread.merged .= false
+    c::Int = 0
+    for (i::Int, ii::Int) in enumerate(index)
+        (mergedread.merged[i] || !alns.annotated[ii]) && continue
+        c += 1
+        nextolpi = i+1
+
+        if nextolpi <= length(index)
+            while !canmerge(alns, ii, index[nextolpi])
+                nextolpi += 1
+                (nextolpi > length(index)) && break
+            end
+        end
+
+        if nextolpi > length(index)
             mergedread.pindexpairs[c] = (ii, ii)
         else
             mergedread.pindexpairs[c] = (ii, index[nextolpi])
@@ -102,7 +131,7 @@ end
 
 function ischimeric(mergedread::MergedAlignedRead; min_distance=1000, check_annotation=true, check_order=false)
     length(mergedread) > 1 || return false
-    for (p1, p2) in combinations(mergedread.pindexpairs, 2)
+    for (i, p1) in enumerate(mergedread.pindexpairs), p2 in (@view mergedread.pindexpairs[i+1:end])
         ischimeric(mergedread, p1, p2; min_distance=min_distance, check_annotation=check_annotation, check_order=check_order) && return true
     end
     return false
@@ -122,7 +151,7 @@ reflen(alns::AlignedReads, pindexpair::Tuple{Int,Int}) =
     max(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)]) -
     min(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)])
 
-function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
+function append2!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
                         min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=true)
     if !(String(replicate_id) in interactions.replicate_ids)
         interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
@@ -138,7 +167,10 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     mergedread = MergedAlignedRead(first(alignments))
     for alignment in alignments
         total_count += 1
-        !isempty(filter_types) && typein(alignment, filter_types) && (exclude_count += 1; continue)
+        if !isempty(filter_types) && typein(alignment, filter_types)
+            exclude_count += 1
+            continue
+        end
         mergeparts!(mergedread, alignment)
         is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
         is_chimeric ? chimeric_count += 1 : single_count +=1
@@ -160,7 +192,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             end
         end
 
-        for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
+        #for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
+        for (i, pair1) in enumerate(mergedread.pindexpairs), pair2 in (@view mergedread.pindexpairs[i+1:end])
             ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
             a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
             interactions.nodes[a, :nb_ints] += 1
@@ -191,6 +224,135 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     end
     @info "Processed $total_count reads, found $single_count singles, $chimeric_count ($multi_count) chimeras and excluded $exclude_count"
     return interactions
+end
+
+function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
+    min_distance=1000, max_ligation_distance=5, filter_types=["rRNA", "tRNA"], allow_self_chimeras=false)
+
+    if !(String(replicate_id) in interactions.replicate_ids)
+        interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
+        push!(interactions.replicate_ids, replicate_id)
+    end
+
+    counts = zeros(Int, 6) #single, unclassified, selfchimeric, exclude, chimeric, multi
+    trans = Dict{UInt, Int}(interactions.nodes[i, :hash]=>i for i in 1:nrow(interactions.nodes))
+    edgestats = interactions.edgestats
+    node_ints = Matrix{Int}(interactions.nodes[:, [:nb_single, :nb_unclassified, :nb_selfchimeric, :nb_ints, :nb_ints_src, :nb_ints_dst]])
+    node_strings = Matrix{String}(interactions.nodes[:, [:name, :type, :ref]])
+    node_strands = Vector{Strand}(interactions.nodes.strand)
+    node_hashs = Vector{UInt}(interactions.nodes.hash)
+    edge_ints = hcat(Matrix{Int}(interactions.edges[:, [:src, :dst, :nb_ints, :nb_multi]]), zeros(Int, nrow(interactions.edges)))
+    edge_floats = Matrix{Float64}(interactions.edges[:, [:meanlen1, :meanlen2, :nms1, :nms2]])
+    mergedread = MergedAlignedRead(first(alignments))
+
+    for alignment in alignments
+        if !isempty(filter_types) && typein(alignment, filter_types)
+            counts[4] += 1
+            continue
+        end
+        mergeparts!(mergedread, alignment)
+        is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
+        counts[5] += is_chimeric
+        is_multi = length(mergedread)>2
+        counts[6] += is_multi
+
+        for (i1,_) in mergedread.pindexpairs
+            h = myhash(alignments, i1)
+            if !(h in keys(trans))
+                idx = length(trans) + 1
+                trans[h] = idx
+                if idx > length(node_hashs)
+                    resize!(node_hashs, length(node_hashs) + 1000000)
+                    resize!(node_strands, length(node_hashs) + 1000000)
+                    node_ints = vcat(node_ints, zeros(Int, 1000000, 6))
+                    node_strings = vcat(node_strings, fill("", 1000000, 3))
+                end
+                node_hashs[idx] = h
+                node_strings[idx, 1] = alignments.annames[i1]
+                node_strings[idx, 2] = alignments.antypes[i1]
+                node_strings[idx, 3] = alignments.refnames[i1]
+                node_strands[idx] = alignments.strands[i1]
+            end
+
+            if isselfchimeric(mergedread)
+                node_ints[trans[h], 3] += 1
+                counts[3] += 1
+            elseif !is_chimeric
+                if issingle(mergedread)
+                    node_ints[trans[h], 1] += 1
+                    counts[1] += 1
+                else
+                    node_ints[trans[h], 2] += 1
+                    counts[2] += 1
+                end
+            end
+        end
+
+        for (i, pair1) in enumerate(mergedread.pindexpairs), pair2 in (@view mergedread.pindexpairs[i+1:end])
+            ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
+            a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
+            node_ints[a, 4] += 1
+            node_ints[a, 5] += 1
+            node_ints[b, 4] += 1
+            node_ints[b, 6] += 1
+            if !((a,b) in keys(edgestats))
+                idx = length(edgestats)+1
+                edgestats[(a,b)] = (idx, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
+                if idx > size(edge_ints)[1]
+                    edge_ints = vcat(edge_ints, zeros(Int, 1000000, 5))
+                    edge_floats = vcat(edge_floats, zeros(Float64, 1000000, 4))
+                end
+                edge_ints[idx, 1] = a
+                edge_ints[idx, 2] = b
+            end
+            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = edgestats[(a, b)]
+            edge_ints[iindex, 3] += 1
+            edge_ints[iindex, 4] += is_multi
+            edge_ints[iindex, 5] += 1
+            leftpos = alignments.strands[last(pair1)] === STRAND_NEG ? alignments.leftpos[last(pair1)] : alignments.rightpos[last(pair1)]
+            rightpos = alignments.strands[first(pair2)] === STRAND_NEG ? alignments.rightpos[first(pair2)] : alignments.leftpos[first(pair2)]
+            leftcounter, rightcounter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ?
+                                            (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
+            leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
+            rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
+            for (i,v) in enumerate((reflen(alignments, pair1), reflen(alignments, pair2),
+                            max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
+                            max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
+                edge_floats[iindex, i] += (v - edge_floats[iindex, i]) / edge_ints[iindex, 5]
+            end
+        end
+    end
+
+    nr = 1:length(trans)
+    resize!(interactions.nodes, length(trans))
+    for (i, n) in enumerate((:name, :type, :ref))
+        interactions.nodes[:, n] .= node_strings[nr,i]
+    end
+    for (i, n) in enumerate((:nb_single, :nb_selfchimeric, :nb_unclassified, :nb_ints, :nb_ints_src, :nb_ints_dst))
+        interactions.nodes[:, n] .= node_ints[nr,i]
+    end
+    interactions.nodes.strand .= node_strands[nr]
+    interactions.nodes.hash .= node_hashs[nr]
+
+    er = 1:length(edgestats)
+    nbefore = nrow(interactions.edges)
+    resize!(interactions.edges, length(edgestats))
+    for rid in interactions.replicate_ids
+        interactions.edges[nbefore+1:length(edgestats), rid] .= zeros(Int, length(edgestats)-nbefore)
+    end
+    for (i, n) in enumerate((:src, :dst, :nb_ints, :nb_multi))
+        interactions.edges[:, n] .= edge_ints[er,i]
+    end
+    for (i, n) in enumerate((:meanlen1, :meanlen2, :nms1, :nms2))
+        interactions.edges[:, n] .= edge_floats[er,i]
+    end
+    interactions.edges[:, replicate_id] = edge_ints[er,5]
+    infotable = DataFrame(
+        :total=>[nread(alignments)], :chimeric=>[counts[5]], :multi=>[counts[6]], :selfchimeric=>[counts[3]],
+        :single=>[counts[1]], :filtered=>[counts[4]], :unclassified=>[counts[2]],
+    )
+    @info "Classification of reads:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+    return nothing
 end
 
 function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true,
@@ -241,6 +403,16 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
         gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
     max_dist = maximum(abs.(check_interaction_distances))
+    complement_genome = Genome(complement(genome.seq), genome.chroms)
+    reverse_genome = Genome(copy(genome.seq), genome.chroms)
+    for (_, seq) in reverse_genome
+        reverse!(seq)
+    end
+    reverse_complement_genome = Genome(complement(genome.seq), genome.chroms)
+    for (_, seq) in reverse_complement_genome
+        reverse!(seq)
+    end
+
     for (c, edge_row) in enumerate(eachrow(interactions.edges))
         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
             i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
@@ -249,13 +421,20 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
             (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
                 ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
 
-            s1 = strand1=='+' ?
-                genome[ref1][(i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2])] :
-                reverse_complement(genome[ref1][(i1+check_interaction_distances[2]):(i1+check_interaction_distances[1]-1)])
-            s2 = strand2=='-' ?
-                complement(genome[ref2][(i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2])]) :
-                reverse(genome[ref2][(i2+check_interaction_distances[2]):(i2+check_interaction_distances[1]-1)])
-
+            s1 = if strand1==STRAND_POS
+                view(genome[ref1], (i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2]))
+            else
+                l = length(genome.chroms[ref1])
+                c1, c2 = l+1-(i1+check_interaction_distances[2]), l+1-(i1+check_interaction_distances[1]-1)
+                view(reverse_complement_genome[ref1], c2:c1)
+            end
+            s2 = if strand2==STRAND_NEG
+                view(complement_genome[ref2], (i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2]))
+            else
+                l = length(genome.chroms[ref2])
+                c1, c2 = l+1-(i2+check_interaction_distances[2]), l+1-(i2+check_interaction_distances[1]-1)
+                view(reverse_genome[ref2], c2:c1)
+            end
             paln = pairalign(LocalAlignment(), s1, s2, model)
             sco = BioAlignments.score(paln)
             interactions.edges.pred_cl1[c] = paln.aln.a.aln.anchors[1].seqpos
@@ -449,7 +628,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
         isdir(joinpath(results_path, "plots")) || mkpath(joinpath(results_path, "plots"))
 
-        interactions = Interactions()
         for (condition, r) in conditions
             @info "Collecting $(length(r)) samples for condition $condition:"
             if (!overwrite_existing && isfile(joinpath(results_path, "tables", "genes_$(condition).csv")) &&
@@ -461,7 +639,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 continue
             end
             replicate_ids = Vector{Symbol}()
-            empty!(interactions)
             interactions = Interactions()
             for (i, bam) in enumerate(bams[r])
                 replicate_id = Symbol("$(condition)_$i")
@@ -478,6 +655,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                     filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
                 empty!(alignments)
+                GC.gc()
             end
             length(interactions) == 0 && (@warn "No interactions found!"; continue)
             correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
