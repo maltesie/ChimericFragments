@@ -151,81 +151,6 @@ reflen(alns::AlignedReads, pindexpair::Tuple{Int,Int}) =
     max(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)]) -
     min(alns.leftpos[first(pindexpair)], alns.leftpos[last(pindexpair)], alns.rightpos[first(pindexpair)], alns.rightpos[last(pindexpair)])
 
-function append2!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
-                        min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=true)
-    if !(String(replicate_id) in interactions.replicate_ids)
-        interactions.edges[:, replicate_id] = zeros(Int, nrow(interactions.edges))
-        push!(interactions.replicate_ids, replicate_id)
-    end
-    trans = Dict{UInt, Int}(interactions.nodes[i, :hash]=>i for i in 1:nrow(interactions.nodes))
-    edgestats = interactions.edgestats
-    exclude_count = 0
-    single_count = 0
-    chimeric_count = 0
-    multi_count = 0
-    total_count = 0
-    mergedread = MergedAlignedRead(first(alignments))
-    for alignment in alignments
-        total_count += 1
-        if !isempty(filter_types) && typein(alignment, filter_types)
-            exclude_count += 1
-            continue
-        end
-        mergeparts!(mergedread, alignment)
-        is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
-        is_chimeric ? chimeric_count += 1 : single_count +=1
-
-        is_multi = is_chimeric ? length(mergedread)>2 : false
-        multi_count += is_multi
-
-        for (i1,_) in mergedread.pindexpairs
-            h = myhash(alignments, i1)
-            if !(h in keys(trans))
-                trans[h] = length(trans) + 1
-                push!(interactions.nodes, (alignments.annames[i1], alignments.antypes[i1], alignments.refnames[i1], 0, 0, 0, 0, 0, 0, 0, alignments.strands[i1], h))
-            end
-
-            if isselfchimeric(mergedread)
-                (interactions.nodes[trans[h], :nb_selfchimeric] += 1)
-            elseif !is_chimeric
-                issingle(mergedread) ? (interactions.nodes[trans[h], :nb_single] += 1) : (interactions.nodes[trans[h], :nb_unclassified] += 1)
-            end
-        end
-
-        #for (pair1, pair2) in combinations(mergedread.pindexpairs, 2)
-        for (i, pair1) in enumerate(mergedread.pindexpairs), pair2 in (@view mergedread.pindexpairs[i+1:end])
-            ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
-            a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
-            interactions.nodes[a, :nb_ints] += 1
-            interactions.nodes[a, :nb_ints_src] += 1
-            interactions.nodes[b, :nb_ints] += 1
-            interactions.nodes[b, :nb_ints_dst] += 1
-            if !((a,b) in keys(edgestats))
-                edgestats[(a,b)] = (length(edgestats)+1, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
-                push!(interactions.edges, (a, b, 0, 0, 0.0, 0.0, 0.0, 0.0, (0 for i in 1:length(interactions.replicate_ids))...))
-            end
-            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = edgestats[(a, b)]
-            interactions.edges[iindex, :nb_ints] += 1
-            interactions.edges[iindex, :nb_multi] += is_multi
-            interactions.edges[iindex, replicate_id] += 1
-            leftpos = alignments.strands[last(pair1)] === STRAND_NEG ? alignments.leftpos[last(pair1)] : alignments.rightpos[last(pair1)]
-            rightpos = alignments.strands[first(pair2)] === STRAND_NEG ? alignments.rightpos[first(pair2)] : alignments.leftpos[first(pair2)]
-            leftcounter, rightcounter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ?
-                                            (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
-            leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
-            rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
-            for (s,v) in zip((:meanlen1, :meanlen2, :nms1, :nms2),
-                            (reflen(alignments, pair1), reflen(alignments, pair2),
-                            max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
-                            max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
-                interactions.edges[iindex, s] += (v - interactions.edges[iindex, s]) / interactions.edges[iindex, :nb_ints]
-            end
-        end
-    end
-    @info "Processed $total_count reads, found $single_count singles, $chimeric_count ($multi_count) chimeras and excluded $exclude_count"
-    return interactions
-end
-
 function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
     min_distance=1000, max_ligation_distance=5, filter_types=["rRNA", "tRNA"], allow_self_chimeras=false)
 
@@ -627,7 +552,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
         isdir(joinpath(results_path, "plots")) || mkpath(joinpath(results_path, "plots"))
-
         for (condition, r) in conditions
             @info "Collecting $(length(r)) samples for condition $condition:"
             if (!overwrite_existing && isfile(joinpath(results_path, "tables", "genes_$(condition).csv")) &&
@@ -640,6 +564,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             end
             replicate_ids = Vector{Symbol}()
             interactions = Interactions()
+            GC.gc()
             for (i, bam) in enumerate(bams[r])
                 replicate_id = Symbol("$(condition)_$i")
                 push!(replicate_ids, replicate_id)
