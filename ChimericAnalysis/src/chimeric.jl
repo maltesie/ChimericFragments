@@ -164,7 +164,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     edgestats = interactions.edgestats
     node_ints = Matrix{Int}(interactions.nodes[:, [:nb_single, :nb_unclassified, :nb_selfchimeric, :nb_ints, :nb_ints_src, :nb_ints_dst]])
     node_strings = Matrix{String}(interactions.nodes[:, [:name, :type, :ref]])
-    node_strands = Vector{Strand}(interactions.nodes.strand)
+    node_strands = Vector{Char}(interactions.nodes.strand)
     node_hashs = Vector{UInt}(interactions.nodes.hash)
     edge_ints = hcat(Matrix{Int}(interactions.edges[:, [:src, :dst, :nb_ints, :nb_multi]]), zeros(Int, nrow(interactions.edges)))
     edge_floats = Matrix{Float64}(interactions.edges[:, [:meanlen1, :meanlen2, :nms1, :nms2]])
@@ -346,14 +346,14 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
             (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
                 ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
 
-            s1 = if strand1==STRAND_POS
+            s1 = if strand1=='+'
                 view(genome[ref1], (i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2]))
             else
                 l = length(genome.chroms[ref1])
                 c1, c2 = l+1-(i1+check_interaction_distances[2]), l+1-(i1+check_interaction_distances[1]-1)
                 view(reverse_complement_genome[ref1], c2:c1)
             end
-            s2 = if strand2==STRAND_NEG
+            s2 = if strand2=='-'
                 view(complement_genome[ref2], (i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2]))
             else
                 l = length(genome.chroms[ref2])
