@@ -202,9 +202,6 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             end
         end
 
-        #@show mergedread
-        #@show alignment
-
         for (i, pair1) in enumerate(mergedread.pindexpairs), pair2 in (@view mergedread.pindexpairs[i+1:end])
             ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
             a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
@@ -267,7 +264,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     end
     interactions.edges[!, replicate_id] .= view(edge_ints, er, 5)
     infotable = DataFrame(
-        :total=>[nread(alignments)], :chimeric=>[counts[5]], :self=>[counts[3]],
+        :total=>[nread(alignments)], :chimeric=>[counts[5]], :multi=>[counts[6]], :self=>[counts[3]],
         :single=>[counts[1]], :filtered=>[counts[4]], :no_class=>[counts[2]],
     )
     @info "Classification of reads:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
