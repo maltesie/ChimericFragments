@@ -47,7 +47,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         end
         sort!(interact.edges, :nb_ints; rev=true)
     end
-    gene_name_info = Dict(dname=>Dict(n*t=>(t,rr,l,r,s,nsingle,nint,cds,n) for (n,t,l,r, cds, rr,s,nsingle,nint) in
+    gene_name_info = Dict(dname=>Dict(n*t=>(t,rr,l,r,s,nsingle,nint,cds,n) for (n,t,l,r,cds,rr,s,nsingle,nint) in
         eachrow(interact.nodes[!, [:name, :type, :left, :right, :cds, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
     gene_name_position = Dict(dname=>Dict(n*t=>Dict("x"=>x, "y"=>y) for (n,t,x,y) in eachrow(interact.nodes[!, [:name, :type, :x, :y]])) for (dname, interact) in interactions)
     return interactions, gene_name_info, gene_name_position, genome_info, genome
