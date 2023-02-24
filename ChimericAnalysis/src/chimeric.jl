@@ -630,13 +630,13 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             p7 = annotation_type_heatmap(interactions)
             save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
-        if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
-            @info "Finalizing..."
-            singles = CsvFiles(joinpath(results_path, "tables"); prefix="genes")
-            ints = CsvFiles(joinpath(results_path, "tables"); prefix="interactions")
-            write(joinpath(results_path, "genes.xlsx"), singles)
-            write(joinpath(results_path, "interactions.xlsx"), ints)
-        end
+        #if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
+        #    @info "Finalizing..."
+        #    singles = CsvFiles(joinpath(results_path, "tables"); prefix="genes")
+        #    ints = CsvFiles(joinpath(results_path, "tables"); prefix="interactions")
+        #    write(joinpath(results_path, "genes.xlsx"), singles)
+        #    write(joinpath(results_path, "interactions.xlsx"), ints)
+        #end
         @info "Done."
     end
 end
