@@ -256,14 +256,38 @@ function node_distribution_plot(interactions::Interactions, plotting_fdr_levels:
     plot(p1, p2; layout=(1,2), size=(1200,400), margin=6mm, xlabel="log degree", ylabel="count")
 end
 
-function annotation_type_heatmap(interactions::Interactions)
+function annotation_type_heatmap(interactions::Interactions, plotting_fdr_levels::Vector{Float64})
     type1 = interactions.nodes.type[interactions.edges.src]
     type2 = interactions.nodes.type[interactions.edges.dst]
     types = collect(union!(Set(type1), Set(type2)))
-    types_counter = zeros(Int, (length(types), length(types)))
     type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
+
+    types_counter = zeros(Int, (length(types), length(types)))
     for (t1, t2) in zip(type1, type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
-    heatmap(types, types, types_counter)
+    plots = [heatmap(types, types, types_counter; legend=:none)]
+    titles = ["all interactions"]
+    for pl in plotting_fdr_levels
+        types_counter = zeros(Int, (length(types), length(types)))
+        type1 = interactions.nodes.type[interactions.edges.src[interactions.edges.fdr .<= pl]]
+        type2 = interactions.nodes.type[interactions.edges.dst[interactions.edges.fdr .<= pl]]
+        for (t1, t2) in zip(type1, type2)
+            types_counter[type_trans[t1], type_trans[t2]] += 1
+        end
+        push!(plots, heatmap(types, types, types_counter; legend=:none))
+        push!(titles, "max fisher fdr = $pl")
+    end
+    for pl in plotting_fdr_levels
+        types_counter = zeros(Int, (length(types), length(types)))
+        type1 = interactions.nodes.type[interactions.edges.src[interactions.edges.pred_fdr .<= pl]]
+        type2 = interactions.nodes.type[interactions.edges.dst[interactions.edges.pred_fdr .<= pl]]
+        for (t1, t2) in zip(type1, type2)
+            types_counter[type_trans[t1], type_trans[t2]] += 1
+        end
+        push!(plots, heatmap(types, types, types_counter; legend=:none))
+        push!(titles, "max bp fdr = $pl")
+    end
+    l = @layout[a{0.25w} grid(2,length(plotting_fdr_levels))]
+    plot(plots...; layout=l, title=reshape(titles, (1, length(titles))), size=(600*(length(plotting_fdr_levels)+1),800), margin=9mm)
 end

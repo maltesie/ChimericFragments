@@ -627,7 +627,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             p6 = node_distribution_plot(interactions, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_degree_dist.png"), p6)
 
-            p7 = annotation_type_heatmap(interactions)
+            p7 = annotation_type_heatmap(interactions, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
         #if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
