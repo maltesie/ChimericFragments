@@ -27,7 +27,7 @@ positioning_control_layout() = html_div(
             value="clustered",
             clearable=false,
             options=[
-                Dict("label"=>l, "value"=>v) for (l,v) in ["clustered"=>"clustered", "random"=>"random"]
+                Dict("label"=>l, "value"=>v) for (l,v) in ["clustered"=>"clustered", "grid"=>"grid"]
             ]
         ),
     ]

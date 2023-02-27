@@ -36,10 +36,9 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
         interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
-        interact.nodes[:, :x] = (rand(rng, nrow(interact.nodes)).+0.5) .* 1200
-        interact.nodes[:, :y] = (rand(rng, nrow(interact.nodes)).+0.5) .* 800
         interact.nodes[:, :nb_significant_ints] = zeros(Int, nrow(interact.nodes))
         interact.nodes[:, :nb_significant_partners] = zeros(Int, nrow(interact.nodes))
+        replace!(interact.edges.odds_ratio, Inf=>-1.0)
         for (i,row) in enumerate(eachrow(interact.nodes))
             row[:nb_significant_ints] = sum(interact.edges[(interact.edges.src .== i) .| (interact.edges.dst .== i), :nb_ints])
             names = Set(hcat(interact.nodes[interact.edges[!,:src], :name],interact.nodes[interact.edges[!,:src], :name])[hcat((interact.edges.src .== i),(interact.edges.dst .== i))])
@@ -49,8 +48,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
     end
     gene_name_info = Dict(dname=>Dict(n*t=>(t,rr,l,r,s,nsingle,nint,cds,n) for (n,t,l,r,cds,rr,s,nsingle,nint) in
         eachrow(interact.nodes[!, [:name, :type, :left, :right, :cds, :ref, :strand, :nb_single, :nb_significant_ints]])) for (dname, interact) in interactions)
-    gene_name_position = Dict(dname=>Dict(n*t=>Dict("x"=>x, "y"=>y) for (n,t,x,y) in eachrow(interact.nodes[!, [:name, :type, :x, :y]])) for (dname, interact) in interactions)
-    return interactions, gene_name_info, gene_name_position, genome_info, genome
+    return interactions, gene_name_info, genome_info, genome
 end
 
 nthindex(a::BitVector, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
@@ -76,7 +74,14 @@ function filtered_dfview(df::DataFrame, search_strings::Vector{String}, min_read
     return @view df[filtered_index, :]
 end
 
-function get_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_distance=100, scaling_factor=0.1)
+function make_graph(df::SubDataFrame)
+    i1, i2 = df.name1 .* df.type1, df.name2 .* df.type2
+    names = collect(Set(vcat(i1, i2)))
+    name_trans = Dict(n=>i for (i,n) in enumerate(names))
+    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(i1, i2))
+    return Graph(edges), names
+end
+function get_clustered_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_distance=100, scaling_factor=0.1)
     pos = Vector{Point2}(undef, nv(g))
     components = sort([component for component in connected_components(g)], by=length, rev=true)
     packed_rectangles = GuillotinePacker(xmax, ymax)
@@ -102,13 +107,9 @@ function get_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_distance=100,
     #((xmax-mean_distance) / maxx) > 1.5 && (pos .*= ((xmax-mean_distance) / maxx))
     return pos
 end
-function clustered_positions(df::SubDataFrame)
-    i1, i2 = df.name1 .* df.type1, df.name2 .* df.type2
-    names = collect(Set(vcat(i1, i2)))
-    name_trans = Dict(n=>i for (i,n) in enumerate(names))
-    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(i1, i2))
-    g = Graph(edges)
-    pos = get_positions(g)
+function clustered_positions(df::SubDataFrame; xmax=2500, ymax=10000, mean_distance=100, scaling_factor=0.1)
+    g, names = make_graph(df)
+    pos = get_clustered_positions(g; xmax=xmax, ymax=ymax, mean_distance=mean_distance, scaling_factor=scaling_factor)
     return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
 end
 node_index(df::SubDataFrame, node_name::String) = (df.name1 .=== node_name) .| (df.name2 .=== node_name)
@@ -124,13 +125,20 @@ function ligation_trafo(tup::Tuple{String, String, Int, Int, Char, Int, Int, Int
     i <= 0 ? i-1 : i
 end
 
+function grid_positions(df::SubDataFrame; mean_distance=100.0)
+    g, names = make_graph(df)
+    pos = squaregrid(adjacency_matrix(g))
+    pos .-= Point2(minimum(p1 for (p1,_) in pos)-1.0, minimum(p2 for (_,p2) in pos)-1.0)
+    pos .*= mean_distance
+    return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
+end
 function cytoscape_elements(df::SubDataFrame, interact::Interactions, gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}},
-                            gene_name_position::Dict{String, Dict{String, Float64}}, srna_type::String, layout_value::String)
+                            srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
     srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
-    pos = layout_value == "random" ? gene_name_position : clustered_positions(df)
+    pos = layout_value == "clustered" ? clustered_positions(df) : grid_positions(df)
     edges = [Dict(
         "data"=>Dict(
             "id"=>row.name1*row.type1*row.name2*row.type2,

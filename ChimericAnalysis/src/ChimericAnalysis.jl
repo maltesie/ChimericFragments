@@ -9,7 +9,9 @@ using Measures
 
 export chimeric_analysis, mergetypes
 
-include("chimeric.jl")
+include("mergedreads.jl")
+include("interactions.jl")
+include("pipeline.jl")
 include("plots.jl")
 
 end

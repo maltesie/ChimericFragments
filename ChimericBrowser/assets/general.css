@@ -508,7 +508,7 @@ input[type="button"]:hover {
     display: flex;
     width: 100%;
     justify-content: center;
-    height:900px;
+    height:970px;
 }
 
 #table {
@@ -534,7 +534,7 @@ input[type="button"]:hover {
         display: flex;
         width: 100%;
         justify-content: center;
-        height:900px;
+        height:970px;
     }
     
 #circos {
@@ -559,7 +559,7 @@ input[type="button"]:hover {
         display: flex;
         width: 100%;
         justify-content: center;
-        height:900px;
+        height:970px;
     }
     
 #graph {
@@ -575,7 +575,7 @@ input[type="button"]:hover {
 	padding:100px;
 	background-color: #ffffff;
 	width: 100%;
-	height:900px;
+	height:970px;
 }
 
 #colorbar-edges {

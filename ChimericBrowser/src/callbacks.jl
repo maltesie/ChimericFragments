@@ -20,13 +20,13 @@ const update_selection_states = [
     State("data-tabs", "value")
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, gene_name_info::Dict{String, Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}}},
-    gene_name_position::Dict{String, Dict{String, Dict{String, Float64}}}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
+    sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, layout_value, ligation, exclusive, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
     df = filtered_dfview(interactions[dataset].edges, my_search_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df)
-    cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], gene_name_position[dataset], sRNA_type, layout_value)
+    cytoscape_output = cytoscape_elements(df, interactions[dataset], gene_name_info[dataset], sRNA_type, layout_value)
     circos_output = circos_data(df)
     summary_output = summary_statistics(interactions[dataset], df, param_dict)
     return table_output, cytoscape_output, circos_output, summary_output, tab_value
@@ -79,7 +79,7 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=200)
+function baisepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int, rna1::String, rna2::String; width::Integer=200)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
@@ -162,15 +162,16 @@ function edge_info(edge_data::Dash.JSON3.Object, genome::Dict{String, BioSequenc
         p = pairalign(LocalAlignment(), s1, s2, model)
         baisepairing_string(alignment(p),
             (strand1=="+" ? ((i1-check_interaction_distances[1]+1)-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]-1))),
-            (strand2=="-" ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1]+1)) : ((i2+check_interaction_distances[1]-1)-(c2>0 ? c2 : l2))))
+            (strand2=="-" ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1]+1)) : ((i2+check_interaction_distances[1]-1)-(c2>0 ? c2 : l2))),
+            edge_data["name1"], edge_data["name2"])
     else
         "no ligation data."
     end
     return [html_div(id="edge-info", children=[
-        html_p("RNA1: $(edge_data["name1"]) on $ref1"),
+        html_p("RNA1: $(edge_data["name1"]) on $ref1 ($(edge_data["right1"]-edge_data["left1"]+1)nt)"),
         gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), i1, Int(edge_data["modeligcount1"]), l1, r1, c1, strand1=="-", true),
         html_br(),
-        html_p("RNA2: $(edge_data["name2"]) on $ref2"),
+        html_p("RNA2: $(edge_data["name2"]) on $ref2 ($(edge_data["right2"]-edge_data["left2"]+1)nt)"),
         gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), i2, Int(edge_data["modeligcount2"]), l2, r2, c2, strand2=="-", false),
         html_br(),
         html_p(children=alnstring, style=Dict("white-space" => "pre", "font-family" => "monospace", "max-width"=>"300px", "overflow"=>"scroll", "padding-bottom"=>"13px")),

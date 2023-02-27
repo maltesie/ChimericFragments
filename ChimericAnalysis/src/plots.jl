@@ -262,32 +262,52 @@ function annotation_type_heatmap(interactions::Interactions, plotting_fdr_levels
     types = collect(union!(Set(type1), Set(type2)))
     type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
 
-    types_counter = zeros(Int, (length(types), length(types)))
-    for (t1, t2) in zip(type1, type2)
-        types_counter[type_trans[t1], type_trans[t2]] += 1
-    end
-    plots = [heatmap(types, types, types_counter; legend=:none)]
-    titles = ["all interactions"]
+    plots = []
+    titles = []
+
     for pl in plotting_fdr_levels
-        types_counter = zeros(Int, (length(types), length(types)))
+        types_counter = zeros(Float64, (length(types), length(types)))
         type1 = interactions.nodes.type[interactions.edges.src[interactions.edges.fdr .<= pl]]
         type2 = interactions.nodes.type[interactions.edges.dst[interactions.edges.fdr .<= pl]]
         for (t1, t2) in zip(type1, type2)
             types_counter[type_trans[t1], type_trans[t2]] += 1
         end
-        push!(plots, heatmap(types, types, types_counter; legend=:none))
+        types_counter ./= sum(types_counter)
+        push!(plots, heatmap(types, types, types_counter; legend=:none, clims=(0.0,1.0)))
         push!(titles, "max fisher fdr = $pl")
     end
     for pl in plotting_fdr_levels
-        types_counter = zeros(Int, (length(types), length(types)))
+        types_counter = zeros(Float64, (length(types), length(types)))
         type1 = interactions.nodes.type[interactions.edges.src[interactions.edges.pred_fdr .<= pl]]
         type2 = interactions.nodes.type[interactions.edges.dst[interactions.edges.pred_fdr .<= pl]]
         for (t1, t2) in zip(type1, type2)
             types_counter[type_trans[t1], type_trans[t2]] += 1
         end
-        push!(plots, heatmap(types, types, types_counter; legend=:none))
+        types_counter ./= sum(types_counter)
+        push!(plots, heatmap(types, types, types_counter; legend=:none, clims=(0.0,1.0)))
         push!(titles, "max bp fdr = $pl")
     end
-    l = @layout[a{0.25w} grid(2,length(plotting_fdr_levels))]
-    plot(plots...; layout=l, title=reshape(titles, (1, length(titles))), size=(600*(length(plotting_fdr_levels)+1),800), margin=9mm)
+
+    for min_reads in reverse([2,5,10,20,50][1:length(plotting_fdr_levels)])
+        types_counter = zeros(Float64, (length(types), length(types)))
+        type1 = interactions.nodes.type[interactions.edges.src[interactions.edges.nb_ints .>= min_reads]]
+        type2 = interactions.nodes.type[interactions.edges.dst[interactions.edges.nb_ints .>= min_reads]]
+        for (t1, t2) in zip(type1, type2)
+            types_counter[type_trans[t1], type_trans[t2]] += 1
+        end
+        types_counter ./= sum(types_counter)
+        push!(plots, heatmap(types, types, types_counter; legend=:none, clims=(0.0,1.0)))
+        push!(titles, "min reads = $min_reads")
+    end
+
+    types_counter = zeros(Float64, (length(types), length(types)))
+    for (t1, t2) in zip(type1, type2)
+        types_counter[type_trans[t1], type_trans[t2]] += 1
+    end
+    types_counter ./= sum(types_counter)
+    push!(plots, heatmap(types, types, types_counter; clims=(0.0,1.0), colorbar_title="frequency"))
+    push!(titles, "all interactions")
+
+    l = @layout[grid(3,length(plotting_fdr_levels)){0.7w} [_;b{0.33h};_]]
+    plot(plots...; layout=l, title=reshape(titles, (1, length(titles))), size=(600*(length(plotting_fdr_levels)+1),1200), plot_titlefontsize=12, margin=9mm)
 end
