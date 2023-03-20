@@ -55,52 +55,55 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
             gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
-        seq_length = sum(abs.(check_interaction_distances))
+        seq_length = check_interaction_distances[1]-check_interaction_distances[2]
 
         genome_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
-            i1 % 2 == 0 ? genome.seq[i1:i1+seq_length] : reverse_complement(genome.seq[i1:i1+seq_length]),
-            i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length]) : complement(genome.seq[i2:i2+seq_length]),
-            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))])
+            i1 % 2 == 0 ? genome.seq[i1:i1+seq_length-1] : reverse_complement(genome.seq[i1:i1+seq_length-1]),
+            i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length-1]) : complement(genome.seq[i2:i2+seq_length-1]),
+            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
+        )
 
+        randseq = randdnaseq(length(genome.seq))
         randseq_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
-            randdnaseq(seq_length),
-            randdnaseq(seq_length),
-            model; score_only=true)) for i in 1:n_genome_samples])
+            view(randseq, i1:i1+seq_length-1),
+            view(randseq, i2:i2+seq_length-1),
+            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
+        )
 
         @info "Using $(summarize(features))"
         isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
         isdir(joinpath(results_path, "plots")) || mkpath(joinpath(results_path, "plots"))
         for (condition, r) in conditions
-            @info "Collecting $(length(r)) samples for condition $condition:"
-            if (!overwrite_existing && isfile(joinpath(results_path, "tables", "genes_$(condition).csv")) &&
-                isfile(joinpath(results_path, "tables", "interactions_$(condition).csv")) &&
-                isfile(joinpath(results_path, "tables", "ligation_points_$(condition).csv")) &&
-                isfile(joinpath(results_path, "jld", "$(condition).jld2")))
 
-                @info "Found results files. Skipping condition $condition..."
-                continue
-            end
             replicate_ids = Vector{Symbol}()
             interactions = Interactions()
             GC.gc()
-            for (i, bam) in enumerate(bams[r])
-                replicate_id = Symbol("$(condition)_$i")
-                push!(replicate_ids, replicate_id)
-                @info "Replicate $replicate_id:"
-                @info "Reading $bam"
-                alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
-                                        include_alternative_alignments=include_alternative_alignments,
-                                        is_reverse_complement=is_reverse_complement)
-                @info "Annotating alignments..."
-                annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
-                                                overwrite_type=overwrite_type)
-                @info "Building graph of interactions..."
-                append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
-                    filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, is_paired_end=is_paired_end)
-                empty!(alignments)
-                GC.gc()
+
+            @info "Collecting $(length(r)) samples for condition $condition:"
+            if isfile(joinpath(results_path, "jld", "$(condition).jld2"))
+                @info "Found results files. Using existing JLD2 file for $condition..."
+                interactions = Interactions(joinpath(results_path, "jld", "$(condition).jld2"))
+            else
+                for (i, bam) in enumerate(bams[r])
+                    replicate_id = Symbol("$(condition)_$i")
+                    push!(replicate_ids, replicate_id)
+                    @info "Replicate $replicate_id:"
+                    @info "Reading $bam"
+                    alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
+                                            include_alternative_alignments=include_alternative_alignments,
+                                            is_reverse_complement=is_reverse_complement)
+                    @info "Annotating alignments..."
+                    annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
+                                                    overwrite_type=overwrite_type)
+                    @info "Building graph of interactions..."
+                    append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
+                        filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, is_paired_end=is_paired_end)
+                    empty!(alignments)
+                    GC.gc()
+                end
             end
+
             length(interactions) == 0 && (@warn "No interactions found!"; continue)
             correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
             correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
@@ -158,13 +161,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             p7 = annotation_type_heatmap(interactions, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
-        #if !(!overwrite_existing && isfile(joinpath(results_path, "singles.xlsx")) && isfile(joinpath(results_path, "interactions.xlsx")))
-        #    @info "Finalizing..."
-        #    singles = CsvFiles(joinpath(results_path, "tables"); prefix="genes")
-        #    ints = CsvFiles(joinpath(results_path, "tables"); prefix="interactions")
-        #    write(joinpath(results_path, "genes.xlsx"), singles)
-        #    write(joinpath(results_path, "interactions.xlsx"), ints)
-        #end
+
         @info "Done."
     end
 end

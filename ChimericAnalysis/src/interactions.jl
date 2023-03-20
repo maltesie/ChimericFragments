@@ -41,6 +41,10 @@ function Base.write(filepath::String, interactions::Interactions)
     end
 end
 
+Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAnalysis.Interactions" => Interactions)) do f
+    f["interactions"]
+end
+
 function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
     min_distance=1000, max_ligation_distance=5, filter_types=["rRNA", "tRNA"], allow_self_chimeras=false, is_paired_end=true)
 

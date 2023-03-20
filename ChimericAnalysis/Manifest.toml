@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "c9de2d9368400da7669ef7589b7d55eb8f82794a"
+project_hash = "e1e99ea0e1a9a908197f2df70ec22d333aadc874"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -615,12 +615,6 @@ git-tree-sha1 = "42324d08725e200c23d4dfb549e0d5d89dede2d2"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.5.10"
 
-[[deps.MakieCore]]
-deps = ["Observables"]
-git-tree-sha1 = "2c3fc86d52dfbada1a2e5e150e50f06c30ef149c"
-uuid = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
-version = "0.6.2"
-
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -669,11 +663,6 @@ version = "1.0.1"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
-
-[[deps.Observables]]
-git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
-uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
-version = "0.5.4"
 
 [[deps.Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -815,9 +804,9 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RNASeqTools]]
 deps = ["BigWig", "BioAlignments", "BioGenerics", "BioSequences", "CodecZlib", "Distributions", "FASTX", "GFF3", "GLM", "GenomicFeatures", "IntervalTrees", "IterTools", "MultipleTesting", "StringViews", "XAM"]
-git-tree-sha1 = "ccb49dff1607737f61a6f38858f38e04674af3a3"
-repo-rev = "v0.3.3"
-repo-url = "http://github.com/maltesie/RNASeqTools"
+git-tree-sha1 = "28c330b8335e5f618f869522b92541efc74684d9"
+repo-rev = "master"
+repo-url = "https://github.com/maltesie/RNASeqTools"
 uuid = "c929925e-1c85-4562-9573-d68085edd19a"
 version = "0.3.3"
 
