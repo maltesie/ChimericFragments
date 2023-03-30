@@ -36,12 +36,14 @@ function Base.write(fname::String, files::SingleTypeFiles)
     end
 end
 
+score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
+
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, is_paired_end=true, check_interaction_distances=(45,-10),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
-                            overwrite_existing=false, include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50,
-                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, plot_fdr_levels=[0.1,0.2,0.5])
+                            include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50,
+                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, plot_fdr_levels=[0.1,0.2,0.5], shift_weight=0.1)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -55,19 +57,19 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
             gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
-        seq_length = check_interaction_distances[1]-check_interaction_distances[2]
+        seq_length = check_interaction_distances[1]-check_interaction_distances[2]+1
 
-        genome_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
+        genome_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
             i1 % 2 == 0 ? genome.seq[i1:i1+seq_length-1] : reverse_complement(genome.seq[i1:i1+seq_length-1]),
             i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length-1]) : complement(genome.seq[i2:i2+seq_length-1]),
-            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
+            model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
         )
 
         randseq = randdnaseq(length(genome.seq))
-        randseq_model_ecdf = ecdf([BioAlignments.score(pairalign(LocalAlignment(),
+        randseq_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
             view(randseq, i1:i1+seq_length-1),
             view(randseq, i2:i2+seq_length-1),
-            model; score_only=true)) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
+            model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
         )
 
         @info "Using $(summarize(features))"
@@ -113,8 +115,53 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Running statistical tests..."
             addpositions!(interactions, features)
+            #ss = Vector{Set{Tuple{Int,Int}}}()
+            #randpos = rand(1:(length(genome.seq)-50), (n_genome_samples,2))
+            #for shift_weight in (0.0, 1.0, 1.5, 2.0)
+            #    check_interaction_dists = check_interaction_distances
+            #    bp_params = bp_parameters
+            #    println("new test:")
+            #    println(shift_weight)
+            #    seq_length = check_interaction_dists[1]-check_interaction_dists[2]
+            #    scores = Dict((DNA_A, DNA_T)=>bp_params[1], (DNA_T, DNA_A)=>bp_params[1],
+            #        (DNA_C, DNA_G)=>bp_params[2], (DNA_G, DNA_C)=>bp_params[2],
+            #        (DNA_G, DNA_T)=>bp_params[3], (DNA_T, DNA_G)=>bp_params[3])
+            #    model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_params[4], default_mismatch=-1*bp_params[4]);
+            #        gap_open=-1*bp_params[5], gap_extend=-1*bp_params[6])
+            #    genome_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
+            #        i1 % 2 == 0 ? genome.seq[i1:i1+seq_length-1] : reverse_complement(genome.seq[i1:i1+seq_length-1]),
+            #        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length-1]) : complement(genome.seq[i2:i2+seq_length-1]),
+            #        model), shift_weight) for (i1, i2) in eachrow(randpos)]
+            #    )
+            #    addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
+            #        fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_dists, bp_parameters=bp_params, shift_weight=shift_weight)
+            #    println(sum(interactions.edges.pred_fdr .<= 0.1))
+            #    println(sum(interactions.edges.pred_fdr .<= 0.3))
+            #    push!(ss, Set(collect(zip(interactions.edges.src[interactions.edges.pred_fdr .<= 0.1], interactions.edges.dst[interactions.edges.pred_fdr .<= 0.1]))))
+            #    println()
+            #end
+            #println("overlaps between sets:")
+            #println(length.(ss))
+            #for r in eachrow([length(intersect(s1, s2)) for s1 in ss, s2 in ss])
+            #    println(r)
+            #end
+            #println("normalized to first:")
+            #for r in eachrow([round.(length(intersect(s1, s2))/length(s1); digits=2) for s1 in ss, s2 in ss])
+            #    println(r)
+            #end
+            #println("normalized to min:")
+            #for r in eachrow([round.(length(intersect(s1, s2))/min(length(s1), length(s2)); digits=2) for s1 in ss, s2 in ss])
+            #    println(r)
+            #end
+            #supers = Set{Tuple{Int,Int}}()
+            #for s in ss
+            #    union!(supers, s)
+            #end
+            #println(length(supers))
+
             addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
-                fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters)
+                    fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters)
+
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
 
@@ -147,9 +194,13 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
 
-            p2, p3 = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3)
+            (p2_1, p2_2, p2_3), (p3_1, p3_2, p3_3) = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2_1)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3_1)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_bp_ratios.png"), p2_2)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_ratios.png"), p3_2)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_bp_diff.png"), p2_3)
+            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_diff.png"), p3_3)
 
             p4, p5 = interaction_distribution_plots(interactions, plot_fdr_levels)
             save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)

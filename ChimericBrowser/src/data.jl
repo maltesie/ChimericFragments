@@ -91,7 +91,7 @@ function get_clustered_positions(g::SimpleGraph; xmax=2500, ymax=10000, mean_dis
         minx = minimum(first(p) for p in pos[component])
         maxx = maximum(first(p) for p in pos[component])
         if ((maxx-minx) > (xmax-mean_distance))
-            pos[component] .*= (xmax-mean_distance)/(maxx-minx)
+            pos[component] .*= (xmax-mean_distance)/(maxx-minx+1)
             minx = minimum(first(p) for p in pos[component])
             maxx = maximum(first(p) for p in pos[component])
         end

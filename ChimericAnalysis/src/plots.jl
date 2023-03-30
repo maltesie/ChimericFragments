@@ -73,13 +73,13 @@ end
 
 function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_levels::Vector{Float64})
 
-    interactions_ecdf = ecdf(Int.(interactions.edges.pred_score[.!isnan.(interactions.edges.pred_score)]))
+    interactions_ecdf = ecdf(interactions.edges.pred_score[.!isnan.(interactions.edges.pred_score)])
 
-    max_score = Int(max(
+    max_score = Int(floor(max(
         maximum(interactions_ecdf.sorted_values),
         maximum(randseq_model_ecdf.sorted_values),
         maximum(genome_model_ecdf.sorted_values)
-    ))
+    )))
 
     nan_index = .!isnan.(interactions.edges.pred_fdr)
     si_fdr = sort(collect(enumerate(zip(interactions.edges.pred_fdr[nan_index], interactions.edges.pred_pvalue[nan_index]))), by=x->x[2][2], rev=true)
@@ -126,6 +126,48 @@ function alignment_histogram(l1::Vector{Float64}, r1::Vector{Float64}, l2::Vecto
     xlabel!(h6, "position in alignment")
     title!(h6, "RNA2, length")
 
+    hn1 = histogram(l1; bins=bins, label="all", legend=:topright)
+    title!(hn1, "RNA1, left end")
+    ylabel!(hn1, "count")
+    hn2 = histogram(r1; bins=bins, label="all", legend=:topleft)
+    title!(hn2, "RNA1, right end")
+    hn3 = histogram(l2; bins=bins, label="all", legend=:topright)
+    ylabel!(hn3, "count")
+    xlabel!(hn3, "position in alignment")
+    title!(hn3, "RNA2, left end")
+    hn4 = histogram(r2; bins=bins, label="all", legend=:topleft)
+    xlabel!(hn4, "position in alignment")
+    title!(hn4, "RNA2, right end")
+    hn5 = histogram(r1 .- l1 .+ 1; bins=bins, label="all", legend=:topright)
+    title!(hn5, "RNA1, length")
+    hn6 = histogram(r2 .- l2 .+ 1; bins=bins, label="all", legend=:topright)
+    xlabel!(hn6, "position in alignment")
+    title!(hn6, "RNA2, length")
+
+    lp1 = plot(ones(length(bins)); label="all", legend=:topright)
+    title!(lp1, "RNA1, left end")
+    ylabel!(lp1, "ratio")
+    w1 = fit(Histogram, l1, bins).weights
+    lp2 = plot(ones(length(bins)); label="all", legend=:topleft)
+    title!(lp2, "RNA1, right end")
+    w2 = fit(Histogram, r1, bins).weights
+    lp3 = plot(ones(length(bins)); label="all", legend=:topright)
+    ylabel!(lp3, "ratio")
+    xlabel!(lp3, "position in alignment")
+    title!(lp3, "RNA1, left end")
+    w3 = fit(Histogram, l2, bins).weights
+    lp4 = plot(ones(length(bins)); label="all", legend=:topleft)
+    xlabel!(lp4, "position in alignment")
+    title!(lp4, "RNA2, right end")
+    w4 = fit(Histogram, r2, bins).weights
+    lp5 = plot(ones(length(bins)); label="all")
+    title!(lp5, "RNA2, length")
+    w5 = fit(Histogram, r1 .- l1 .+ 1, bins).weights
+    lp6 = plot(ones(length(bins)); label="all")
+    xlabel!(lp6, "position in alignment")
+    title!(lp6, "RNA2, length")
+    w6 = fit(Histogram, r2 .- l2 .+ 1, bins).weights
+
     for max_fdr in reverse(max_fdrs)
         sig_index = fdrs .<= max_fdr
         histogram!(h1, l1[sig_index]; bins=bins, label="fdr <= $max_fdr")
@@ -134,14 +176,31 @@ function alignment_histogram(l1::Vector{Float64}, r1::Vector{Float64}, l2::Vecto
         histogram!(h4, r2[sig_index]; bins=bins, label="fdr <= $max_fdr")
         histogram!(h5, r1[sig_index] .- l1[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
         histogram!(h6, r2[sig_index] .- l2[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
+
+        plot!(lp1, fit(Histogram, l1[sig_index], bins).weights ./ w1; label="fdr <= $max_fdr")
+        plot!(lp2, fit(Histogram, r1[sig_index], bins).weights ./ w2; label="fdr <= $max_fdr")
+        plot!(lp3, fit(Histogram, l2[sig_index], bins).weights ./ w3; label="fdr <= $max_fdr")
+        plot!(lp4, fit(Histogram, r2[sig_index], bins).weights ./ w4; label="fdr <= $max_fdr")
+        plot!(lp5, fit(Histogram, r1[sig_index] .- l1[sig_index] .+ 1, bins).weights ./ w5; label="fdr <= $max_fdr")
+        plot!(lp6, fit(Histogram, r2[sig_index] .- l2[sig_index] .+ 1, bins).weights ./ w6; label="fdr <= $max_fdr")
+
+        plot!(hn1, w1 .- fit(Histogram, l1[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
+        plot!(hn2, w2 .- fit(Histogram, r1[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
+        plot!(hn3, w3 .- fit(Histogram, l2[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
+        plot!(hn4, w4 .- fit(Histogram, r2[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
+        plot!(hn5, w5 .- fit(Histogram, r1[sig_index] .- l1[sig_index] .+ 1, bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
+        plot!(hn6, w6 .- fit(Histogram, r2[sig_index] .- l2[sig_index] .+ 1, bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
     end
 
-    plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)
+    p1 = plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)
+    p2 = plot(lp1, lp5, lp2, lp3, lp6, lp4; layout=(2,3), size=(1800,800), margin=7mm)
+    p3 = plot(hn1, hn5, hn2, hn3, hn6, hn4; layout=(2,3), size=(1800,800), margin=7mm)
+    return p1, p2, p3
 end
 
 function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, plotting_fdr_levels::Vector{Float64})
 
-    bins = 0:(bp_distance[1]-bp_distance[2])
+    bins = 1:(bp_distance[1]-bp_distance[2])
     nan_index = .!isnan.(interactions.edges.pred_fdr)
 
     l1 = interactions.edges.pred_cl1[nan_index]
@@ -150,12 +209,12 @@ function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{I
     r2 = interactions.edges.pred_cr2[nan_index]
 
     bp_fdrs = interactions.edges.pred_fdr[nan_index]
-    p1 = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, bp_fdrs)
+    p1s = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, bp_fdrs)
 
     fisher_fdrs = interactions.edges.fdr[nan_index]
-    p2 = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, fisher_fdrs)
+    p2s = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, fisher_fdrs)
 
-    return p1, p2
+    return p1s, p2s
 end
 
 function countdata(data::Vector{Int})
