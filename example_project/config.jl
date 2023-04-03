@@ -170,11 +170,12 @@ fisher_exact_tail="both"
 
 # Simple basepairing predictions based on alignments are performed within a region around the ligation point.
 # This region is defined by the two values in bp_distance. The first one defines, how far from the ligation
-# point in the direction that is "on" the read of RNA1 (upstream) and RNA2 (downstream). The second value 
+# point in the direction that is "on" the read of RNA1 (upstream) and RNA2 (downstream). The second value
 # corresponds to the direction that is cut off by the ligation (downstream for RNA1, upstream for RNA2) and
 # should be negative to increase the distance. (45,-10) spans a region of 55 nucleotides around the ligation
 # point.
-bp_distance=(45,-10)
+bp_distance=(30,0)
+bp_shift_weight=1.0
 
 # Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
 # null model of the basepairing test.
@@ -185,10 +186,10 @@ n_genome_samples=500000
 # possible alignments based on the following nucleotide pairing scores and the mismatch and gapping penalties.
 AU_score=4
 GC_score=5
-GU_score=1
+GU_score=0
 bp_mismatch_penalty=7
 bp_gap_open_penalty=8
-bp_gap_extend_penalty=4
+bp_gap_extend_penalty=3
 
 
 #PLOTTING PARAMETERS
