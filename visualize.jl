@@ -13,8 +13,11 @@ isdir(joinpath(project_path, "results")) || throw(AssertionError("Cannot find re
 
 isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
 
-using Pkg
+import Pkg
+
 Pkg.activate("ChimericBrowser")
+Pkg.instantiate()
+
 using ChimericBrowser
 
 types = Dict(
@@ -40,6 +43,8 @@ param_dict::Vector{Pair{String,String}} = [
 ]
 
 bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_penalty, bp_gap_extend_penalty)
+
+@info "Initializing visualization for datasets $(join(unique(v[2] for v in samplename_condition), ", "))."
 
 chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, max_bp_fdr,
     address, port, bp_distance, param_dict, bp_parameters)

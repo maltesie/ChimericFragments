@@ -1,6 +1,7 @@
 module ChimericBrowser
 
-using Dash, DataFrames, Random, CSV, FASTX, JLD2, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures, BioAlignments, BioSymbols
+using Dash, PlotlyJS, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures, Random
+using BioAlignments, BioSymbols, FASTX, CSV, JLD2, DataFrames, StatsBase
 import BioSequences
 
 export chimeric_browser
@@ -12,6 +13,7 @@ const rng = MersenneTwister(1234)
 include("deps.jl")
 include("data.jl")
 include("cytostyle.jl")
+include("plots.jl")
 include("layout.jl")
 include("callbacks.jl")
 include("browser.jl")

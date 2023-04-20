@@ -1,7 +1,8 @@
 struct Interactions
     nodes::DataFrame
     edges::DataFrame
-    edgestats::Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}
+    edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
+    bpstats::Dict{Tuple{Int,Int}, Float64}
     replicate_ids::Vector{Symbol}
 end
 
@@ -9,8 +10,9 @@ function Interactions()
     nodes = DataFrame(:name=>String[], :type=>String[], :ref=>String[], :nb_single=>Int[], :nb_selfchimeric=>Int[], :nb_unclassified=>Int[],
         :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
     edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
-    edgestats = Dict{Tuple{Int,Int}, Tuple{Int,Dict{Int,Int},Dict{Int,Int},Dict{Int,Int},Dict{Int,Int}}}()
-    Interactions(nodes, edges, edgestats, Symbol[])
+    edgestats = Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}()
+    bpstats = Dict{Tuple{Int,Int}, Float64}()
+    Interactions(nodes, edges, edgestats, bpstats, Symbol[])
 end
 
 Interactions(alignments::AlignedReads; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
@@ -112,7 +114,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             node_ints[b, 6] += 1
             if !((a,b) in keys(edgestats))
                 idx = length(edgestats)+1
-                edgestats[(a,b)] = (idx, Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}(), Dict{Int,Int}())
+                edgestats[(a,b)] = (idx, Dict{Tuple{Int, Int},Int}(), Dict{Tuple{Int, Int},Int}())
                 if idx > size(edge_ints)[1]
                     edge_ints = vcat(edge_ints, zeros(Int, 100000, 5))
                     edge_floats = vcat(edge_floats, zeros(Float64, 100000, 4))
@@ -120,16 +122,15 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
                 edge_ints[idx, 1] = a
                 edge_ints[idx, 2] = b
             end
-            (iindex, leftintcounter, leftligationcounter, rightintcounter, rightligationcounter) = edgestats[(a, b)]
+            (iindex, intcounter, ligationcounter) = edgestats[(a, b)]
             edge_ints[iindex, 3] += 1
             edge_ints[iindex, 4] += is_multi
             edge_ints[iindex, 5] += 1
             leftpos = alignments.strands[last(pair1)] === STRAND_NEG ? alignments.leftpos[last(pair1)] : alignments.rightpos[last(pair1)]
             rightpos = alignments.strands[first(pair2)] === STRAND_NEG ? alignments.rightpos[first(pair2)] : alignments.leftpos[first(pair2)]
-            leftcounter, rightcounter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ?
-                                            (leftligationcounter, rightligationcounter) : (leftintcounter, rightintcounter)
-            leftpos in keys(leftcounter) ? (leftcounter[leftpos]+=1) : (leftcounter[leftpos]=1)
-            rightpos in keys(rightcounter) ? (rightcounter[rightpos]+=1) : (rightcounter[rightpos]=1)
+            counter = hasligationpoint(mergedread, pair1, pair2; max_distance=max_ligation_distance) ? ligationcounter : intcounter
+            pospair = (leftpos, rightpos)
+            pospair in keys(counter) ? (counter[pospair]+=1) : (counter[pospair]=1)
             for (i,v) in enumerate((reflen(alignments, pair1), reflen(alignments, pair2),
                             max(alignments.nms[first(pair1)], alignments.nms[last(pair1)]),
                             max(alignments.nms[first(pair2)], alignments.nms[last(pair2)])))
@@ -303,33 +304,46 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
     for (c, edge_row) in enumerate(eachrow(interactions.edges))
         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
-            i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
-            strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
-            ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
-            (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
-                ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
+            edge_row.pred_pvalue = 1.0
+            edge_row.modeintrange1 = 0.0
+            edge_row.modeintrange2 = 0.0
+            for (i1::Int, i2::Int) in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                #i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
+                strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
+                ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
+                (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
+                    ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
 
-            s1 = if strand1=='+'
-                view(genome[ref1], (i1-check_interaction_distances[1]):(i1-check_interaction_distances[2]))
-            else
-                l = length(genome.chroms[ref1])
-                c1, c2 = l+1-(i1+check_interaction_distances[2]), l+1-(i1+check_interaction_distances[1])
-                view(reverse_complement_genome[ref1], c2:c1)
+                s1 = if strand1=='+'
+                    view(genome[ref1], (i1-check_interaction_distances[1]):(i1-check_interaction_distances[2]))
+                else
+                    l = length(genome.chroms[ref1])
+                    c1, c2 = l+1-(i1+check_interaction_distances[2]), l+1-(i1+check_interaction_distances[1])
+                    view(reverse_complement_genome[ref1], c2:c1)
+                end
+                s2 = if strand2=='-'
+                    view(complement_genome[ref2], (i2-check_interaction_distances[1]):(i2-check_interaction_distances[2]))
+                else
+                    l = length(genome.chroms[ref2])
+                    c1, c2 = l+1-(i2+check_interaction_distances[2]), l+1-(i2+check_interaction_distances[1])
+                    view(reverse_genome[ref2], c2:c1)
+                end
+                paln = pairalign(LocalAlignment(), s1, s2, model)
+                sco = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
+                thisp = 1-random_model_ecdf(sco)
+                interactions.bpstats[(i1,i2)] = thisp
+                edge_row.modeintrange2 += 1.0
+                edge_row.modeintrange1 += (thisp <= 0.05)
+                if thisp < edge_row.pred_pvalue
+                    interactions.edges.modelig1[c] = Float64(i1)
+                    interactions.edges.modelig2[c] = Float64(i2)
+                    interactions.edges.pred_cl1[c] = paln.aln.a.aln.anchors[1].seqpos + 1
+                    interactions.edges.pred_cr1[c] = paln.aln.a.aln.anchors[end].seqpos
+                    interactions.edges.pred_cl2[c] = paln.aln.a.aln.anchors[1].refpos + 1
+                    interactions.edges.pred_cr2[c] = paln.aln.a.aln.anchors[end].refpos
+                    edge_row.pred_pvalue, edge_row.pred_score = thisp, sco
+                end
             end
-            s2 = if strand2=='-'
-                view(complement_genome[ref2], (i2-check_interaction_distances[1]):(i2-check_interaction_distances[2]))
-            else
-                l = length(genome.chroms[ref2])
-                c1, c2 = l+1-(i2+check_interaction_distances[2]), l+1-(i2+check_interaction_distances[1])
-                view(reverse_genome[ref2], c2:c1)
-            end
-            paln = pairalign(LocalAlignment(), s1, s2, model)
-            sco = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
-            interactions.edges.pred_cl1[c] = paln.aln.a.aln.anchors[1].seqpos + 1
-            interactions.edges.pred_cr1[c] = paln.aln.a.aln.anchors[end].seqpos
-            interactions.edges.pred_cl2[c] = paln.aln.a.aln.anchors[1].refpos + 1
-            interactions.edges.pred_cr2[c] = paln.aln.a.aln.anchors[end].refpos
-            edge_row.pred_pvalue, edge_row.pred_score = 1-random_model_ecdf(sco), sco
         end
     end
 
@@ -341,9 +355,11 @@ end
 cdsposition(feature::Interval{Annotation}) = hasparam(feature, "cds") ? param(feature, "cds", Int) : 0
 function addpositions!(interactions::Interactions, features::Features)
     tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature), cdsposition(feature)) for feature in features)
-    for (col_featurepos, col_modes, col_rels) in zip([:left1, :right1, :left2, :right2], [:modeint1, :modeint2, :modelig1, :modelig2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
+    for (col_featurepos, col_modes, col_moderanges, col_rels) in zip([:left1, :right1, :left2, :right2], [:modeint1, :modeint2, :modelig1, :modelig2],
+                                                    [:modeintrange1, :modeintrange2, :modeligrange1, :modeligrange2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
         interactions.edges[:, col_featurepos] = Vector{Int}(undef, length(interactions))
         interactions.edges[:, col_modes] = Vector{Float64}(undef, length(interactions))
+        interactions.edges[:, col_moderanges] = Vector{Float64}(undef, length(interactions))
         interactions.edges[:, col_rels] = Vector{Float64}(undef, length(interactions))
     end
     for edge_row in eachrow(interactions.edges)
@@ -352,16 +368,20 @@ function addpositions!(interactions::Interactions, features::Features)
         isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
         isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
         stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        modeint1 = length(stats[2]) > 0 ? argmax(stats[2]) : NaN64
-        modelig1 = length(stats[3]) > 0 ? argmax(stats[3]) : NaN64
-        modeint2 = length(stats[4]) > 0 ? argmax(stats[4]) : NaN64
-        modelig2 = length(stats[5]) > 0 ? argmax(stats[5]) : NaN64
+        modeint1, modeint2 = length(stats[2]) > 0 ? argmax(stats[2]) : (NaN64, NaN64)
+        modelig1, modelig2 = length(stats[3]) > 0 ? argmax(stats[3]) : (NaN64, NaN64)
+        modeintrange1 = length(stats[2]) > 0 ? maximum(first(k) for k in keys(stats[2]))-minimum(first(k) for k in keys(stats[2]))+1 : NaN64
+        modeligrange1 = length(stats[3]) > 0 ? maximum(first(k) for k in keys(stats[3]))-minimum(first(k) for k in keys(stats[3]))+1 : NaN64
+        modeintrange2 = length(stats[2]) > 0 ? maximum(last(k) for k in keys(stats[2]))-minimum(last(k) for k in keys(stats[2]))+1 : NaN64
+        modeligrange2 = length(stats[3]) > 0 ? maximum(last(k) for k in keys(stats[3]))-minimum(last(k) for k in keys(stats[3]))+1 : NaN64
         (rel_int1, rel_lig1) = ((modeint1, modelig1) .- feature1_left) ./ (feature1_right - feature1_left)
         (rel_int2, rel_lig2) = ((modeint2, modelig2) .- feature2_left) ./ (feature2_right - feature2_left)
         isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
         isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
-        edge_row[[:left1, :right1, :left2, :right2, :modeint1, :rel_int1, :modeint2, :rel_int2, :modelig1, :rel_lig1, :modelig2, :rel_lig2]] =
-            round.((feature1_left, feature1_right, feature2_left, feature2_right, modeint1, rel_int1, modeint2, rel_int2, modelig1, rel_lig1, modelig2, rel_lig2); digits=4)
+        edge_row[[:left1, :right1, :left2, :right2, :modeint1, :modeintrange1, :rel_int1, :modeint2, :modeintrange2,
+                    :rel_int2, :modelig1, :modeligrange1, :rel_lig1, :modelig2, :modeligrange2, :rel_lig2]] =
+            round.((feature1_left, feature1_right, feature2_left, feature2_right, modeint1, modeintrange1, rel_int1, modeint2,
+                    modeintrange2, rel_int2, modelig1, modeligrange1, rel_lig1, modelig2, modeligrange2, rel_lig2); digits=4)
     end
     interactions.nodes[:, :left] = Vector{Int}(undef, nrow(interactions.nodes))
     interactions.nodes[:, :right] = Vector{Int}(undef, nrow(interactions.nodes))
@@ -372,12 +392,31 @@ function addpositions!(interactions::Interactions, features::Features)
     return interactions
 end
 
-function histo(ints::Dict{Int,Int}, mi::Int, ma::Int, nbins::Int)
+function addrelpositions!(interactions::Interactions, features::Features)
+    tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature), cdsposition(feature)) for feature in features)
+    for edge_row in eachrow(interactions.edges)
+        (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
+        (feature2_left, feature2_right) = tus[interactions.nodes[edge_row[:dst], :hash]]
+        isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
+        isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
+        modeint1, modeint2, modelig1, modelig2 = edge_row.modeint1, edge_row.modeint2, edge_row.modelig1, edge_row.modelig2
+        (rel_int1, rel_lig1) = ((modeint1, modelig1) .- feature1_left) ./ (feature1_right - feature1_left)
+        (rel_int2, rel_lig2) = ((modeint2, modelig2) .- feature2_left) ./ (feature2_right - feature2_left)
+        isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
+        isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
+        edge_row[[:rel_int1, :rel_int2, :rel_lig1, :rel_lig2]] = round.((rel_int1, rel_int2, rel_lig1, rel_lig2); digits=4)
+    end
+    return interactions
+end
+
+function histo(ints::Dict{Tuple{Int,Int},Int}, mi::Int, ma::Int, nbins::Int, l::Bool)
     h = zeros(Int, nbins)
     dbin = (ma-mi+1)/nbins
     for i in mi:ma
-        if i in keys(ints)
-            h[Int(floor((i-mi)/dbin)) + 1] += ints[i]
+        for (k,c) in ints
+            if i == (l ? first(k) : last(k))
+                h[Int(floor((i-mi)/dbin)) + 1] += c
+            end
         end
     end
     return h
@@ -415,11 +454,11 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         edgestats = interactions.edgestats
         statsmatrix = zeros(nrow(out_df), 4*hist_bins)
         for (i, (a,b, mi1, ma1, mi2, ma2)) in enumerate(zip(out_df[!,:src], out_df[!,:dst], out_df[!, :left1], out_df[!, :right1], out_df[!, :left2], out_df[!, :right2]))
-            (_, ints1, ligs1, ints2, ligs2) = edgestats[(a, b)]
-            statsmatrix[i, 1:hist_bins] .= histo(ints1, mi1, ma1, hist_bins)
-            statsmatrix[i, (hist_bins+1):(2*hist_bins)] .= histo(ligs1, mi1, ma1, hist_bins)
-            statsmatrix[i, (2*hist_bins+1):(3*hist_bins)] .= histo(ints2, mi2, ma2, hist_bins)
-            statsmatrix[i, (3*hist_bins+1):(4*hist_bins)] .= histo(ligs2, mi2, ma2, hist_bins)
+            (_, ints, ligs) = edgestats[(a, b)]
+            statsmatrix[i, 1:hist_bins] .= histo(ints, mi1, ma1, hist_bins, true)
+            statsmatrix[i, (hist_bins+1):(2*hist_bins)] .= histo(ligs, mi1, ma1, hist_bins, true)
+            statsmatrix[i, (2*hist_bins+1):(3*hist_bins)] .= histo(ints, mi2, ma2, hist_bins, false)
+            statsmatrix[i, (3*hist_bins+1):(4*hist_bins)] .= histo(ligs, mi2, ma2, hist_bins, false)
         end
         stats_df = DataFrame(statsmatrix, [
             ["$(i)_ints1" for i in 1:hist_bins]...,

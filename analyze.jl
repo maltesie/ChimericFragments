@@ -18,7 +18,10 @@ isdir(data_folder) || (data_folder = joinpath(project_path, data_folder))
 isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data_folder. Please edit config.jl."))
 
 using Pkg
+
 Pkg.activate("ChimericAnalysis")
+Pkg.instantiate()
+
 using ChimericAnalysis, RNASeqTools
 
 fastqs = (is_paired_end & !is_interleaved_paired_end) ?

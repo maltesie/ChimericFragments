@@ -27,16 +27,11 @@ https://github.com/samtools/samtools/releases
 
 The default parameters of ChimericFragments expect samtools and bwa-mem2 installed systemwide,
 otherwise the paths to the binaries have to be set in the configuration. ChimericFragments depends 
-on a number of Julia packages that have to be installed and precompiled. To do this, run
-
->julia install.jl
-
-The installation process could take up to a few minutes.
+on a number of Julia packages that have to be installed and precompiled. This is done automatically on the first run of ChimericFragments and can take up to a few minutes.
 
 ### Update
 
-To update ChimericFragments, download the latest version and run the provided install.jl. In
-general, the analysis and visualization are only compatible within one version and analysis results
+To update ChimericFragments, download the latest version and use the new files. In general, the analysis and visualization are only compatible within one version and analysis results
 should be recomputed after an update.
 
 ## Using ChimericFragments

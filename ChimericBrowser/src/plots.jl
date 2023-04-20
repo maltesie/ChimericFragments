@@ -41,18 +41,18 @@ function checkinteractions(conditions::Vector{Interactions}, verified_pairs::Vec
     end
     return verified_stats
 end
-function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr =0.05)
-    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
-end
-function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr =0.05)
-    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-    df = DataFrame(CSV.File(verified_pairs_file; stringtype=String))
-    verified_pairs = [(a,b) for (a,b) in eachrow(df)]
-    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
-end
+#function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr =0.05)
+#    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
+#    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
+#    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
+#end
+#function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr =0.05)
+#    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
+#    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
+#    df = DataFrame(CSV.File(verified_pairs_file; stringtype=String))
+#    verified_pairs = [(a,b) for (a,b) in eachrow(df)]
+#    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
+#end
 
 function uniqueinteractions(ints::Interactions; min_reads=5, max_fdr =0.05)
     df = asdataframe(ints; min_reads=min_reads, max_fdr =max_fdr)
@@ -367,6 +367,91 @@ function annotation_type_heatmap(interactions::Interactions, plotting_fdr_levels
     push!(plots, heatmap(types, types, types_counter; clims=(0.0,1.0), colorbar_title="frequency"))
     push!(titles, "all interactions")
 
-    l = @layout[grid(3,length(plotting_fdr_levels)){0.7w} [_;b{0.33h};_]]
-    plot(plots...; layout=l, title=reshape(titles, (1, length(titles))), size=(600*(length(plotting_fdr_levels)+1),1200), plot_titlefontsize=12, margin=9mm)
+    #l = @layout[grid(3,length(plotting_fdr_levels)){0.7w} [_;b{0.33h};_]]
+    #plot(plots...; layout=l, title=reshape(titles, (1, length(titles))), size=(600*(length(plotting_fdr_levels)+1),1200), plot_titlefontsize=12, margin=9mm)
+end
+
+alnchar(x::DNA, y::DNA) =
+    if (x == DNA_A && y == DNA_T) || (x == DNA_T && y == DNA_A) || (x == DNA_C && y == DNA_G) || (x == DNA_G && y == DNA_C)
+        '|'
+    elseif (x == DNA_G && y == DNA_T) || (x == DNA_T && y == DNA_G)
+        '⋅'
+    else
+        ' '
+    end
+function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=200)
+    seq = aln.a.seq
+    ref = aln.b
+    anchors = aln.a.aln.anchors
+    # width of position numbers
+    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos))) + 2
+    outstring = ""
+    i = 0
+    seqpos = offset1 + anchors[1].seqpos
+    refpos = offset2 - anchors[1].refpos + 2
+    seqbuf = IOBuffer()
+    refbuf = IOBuffer()
+    matbuf = IOBuffer()
+    next_xy = iterate(aln)
+    while next_xy !== nothing
+        (x, y), s = next_xy
+        next_xy = iterate(aln ,s)
+
+        i += 1
+        if x != gap(eltype(seq))
+            seqpos += 1
+        end
+        if y != gap(eltype(ref))
+            refpos -= 1
+        end
+
+        if i % width == 1
+            print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
+            print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
+            print(matbuf, " "^(posw + 6))
+        end
+
+        print(seqbuf, RNA(x))
+        print(refbuf, RNA(y))
+        print(matbuf, alnchar(x, y))
+
+        if i % width == 0
+            print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
+            print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
+            print(matbuf)
+
+            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n⋅⋅⋅\n"
+
+            if next_xy !== nothing
+                seek(seqbuf, 0)
+                seek(matbuf, 0)
+                seek(refbuf, 0)
+            end
+        end
+    end
+
+    if i % width != 0
+        print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
+        print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
+        print(matbuf)
+
+        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf))
+    end
+    outstring
+end
+function alignment_ascii_plot(i1::Int, i2::Int, interact::Interactions, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+
+    ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:ref, :strand, :left, :right, :cds]]
+    ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:ref, :strand, :left, :right, :cds]]
+
+    s1 = strand1=='+' ?
+        genome[ref1][(i1-check_interaction_distances[1]):(i1-check_interaction_distances[2])] :
+        BioSequences.reverse_complement(genome[ref1][(i1+check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+    s2 = strand2=='-' ?
+        BioSequences.complement(genome[ref2][(i2-check_interaction_distances[1]):(i2-check_interaction_distances[2])]) :
+        BioSequences.reverse(genome[ref2][(i2+check_interaction_distances[2]):(i2+check_interaction_distances[1])])
+    p = pairalign(LocalAlignment(), s1, s2, model)
+    basepairing_string(alignment(p),
+        (strand1=='+' ? ((i1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]))),
+        (strand2=='-' ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
 end

@@ -115,52 +115,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Running statistical tests..."
             addpositions!(interactions, features)
-            #ss = Vector{Set{Tuple{Int,Int}}}()
-            #randpos = rand(1:(length(genome.seq)-50), (n_genome_samples,2))
-            #for shift_weight in (0.0, 1.0, 1.5, 2.0)
-            #    check_interaction_dists = check_interaction_distances
-            #    bp_params = bp_parameters
-            #    println("new test:")
-            #    println(shift_weight)
-            #    seq_length = check_interaction_dists[1]-check_interaction_dists[2]
-            #    scores = Dict((DNA_A, DNA_T)=>bp_params[1], (DNA_T, DNA_A)=>bp_params[1],
-            #        (DNA_C, DNA_G)=>bp_params[2], (DNA_G, DNA_C)=>bp_params[2],
-            #        (DNA_G, DNA_T)=>bp_params[3], (DNA_T, DNA_G)=>bp_params[3])
-            #    model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_params[4], default_mismatch=-1*bp_params[4]);
-            #        gap_open=-1*bp_params[5], gap_extend=-1*bp_params[6])
-            #    genome_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
-            #        i1 % 2 == 0 ? genome.seq[i1:i1+seq_length-1] : reverse_complement(genome.seq[i1:i1+seq_length-1]),
-            #        i2 % 2 == 0 ? reverse(genome.seq[i2:i2+seq_length-1]) : complement(genome.seq[i2:i2+seq_length-1]),
-            #        model), shift_weight) for (i1, i2) in eachrow(randpos)]
-            #    )
-            #    addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
-            #        fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_dists, bp_parameters=bp_params, shift_weight=shift_weight)
-            #    println(sum(interactions.edges.pred_fdr .<= 0.1))
-            #    println(sum(interactions.edges.pred_fdr .<= 0.3))
-            #    push!(ss, Set(collect(zip(interactions.edges.src[interactions.edges.pred_fdr .<= 0.1], interactions.edges.dst[interactions.edges.pred_fdr .<= 0.1]))))
-            #    println()
-            #end
-            #println("overlaps between sets:")
-            #println(length.(ss))
-            #for r in eachrow([length(intersect(s1, s2)) for s1 in ss, s2 in ss])
-            #    println(r)
-            #end
-            #println("normalized to first:")
-            #for r in eachrow([round.(length(intersect(s1, s2))/length(s1); digits=2) for s1 in ss, s2 in ss])
-            #    println(r)
-            #end
-            #println("normalized to min:")
-            #for r in eachrow([round.(length(intersect(s1, s2))/min(length(s1), length(s2)); digits=2) for s1 in ss, s2 in ss])
-            #    println(r)
-            #end
-            #supers = Set{Tuple{Int,Int}}()
-            #for s in ss
-            #    union!(supers, s)
-            #end
-            #println(length(supers))
-
             addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
                     fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters)
+            addrelpositions!(interactions, features)
 
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
@@ -181,36 +138,39 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "both"=>[both_reads, both_ints], "bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
-            @info "Saving tables and plots..."
+            @info "Saving..."
+            filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
+            filter!(:fdr => x -> x <= max_fdr, interactions.edges)
+            filter!(:pred_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
-            odf = asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, hist_bins=position_distribution_bins)
-            CSV.write(joinpath(results_path, "tables", "ligation_points_$(condition).csv"), odf)
+            #odf = asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, hist_bins=position_distribution_bins)
+            #CSV.write(joinpath(results_path, "tables", "ligation_points_$(condition).csv"), odf)
             odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
 
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 
-            p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
+            #p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, plot_fdr_levels)
+            #save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
 
-            (p2_1, p2_2, p2_3), (p3_1, p3_2, p3_3) = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2_1)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3_1)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_bp_ratios.png"), p2_2)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_ratios.png"), p3_2)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_bp_diff.png"), p2_3)
-            save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_diff.png"), p3_3)
+            #(p2_1, p2_2, p2_3), (p3_1, p3_2, p3_3) = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2_1)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3_1)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp_ratios.png"), p2_2)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_ratios.png"), p3_2)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp_diff.png"), p2_3)
+            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_diff.png"), p3_3)
 
-            p4, p5 = interaction_distribution_plots(interactions, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)
-            save(joinpath(results_path, "plots", "$(condition)_odds_ratio_dist.png"), p5)
+            #p4, p5 = interaction_distribution_plots(interactions, plot_fdr_levels)
+            #save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)
+            #save(joinpath(results_path, "plots", "$(condition)_odds_ratio_dist.png"), p5)
 
-            p6 = node_distribution_plot(interactions, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_degree_dist.png"), p6)
+            #p6 = node_distribution_plot(interactions, plot_fdr_levels)
+            #save(joinpath(results_path, "plots", "$(condition)_degree_dist.png"), p6)
 
-            p7 = annotation_type_heatmap(interactions, plot_fdr_levels)
-            save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
+            #p7 = annotation_type_heatmap(interactions, plot_fdr_levels)
+            #save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
 
         @info "Done."
