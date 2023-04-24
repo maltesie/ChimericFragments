@@ -112,6 +112,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             for (i,repid) in enumerate(interactions.replicate_ids)
                 correlation_df[:, repid] = correlation_matrix[:, i]
             end
+
+            @info "Found $(length(interactions.multichimeras)) unique multichimeric arrangements."
             @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
             @info "Running statistical tests..."
             addpositions!(interactions, features)
@@ -148,6 +150,27 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             #CSV.write(joinpath(results_path, "tables", "ligation_points_$(condition).csv"), odf)
             odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
+
+            sorted_multis = sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+            max_nb_partners = maximum(length(m[1]) for m in sorted_multis)
+            odf = DataFrame()
+            for i in 1:max_nb_partners
+                odf[:, "name_$i"] = String[]
+                odf[:, "type_$i"] = String[]
+            end
+            odf[:, :count] = Int[]
+            odf[:, :nb_partners] = Int[]
+            current_multi = Vector{String}(undef, 2*max_nb_partners)
+            for (multichimera, count) in sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+                i = 0
+                for mc in multichimera
+                    current_multi[i+=1] = interactions.nodes.name[mc]
+                    current_multi[i+=1] = interactions.nodes.type[mc]
+                end
+                current_multi[(i+1):(2*max_nb_partners)] .= ""
+                push!(odf, (current_multi..., count, length(unique(multichimera))))
+            end
+            CSV.write(joinpath(results_path, "tables", "multi_$(condition).csv"), odf)
 
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 

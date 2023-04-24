@@ -3,6 +3,7 @@ struct Interactions
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
     bpstats::Dict{Tuple{Int,Int}, Float64}
+    multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
 
@@ -12,7 +13,8 @@ function Interactions()
     edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}()
     bpstats = Dict{Tuple{Int,Int}, Float64}()
-    Interactions(nodes, edges, edgestats, bpstats, Symbol[])
+    multichimeras = Dict{Vector{Int}, Int}()
+    Interactions(nodes, edges, edgestats, bpstats, multichimeras, Symbol[])
 end
 
 Interactions(alignments::AlignedReads; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
@@ -102,6 +104,15 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             else
                 node_ints[trans[h], 2] += 1
                 counts[2] += 1
+            end
+        end
+
+        if is_multi
+            all_together = [trans[myhash(alignments, i1)] for (i1,_) in mergedread.pindexpairs]
+            if all_together in keys(interactions.multichimeras)
+                interactions.multichimeras[all_together] += 1
+            else
+                interactions.multichimeras[all_together] = 1
             end
         end
 
