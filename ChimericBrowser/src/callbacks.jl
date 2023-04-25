@@ -36,11 +36,18 @@ const update_dataset_inputs = [
 ]
 const update_dataset_outputs = [
     Output("min-reads", "value"),
-    Output("gene-multi-select", "options")
+    Output("gene-multi-select", "options"),
+    Output("plot1", "figure"),
 ]
 update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)]
+    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)], (
+        data = [
+            (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
+            (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
+        ],
+        layout = (title = "Dash Data Visualization",)
+    )
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
@@ -88,6 +95,20 @@ function edge_info(edge_data::Dash.JSON3.Object, interact::Interactions)
         html_p("supporting reads: $(edge_data["interactions"]) ($(sum(values(interact.edgestats[src, dst][3]))) with ligation point)"),
 
     ])]
+end
+
+function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions)
+    src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
+    name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
+    ref1, ref2 = interact.nodes[src, :ref], interact.nodes[dst, :ref]
+    left1, left2 = interact.nodes[src, :left], interact.nodes[dst, :left]
+    right1, right2 = interact.nodes[src, :right], interact.nodes[dst, :right]
+    return (
+        data = [
+            (x = [first(p) for (p,c) in interact.edgestats[(src,dst)][3]], y = [last(p) for (p,c) in interact.edgestats[(src,dst)][3]], type = "scatter", name = "LP"),
+        ],
+        layout = (title = "$name1 $name2",)
+    )
 end
 
 ligation_modes_table(ligation_points::Dash.JSON3.Object; ncolumns=5) =
@@ -142,7 +163,8 @@ const update_selected_element_inputs = [
     Input("data-tabs", "value")
 ]
 const update_selected_element_outputs = [
-    Output("info-output", "children")
+    Output("info-output", "children"),
+    Output("plotly-graph", "figure"),
 ]
 const update_selected_element_states = [
     State("dropdown-update-dataset", "value")
@@ -150,20 +172,35 @@ const update_selected_element_states = [
 update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, interactions::Dict{String, Interactions},
         check_interaction_distances::Tuple{Int,Int}, bp_parameters::NTuple{6,Int}) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value, dataset
-    if tab_value == "circos"
-        (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
-        return [circos_description(circos_data)]
-    elseif tab_value == "table"
-        return ["The downloadable version of this table contains additional information, e.g. about ligation points."]
-    elseif tab_value == "graph"
+    
+    #if tab_value == "circos"
+    #    (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
+    #    return [circos_description(circos_data)]
+    #elseif tab_value == "table"
+    #    return ["The downloadable version of this table contains additional information, e.g. about ligation points."]
+    #elseif tab_value == "graph"
         no_node_data = isnothing(node_data) || isempty(node_data)
         no_edge_data = isnothing(edge_data) || isempty(edge_data)
-        no_node_data && no_edge_data && return ["Select an edge or node in the graph to display additional information. Click the <- button to add a selected node to the search."]
-        no_edge_data && return node_info(node_data[1], interactions[dataset])
-        return edge_info(edge_data[1], interactions[dataset])
-    elseif tab_value == "summary"
-        return ["Change the dataset or selection criteria to update the summary."]
-    end
+        no_node_data && no_edge_data && 
+            return ["test1"], (
+                data = [
+                    (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
+                    (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
+                ],
+                layout = (title = "Dash Data Visualization",)
+            )
+        no_edge_data && return ["test2"], (
+            data = [
+                (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
+                (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
+            ],
+            layout = (title = "Dash Data Visualization",)
+        )
+        src, dst = parse(Int, edge_data[1]["source"]), parse(Int, edge_data[1]["target"])
+        return [join([first(p) for (p,c) in interactions[dataset].edgestats[(src,dst)][2]], ", ")], edge_figure(edge_data[1], interactions[dataset])
+    #elseif tab_value == "summary"
+    #    return ["Change the dataset or selection criteria to update the summary."]
+    #end
 end
 
 click_cyto_button_callback!(app::Dash.DashApp) =

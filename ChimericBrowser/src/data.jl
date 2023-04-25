@@ -3,6 +3,7 @@ struct Interactions
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
     bpstats::Dict{Tuple{Int,Int}, Float64}
+    multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
 

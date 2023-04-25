@@ -141,59 +141,42 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
             @info "Saving..."
+
             filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
             filter!(:fdr => x -> x <= max_fdr, interactions.edges)
             filter!(:pred_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
+
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
-            #odf = asdataframe(interactions; output=:stats, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, hist_bins=position_distribution_bins)
-            #CSV.write(joinpath(results_path, "tables", "ligation_points_$(condition).csv"), odf)
+
             odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
 
-            sorted_multis = sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
-            max_nb_partners = maximum(length(m[1]) for m in sorted_multis)
-            odf = DataFrame()
-            for i in 1:max_nb_partners
-                odf[:, "name_$i"] = String[]
-                odf[:, "type_$i"] = String[]
-            end
-            odf[:, :count] = Int[]
-            odf[:, :nb_partners] = Int[]
-            current_multi = Vector{String}(undef, 2*max_nb_partners)
-            for (multichimera, count) in sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
-                i = 0
-                for mc in multichimera
-                    current_multi[i+=1] = interactions.nodes.name[mc]
-                    current_multi[i+=1] = interactions.nodes.type[mc]
+            if length(interactions.multichimeras) > 0
+                sorted_multis = sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+                max_nb_partners = maximum(length(m[1]) for m in sorted_multis)
+                odf = DataFrame()
+                for i in 1:max_nb_partners
+                    odf[:, "name_$i"] = String[]
+                    odf[:, "type_$i"] = String[]
                 end
-                current_multi[(i+1):(2*max_nb_partners)] .= ""
-                push!(odf, (current_multi..., count, length(unique(multichimera))))
+                odf[:, :count] = Int[]
+                odf[:, :nb_partners] = Int[]
+                current_multi = Vector{String}(undef, 2*max_nb_partners)
+                for (multichimera, count) in sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+                    i = 0
+                    for mc in multichimera
+                        current_multi[i+=1] = interactions.nodes.name[mc]
+                        current_multi[i+=1] = interactions.nodes.type[mc]
+                    end
+                    current_multi[(i+1):(2*max_nb_partners)] .= ""
+                    push!(odf, (current_multi..., count, length(unique(multichimera))))
+                end
+                CSV.write(joinpath(results_path, "tables", "multi_$(condition).csv"), odf)
             end
-            CSV.write(joinpath(results_path, "tables", "multi_$(condition).csv"), odf)
 
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 
-            #p = bp_score_dist_plot(interactions, genome_model_ecdf, randseq_model_ecdf, plot_fdr_levels)
-            #save(joinpath(results_path, "plots", "$(condition)_bp_scores_dist.png"), p)
-
-            #(p2_1, p2_2, p2_3), (p3_1, p3_2, p3_3) = bp_clipping_dist_plots(interactions, check_interaction_distances, plot_fdr_levels)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp.png"), p2_1)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher.png"), p3_1)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp_ratios.png"), p2_2)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_ratios.png"), p3_2)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_bp_diff.png"), p2_3)
-            #save(joinpath(results_path, "plots", "$(condition)_clippings_fisher_diff.png"), p3_3)
-
-            #p4, p5 = interaction_distribution_plots(interactions, plot_fdr_levels)
-            #save(joinpath(results_path, "plots", "$(condition)_count_dist.png"), p4)
-            #save(joinpath(results_path, "plots", "$(condition)_odds_ratio_dist.png"), p5)
-
-            #p6 = node_distribution_plot(interactions, plot_fdr_levels)
-            #save(joinpath(results_path, "plots", "$(condition)_degree_dist.png"), p6)
-
-            #p7 = annotation_type_heatmap(interactions, plot_fdr_levels)
-            #save(joinpath(results_path, "plots", "$(condition)_annotation_type_heatmap.png"), p7)
         end
 
         @info "Done."
