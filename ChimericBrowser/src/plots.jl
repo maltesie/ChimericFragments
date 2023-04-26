@@ -73,6 +73,13 @@ end
 
 function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_levels::Vector{Float64})
 
+    #randseq = randdnaseq(length(genome.seq))
+    #randseq_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
+    #    view(randseq, i1:i1+seq_length-1),
+    #    view(randseq, i2:i2+seq_length-1),
+    #    model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
+    #)
+
     interactions_ecdf = ecdf(interactions.edges.pred_score[.!isnan.(interactions.edges.pred_score)])
 
     max_score = Int(floor(max(

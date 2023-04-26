@@ -142,7 +142,6 @@ annotation_control_layout(function_categories::Vector{Dict{String,String}}) = ht
 info_area_layout() = html_div(
     id="plots-block",
     children=[
-        html_p(id="info-output", children=["No interaction selected."]),
         dcc_graph(id="plotly-graph")
     ]
 )

@@ -37,64 +37,26 @@ const update_dataset_inputs = [
 const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options"),
-    Output("plot1", "figure"),
+    Output("plot2", "figure"),
 ]
 update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)], (
-        data = [
-            (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
-            (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
+    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)], plot(
+        [
+            bar(x = [1, 2, 3], y = [4, 1, 2]),
+            scatter(x = [1, 2, 3], y = [2, 4, 5]),
         ],
-        layout = (title = "Dash Data Visualization",)
+        Layout(title = "Initializing...",)
     )
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
 mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
-function gene_arrow_and_means(m1::Int, count1::Int, range1::Int, m2::Int, count2::Int, range2::Int, left::Int, right::Int, cds::Int, isnegative::Bool, isrna1::Bool)
-    arrows = [
-        m1==0 ? html_div(className="colorbar-arrow mean empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow interaction-left" : "colorbar-arrow interaction-right",
-                                            title="$m1", style=Dict("left"=>"$(mapvalue(normalize(m1, left, right, false)))%")),
-        m2==0 ? html_div(className="colorbar-arrow mode empty") : html_div(className=isrna1 != isnegative ? "colorbar-arrow ligation-left" : "colorbar-arrow ligation-right",
-                                            title="$m2", style=Dict("left"=>"$(mapvalue(normalize(m2, left, right, false)))%"))
-    ]
-    p2 = isnegative ? (cds > 0 ? cds : right)-m2+1 : m2-(cds > 0 ? cds : left)+1
-    p1 = isnegative ? (cds > 0 ? cds : right)-m1+1 : m1-(cds > 0 ? cds : left)+1
-    p2 <= 0 && (p2 -= 1)
-    p1 <= 0 && (p1 -= 1)
-    s2 = p2>0 ? " +" : " "
-    s1 = p1>0 ? " +" : " "
-    return html_div(children=[
-        #html_p("$m1, $(mapvalue(normalize(m1, left, right, isnegative))), $m2, $(mapvalue(normalize(m2, left, right, isnegative)))"),
-        html_p(m2 == 0 ? "no ligation data." : "most frequent ligation point:$s2$p2 ($count2 reads, $range2 nt)", style=Dict("border-top"=>"1px solid #7fafdf", "margin-bottom"=>"12px", "color"=>"DarkSalmon")),
-        html_div(className="horizontal deflate", children=[
-            html_p(["$left"], className="cb-left"),
-            html_div(id=isnegative ? "pointer-left" : "pointer-right", children=arrows),#className="controls-block horizontal", children=arrows),
-            html_p(["$right"], className="cb-right")
-        ]),
-        html_p(m1 == 0 ? "no alignment end data." : "most frequent alignment end:$s1$p1 ($count1 reads, $range1 nt)", style=Dict("margin-top"=>"3px", "border-bottom"=>"1px solid #7fafdf"))
-    ])
-end
-
-function edge_info(edge_data::Dash.JSON3.Object, interact::Interactions)
-    src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
-    name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
-    ref1, ref2 = interact.nodes[src, :ref], interact.nodes[dst, :ref]
-    left1, left2 = interact.nodes[src, :left], interact.nodes[dst, :left]
-    right1, right2 = interact.nodes[src, :right], interact.nodes[dst, :right]
-    return [html_div(id="edge-info", children=[
-        html_p("RNA1: $name1 on $ref1 ($(right1-left1+1)nt)"),
-        #gene_arrow_and_means(Int(edge_data["modeint1"]), Int(edge_data["modeintcount1"]), Int(edge_data["modeintrange1"]), i1, Int(edge_data["modeligcount1"]), Int(edge_data["modeligrange1"]), l1, r1, c1, strand1=="-", true),
-        #html_p(join(", ", edge_data["ligation_points"])), #join(", ", interact.edgestats[(Int(edge_data["src"]), Int(edge_data["dst"]))])),
-        #html_br(),
-        html_p("RNA2: $name2 on $ref2 ($(right2-left2+1)nt)"),
-        #gene_arrow_and_means(Int(edge_data["modeint2"]), Int(edge_data["modeintcount2"]), Int(edge_data["modeintrange2"]), i2, Int(edge_data["modeligcount2"]), Int(edge_data["modeligrange2"]), l2, r2, c2, strand2=="-", false),
-        #html_br(),
-        #html_p(children=alnstring, style=Dict("white-space" => "pre", "font-family" => "monospace", "max-width"=>"300px", "overflow"=>"scroll", "padding-bottom"=>"13px")),
-        html_p("supporting reads: $(edge_data["interactions"]) ($(sum(values(interact.edgestats[src, dst][3]))) with ligation point)"),
-
-    ])]
+function cdsframestring(p::Int, idx::Int, interact::Interactions)
+    cds, left, right = interact.nodes[idx, [:cds, :left, :right]]
+    tp = interact.nodes.strand[idx] == '-' ? (cds > 0 ? cds : right)-p+1 : p-(cds > 0 ? cds : left)+1
+    tp <= 0 && (tp -= 1)
+    return tp > 0 ? "+$tp" : "$tp"
 end
 
 function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions)
@@ -103,67 +65,44 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions)
     ref1, ref2 = interact.nodes[src, :ref], interact.nodes[dst, :ref]
     left1, left2 = interact.nodes[src, :left], interact.nodes[dst, :left]
     right1, right2 = interact.nodes[src, :right], interact.nodes[dst, :right]
-    return (
-        data = [
-            (x = [first(p) for (p,c) in interact.edgestats[(src,dst)][3]], y = [last(p) for (p,c) in interact.edgestats[(src,dst)][3]], type = "scatter", name = "LP"),
+    label1, label2 = "$name1 on $ref1\n$left1 to $right1", "$name2 on $ref2\n$left2 to $right2"
+    points1, points2 = [first(p) for (p,_) in interact.edgestats[(src,dst)][3]], [last(p) for (p,_) in interact.edgestats[(src,dst)][3]]
+    ticks1, ticks2 = [cdsframestring(p, src, interact) for p in points1], [cdsframestring(p, src, interact) for p in points2]
+    maxints = maximum(values(interact.edgestats[(src, dst)][3]))
+    sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
+    colors = [interact.bpstats[p] for p in zip(points1, points2)]
+    return plot(scatter(x=points1, y=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orinetation="h"),
+            colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0, showscale=false), name = "ligation points"),
+        Layout(title = "test", xlabel = label1, ylabel = label2, xticks = ticks1, yticks = ticks2))
+end
+
+function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
+    idx = parse(Int, node_data["id"])
+    name, ref, strand, left, right, ints = interact.nodes[idx, [:name, :ref, :strand, :left, :right, :nb_ints]]
+    return plot([
+            begin
+                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
+                kv = sort(ligationpoints, by=x->x[1])
+                scatter(x = Int[t[1] for t in kv], y = Int[t[2] for t in kv], fill="tozeroy", name = legend)
+            end
+            for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],
-        layout = (title = "$name1 $name2",)
+        Layout(title = "$name on $ref ($strand)", xaxis_label = "position", yaxis_label = "count", showlegend=false)
     )
 end
 
-ligation_modes_table(ligation_points::Dash.JSON3.Object; ncolumns=5) =
-    return isempty(ligation_points) ?
-    html_p("none") :
-    html_div(
-        children=[
-            html_p(title="$d", String(k)[1] === '-' ? "$k: $v" : "+$k: $v") for (k,(v,d)) in sort(collect(ligation_points), by=x->parse(Int, String(x[1])))
-        ],
-        style=Dict("display"=>"grid", "grid-template-columns"=>repeat("1fr ", ncolumns), "max-height"=>"100px", "overflow"=>"scroll")
-    )
-
-function node_info(node_data::Dash.JSON3.Object, interactions::Interactions)
-    name, ref, strand, left, right, ints = interactions.nodes[parse(Int, node_data["id"]), [:name, :ref, :strand, :left, :right, :nb_ints]]
-    return [html_div(id="edge-info", children=[
-        html_p("$name"),
-        html_p("On $ref ($strand) from $left to $right $(right-left+1)nt)"),
-        html_p("$(node_data["nb_partners"]) partner" * (node_data["nb_partners"]>1 ? "s" : "") * " in the current selection."),
-        html_br(),
-        html_p("Ligation points as RNA1:"),
-        #ligation_modes_table(node_data["lig_as_rna1"]),
-        html_br(),
-        html_p("Ligation points as RNA2:"),
-        #ligation_modes_table(node_data["lig_as_rna2"]),
-        html_br(),
-        html_div(children=[
-            html_p("read counts for $name:"),
-            html_p("$ints (selection), $ints (total), $ints (single)"),
-        ])
-    ])]
-end
-
-function circos_description(circos_data::Dash.JSON3.Object)
-    data = circos_data["data"]
-    html_div([
-        html_p("RNA1: $(data["name1"]) on $(data["ref1"]) ($(data["strand1"]))"),
-        html_p("feature left: $(data["left1"])"),
-        html_p("feature right: $(data["right1"])"),
-        html_br(),
-        html_p("RNA2: $(data["name2"]) on $(data["ref2"]) ($(data["strand2"]))"),
-        html_p("feature left: $(data["left2"])"),
-        html_p("feature right: $(data["right2"])"),
-        html_br(),
-        html_p("interactions: $(data["interactions"])")
-    ])
-end
+const empty_figure = (
+    data = [
+        (x = [], y = [], type = "scatter", name = ""),
+    ],
+    layout = (title = "Please select an edge or a node in the graph.",)
+)
 
 const update_selected_element_inputs = [
     Input("graph", "selectedNodeData"),
-    Input("graph", "selectedEdgeData"),
-    Input("my-dashbio-circos", "eventDatum"),
-    Input("data-tabs", "value")
+    Input("graph", "selectedEdgeData")
 ]
 const update_selected_element_outputs = [
-    Output("info-output", "children"),
     Output("plotly-graph", "figure"),
 ]
 const update_selected_element_states = [
@@ -171,36 +110,13 @@ const update_selected_element_states = [
 ]
 update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, interactions::Dict{String, Interactions},
         check_interaction_distances::Tuple{Int,Int}, bp_parameters::NTuple{6,Int}) =
-callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, circos_data, tab_value, dataset
-    
-    #if tab_value == "circos"
-    #    (isnothing(circos_data) || isempty(circos_data)) && return ["Move your mouse over an interaction in the circos plot to display the corresponding partners."]
-    #    return [circos_description(circos_data)]
-    #elseif tab_value == "table"
-    #    return ["The downloadable version of this table contains additional information, e.g. about ligation points."]
-    #elseif tab_value == "graph"
-        no_node_data = isnothing(node_data) || isempty(node_data)
-        no_edge_data = isnothing(edge_data) || isempty(edge_data)
-        no_node_data && no_edge_data && 
-            return ["test1"], (
-                data = [
-                    (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
-                    (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
-                ],
-                layout = (title = "Dash Data Visualization",)
-            )
-        no_edge_data && return ["test2"], (
-            data = [
-                (x = [1, 2, 3], y = [4, 1, 2], type = "bar", name = "SF"),
-                (x = [1, 2, 3], y = [2, 4, 5], type = "bar", name = "Montréal"),
-            ],
-            layout = (title = "Dash Data Visualization",)
-        )
-        src, dst = parse(Int, edge_data[1]["source"]), parse(Int, edge_data[1]["target"])
-        return [join([first(p) for (p,c) in interactions[dataset].edgestats[(src,dst)][2]], ", ")], edge_figure(edge_data[1], interactions[dataset])
-    #elseif tab_value == "summary"
-    #    return ["Change the dataset or selection criteria to update the summary."]
-    #end
+callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, dataset
+
+    no_node_data = isnothing(node_data) || isempty(node_data)
+    no_edge_data = isnothing(edge_data) || isempty(edge_data)
+    no_node_data && no_edge_data && return [empty_figure]
+    no_edge_data && return [node_figure(node_data[1], interactions[dataset])]
+    return [edge_figure(edge_data[1], interactions[dataset])]
 end
 
 click_cyto_button_callback!(app::Dash.DashApp) =

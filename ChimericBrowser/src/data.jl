@@ -29,27 +29,14 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         interact.edges[!, :meanlen2] = Int.(round.(interact.edges[!, :meanlen2]))
         interact.edges[!, :nms1] = round.(interact.edges[!, :nms1], digits=4)
         interact.edges[!, :nms2] = round.(interact.edges[!, :nms2], digits=4)
-        #interact.edges[:, :name1] = interact.nodes[interact.edges[!,:src], :name]
-        #interact.edges[:, :name2] = interact.nodes[interact.edges[!,:dst], :name]
-        #interact.edges[:, :ref1] = interact.nodes[interact.edges[!,:src], :ref]
-        #interact.edges[:, :ref2] = interact.nodes[interact.edges[!,:dst], :ref]
-        #interact.edges[:, :type1] = interact.nodes[interact.edges[!,:src], :type]
-        #interact.edges[:, :type2] = interact.nodes[interact.edges[!,:dst], :type]
-        #interact.edges[:, :strand1] = interact.nodes[interact.edges[!,:src], :strand]
-        #interact.edges[:, :strand2] = interact.nodes[interact.edges[!,:dst], :strand]
         interact.edges[:, :in_libs] = sum(eachcol(interact.edges[!, interact.replicate_ids] .!= 0))
         interact.nodes[:, :nb_significant_ints] = zeros(Int, nrow(interact.nodes))
-        #interact.nodes[:, :nb_significant_partners] = zeros(Int, nrow(interact.nodes))
         replace!(interact.edges.odds_ratio, Inf=>-1.0)
         for (i,row) in enumerate(eachrow(interact.nodes))
             row[:nb_significant_ints] = sum(interact.edges[(interact.edges.src .== i) .| (interact.edges.dst .== i), :nb_ints])
-            #names = Set(hcat(interact.nodes[interact.edges[!,:src], :name],interact.nodes[interact.edges[!,:src], :name])[hcat((interact.edges.src .== i),(interact.edges.dst .== i))])
-            #row[:nb_significant_partners] = length(names)
         end
         sort!(interact.edges, :nb_ints; rev=true)
     end
-    #gene_name_info = Dict(dname=>Dict(i=>(t,rr,l,r,s,nsingle,nint,cds,n) for (i, (n,t,l,r,cds,rr,s,nsingle,nint)) in
-    #    enumerate(eachrow(interact.nodes[!, [:name, :type, :left, :right, :cds, :ref, :strand, :nb_single, :nb_significant_ints]]))) for (dname, interact) in interactions)
     return interactions, genome_info, genome
 end
 
@@ -79,11 +66,8 @@ function filtered_dfview(interactions::Interactions, search_strings::Vector{Stri
 end
 
 function make_graph(df::SubDataFrame)
-    #i1, i2 = df.name1 .* df.type1, df.name2 .* df.type2
-    #names = collect(Set(vcat(i1, i2)))
     names = collect(union(Set(df.src), Set(df.dst)))
     name_trans = Dict(n=>i for (i,n) in enumerate(names))
-    #edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(i1, i2))
     edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(df.src, df.dst))
     return Graph(edges), names
 end
@@ -118,17 +102,6 @@ function clustered_positions(df::SubDataFrame; xmax=2500, ymax=10000, mean_dista
     pos = get_clustered_positions(g; xmax=xmax, ymax=ymax, mean_distance=mean_distance, scaling_factor=scaling_factor)
     return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
 end
-node_index(df::SubDataFrame, node_id::Int) = (df.src .=== node_id) .| (df.dst .=== node_id)
-node_sum(df::SubDataFrame, node_id::Int) = sum(df.nb_ints[node_index(df, node_id)])
-count_values_rna1(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name1 .=== node_name, column_name]))
-count_values_rna2(df::SubDataFrame, node_name::String, column_name::Symbol) = collect(counter(df[df.name2 .=== node_name, column_name]))
-joint_targets_rna1(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name1 .=== node_name) .& (df.modelig1 .=== mode_lig), :name2], delim)
-joint_targets_rna2(df::SubDataFrame, node_name::String, mode_lig::Float64; delim=", ") = join(df[(df.name2 .=== node_name) .& (df.modelig2 .=== mode_lig), :name1], delim)
-function ligation_trafo(tup::Tuple{String, String, Int, Int, Char, Int, Int, Int, String}, k::Float64)
-    i = Int(tup[5] === '-' ?  (tup[8] > 0 ? tup[8] : tup[4]) - k + 1 : k - (tup[8] > 0 ? tup[8] : tup[3]) + 1)
-    i <= 0 ? i-1 : i
-end
-
 function grid_positions(df::SubDataFrame; mean_distance=100.0)
     g, names = make_graph(df)
     pos = squaregrid(adjacency_matrix(g))
@@ -136,96 +109,67 @@ function grid_positions(df::SubDataFrame; mean_distance=100.0)
     pos .*= mean_distance
     return Dict(names[i]=>Dict("x"=>x, "y"=>y) for (i, (x,y)) in enumerate(pos))
 end
+node_index(df::SubDataFrame, node_id::Int) = (df.src .=== node_id) .| (df.dst .=== node_id)
+node_sum(df::SubDataFrame, node_id::Int) = sum(df.nb_ints[node_index(df, node_id)])
+function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Interactions)
+    counts = Dict{Int, Int}()
+    for partner in df[df.src .== node_id, :dst]
+        ligation_points = interact.edgestats[(node_id, partner)][3]
+        for ((p1, _), c) in ligation_points
+            if p1 in keys(counts)
+                counts[p1] += c
+            else
+                counts[p1] = c
+            end
+        end
+    end
+    return counts
+end
+function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions)
+    counts = Dict{Int, Int}()
+    for partner in df[df.dst .== node_id, :src]
+        ligation_points = interact.edgestats[(partner, node_id)][3]
+        for ((_, p2), c) in ligation_points
+            if p2 in keys(counts)
+                counts[p2] += c
+            else
+                counts[p2] = c
+            end
+        end
+    end
+    return counts
+end
 function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_value::String)
-                            #gene_name_info::Dict{String, Tuple{String, String, Int, Int, Char, Int, Int, Int, String}},
-                            #srna_type::String, layout_value::String)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
-    #srnaindex = hcat(df.type1 .=== srna_type, df.type2 .=== srna_type)
     pos = layout_value == "clustered" ? clustered_positions(df) : grid_positions(df)
     edges = [Dict(
         "data"=>Dict(
             "id"=>hash(row.src, hash(row.dst)),
             "source"=>row.src,
             "target"=>row.dst,
-            #"id"=>row.name1*row.type1*row.name2*row.type2,
-            #"source"=>row.name1*row.type1,
-            #"target"=>row.name2*row.type2,
-            #"src"=>row.src,
-            #"dst"=>row.dst,
-            #"name1"=>row.name1,
-            #"name2"=>row.name2,
             "current_total"=>total_ints,
             "current_ratio"=>round(row.nb_ints/max_ints; digits=2),
             "interactions"=>row.nb_ints,
-            #"strand1"=>row.strand1,
-            #"strand2"=>row.strand2,
-            #"left1"=>row.left1,
-            #"right1"=>row.right1,
-            #"left2"=>row.left2,
-            #"right2"=>row.right2,
-            #"ref1"=>row.ref1,
-            #"ref2"=>row.ref2,
-            #"len1"=>row.meanlen1,
-            #"len2"=>row.meanlen2,
-            #"cds1"=>gene_name_info[row.name1*row.type1][8],
-            #"cds2"=>gene_name_info[row.name2*row.type2][8],
-            #"pred_pvalue"=>(isnan(row.pred_pvalue) ? 2.0 : row.pred_pvalue),
-            #"modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
-            #"modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
-            #"modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
-            #"modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
-            #"modeintrange1"=>isnan(row.modeint1) ? 0 : row.modeintrange1,
-            #"modeligrange1"=>isnan(row.modelig1) ? 0 : row.modeligrange1,
-            #"modeintrange2"=>isnan(row.modeint2) ? 0 : row.modeintrange2,
-            #"modeligrange2"=>isnan(row.modelig2) ? 0 : row.modeligrange2,
-            #"modeintcount1"=>isnan(row.modeint1) ? 0 : interact.edgestats[(row.src, row.dst)][2][(row.modeint1,row.modeint2)],
-            #"modeligcount1"=>isnan(row.modelig1) ? 0 : interact.edgestats[(row.src, row.dst)][3][(row.modelig1,row.modelig2)],
-            #"modeintcount2"=>isnan(row.modeint2) ? 0 : interact.edgestats[(row.src, row.dst)][2][(row.modeint1,row.modeint2)],
-            #"modeligcount2"=>isnan(row.modelig2) ? 0 : interact.edgestats[(row.src, row.dst)][3][(row.modelig1,row.modelig2)],
-            #"ligcount"=>isnan(row.modelig1) ? 0 : sum(values(interact.edgestats[(row.src, row.dst)][3])),
-            #"ligation_points"=>Dict(first(es)=>(last(es), round(interact.bpstats[first(es)]; digits=5)) for es in interact.edgestats[(row.src, row.dst)][3]),
-            #"relpos"=>1.0,
-            #"relpos"=> s2 ?
-            #    (isnan(row.rel_lig1) ? row.rel_int1 : row.rel_lig1) :
-            #    (isnan(row.rel_lig2) ? row.rel_int2 : row.rel_lig2)
         ),
-        "classes"=>"other_edge") for row in eachrow(df)] #s1 != s2 ? "srna_edge" : "other_edge") for (row, (s1, s2)) in zip(eachrow(df), eachrow(srnaindex))]
+        "classes"=>"other_edge"
+    ) for row in eachrow(df)]
+
     nodes = [Dict(
         "data"=>Dict(
             "id"=>n,
-            #"name"=>gene_name_info[n][9],
             "name"=>interact.nodes.name[n],
-            #"label"=>replace(gene_name_info[n][9], ":"=>"\n"),
             "label"=>replace(interact.nodes.name[n], ":"=>"\n"),
-            #"interactions"=>node_sum(df, gene_name_info[n][9]),
             "interactions"=>node_sum(df, n),
-            #"current_ratio"=>round(node_sum(df, gene_name_info[n][9])/total_ints; digits=2),
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
-            #"nb_partners"=>length(union!(Set(df.name1[df.name2 .=== gene_name_info[n][9]]), Set(df.name2[df.name1 .=== gene_name_info[n][9]]))),
             "nb_partners"=>length(union!(Set(df.src[df.dst .=== n]), Set(df.dst[df.src .=== n]))),
-            #"current_total"=>total_ints,
-            #"lig_as_rna1"=>Dict(
-            #    "$(ligation_trafo(gene_name_info[n], k))"=>
-            #    (v, joint_targets_rna1(df, gene_name_info[n][9], k))
-            #    for (k,v) in count_values_rna1(df, gene_name_info[n][9], :modelig1) if !isnan(k)
-            #),
-            #"lig_as_rna2"=>Dict(
-            #    "$(ligation_trafo(gene_name_info[n], k))"=>
-            #    (v, joint_targets_rna2(df, gene_name_info[n][9], k))
-            #    for (k,v) in count_values_rna2(df, gene_name_info[n][9], :modelig2) if !isnan(k)
-            #),
-            #"left"=>gene_name_info[n][3],
-            #"right"=>gene_name_info[n][4],
-            #"ref"=>gene_name_info[n][2],
-            #"strand"=>gene_name_info[n][5],
-            #"nb_single"=>gene_name_info[n][6],
-            #"nb_ints_total"=>gene_name_info[n][7],
-            #"cds"=>gene_name_info[n][8],
+            "lig_as_rna1"=>count_ligation_sites_as1(df, n, interact),
+            "lig_as_rna2"=>count_ligation_sites_as2(df, n, interact),
         ),
         "classes"=>interact.nodes.type[n],
-        "position"=>pos[n]) for n in union(Set(df.src), Set(df.dst))]#Set(vcat(df.name1 .* df.type1, df.name2 .* df.type2))]
+        "position"=>pos[n]
+    ) for n in union(Set(df.src), Set(df.dst))]
     return Dict("edges"=>edges, "nodes"=>nodes)
 end
 
@@ -247,18 +191,6 @@ function circos_data(df::SubDataFrame, interact::Interactions; min_thickness=100
                 "current_total"=>current_total,
                 "current_ratio"=>round(row.nb_ints/current_total; digits=2),
                 "interactions"=>row.nb_ints,
-                "strand1"=>interact.nodes.strand[row.src],
-                "strand2"=>interact.nodes.strand[row.dst],
-                "left1"=>interact.nodes.left[row.src],
-                "right1"=>interact.nodes.right[row.src],
-                "left2"=>interact.nodes.left[row.dst],
-                "right2"=>interact.nodes.right[row.dst],
-                "ref1"=>interact.nodes.ref[row.src],
-                "ref2"=>interact.nodes.ref[row.dst],
-                "modeint1"=>isnan(row.modeint1) ? 0 : row.modeint1,
-                "modelig1"=>isnan(row.modelig1) ? 0 : row.modelig1,
-                "modeint2"=>isnan(row.modeint2) ? 0 : row.modeint2,
-                "modelig2"=>isnan(row.modelig2) ? 0 : row.modelig2,
         )
     ) for row in eachrow(df)])]
     return tracks

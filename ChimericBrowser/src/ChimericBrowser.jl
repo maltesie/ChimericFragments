@@ -1,7 +1,7 @@
 module ChimericBrowser
 
 using Dash, NetworkLayout, LightGraphs, GeometryBasics, Packing, DataStructures, Random
-using BioAlignments, BioSymbols, FASTX, CSV, JLD2, DataFrames, StatsBase
+using BioAlignments, BioSymbols, FASTX, CSV, JLD2, DataFrames, StatsBase, PlotlyJS
 import BioSequences
 
 export chimeric_browser
