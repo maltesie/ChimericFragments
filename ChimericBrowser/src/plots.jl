@@ -41,18 +41,7 @@ function checkinteractions(conditions::Vector{Interactions}, verified_pairs::Vec
     end
     return verified_stats
 end
-#function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs::Vector{Tuple{String,String}}; min_reads=5, max_fdr =0.05)
-#    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-#    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-#    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
-#end
-#function checkinteractions(interaction_files::SingleTypeFiles, verified_pairs_file::String; min_reads=5, max_fdr =0.05)
-#    interaction_files.type === ".jld2" || throw(AssertionError("Can only read .jld2 files!"))
-#    conds = [Interactions(interaction_file) for interaction_file in interaction_files]
-#    df = DataFrame(CSV.File(verified_pairs_file; stringtype=String))
-#    verified_pairs = [(a,b) for (a,b) in eachrow(df)]
-#    return checkinteractions(conds, verified_pairs; min_reads=min_reads, max_fdr =max_fdr)
-#end
+
 
 function uniqueinteractions(ints::Interactions; min_reads=5, max_fdr =0.05)
     df = asdataframe(ints; min_reads=min_reads, max_fdr =max_fdr)
@@ -71,14 +60,7 @@ function checktops(interactions::Interactions; top_cut=20, check=:singles)
     return filtered_edges
 end
 
-function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_levels::Vector{Float64})
-
-    #randseq = randdnaseq(length(genome.seq))
-    #randseq_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
-    #    view(randseq, i1:i1+seq_length-1),
-    #    view(randseq, i2:i2+seq_length-1),
-    #    model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
-    #)
+function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_level::Float64)
 
     interactions_ecdf = ecdf(interactions.edges.pred_score[.!isnan.(interactions.edges.pred_score)])
 
@@ -95,19 +77,16 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
     randseq_model_pdf = diff(randseq_model_ecdf.(1:(max_score+1)))
     interactions_pdf = diff(interactions_ecdf.(1:(max_score+1)))
 
-    p = plot(1:max_score, randseq_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 1, label = "random",
-        legend = :topright, size=(600,400))
-    xlabel!(p, "affine gap model score")
-    ylabel!(p, "empirical density")
-    plot!(p, 1:max_score, genome_model_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 2, label = "random, from genome")
-    plot!(p, 1:max_score, interactions_pdf, fillrange = zeros(max_score), fillalpha = 0.35, c = 3, label = "around ligation points")
-
-    for max_bp_fdr in plot_fdr_levels
-        fdr_p_index = findfirst(x->x[2][1]<=max_bp_fdr, si_fdr)
-        fdr_p = isnothing(fdr_p_index) ? 1.0 : si_fdr[fdr_p_index][2][2]
-        genome_model_fdr_score = findfirst(x->((1-genome_model_ecdf(x))<fdr_p), 1:(max_score+1)) - 1
-        vline!(p, [genome_model_fdr_score], label="fdr = $max_bp_fdr")
-    end
+    p_random = scatter(x=1:max_score, y=randseq_model_pdf, fill="tozeroy", name="random")
+    p_random_genome = scatter(x=1:max_score, y=genome_model_pdf, fill="tozeroy", name="random, from genome")
+    p_interactions = scatter(x=1:max_score, y=interactions_pdf, fill="tozeroy", name="around ligation points")
+    p = plot([p_random, p_random_genome, p_interactions], Layout(title="basepairing predictions score distribution"))
+    
+    ymax = max(maximum(randseq_model_pdf), maximum(genome_model_pdf), maximum(interactions_pdf))
+    fdr_p_index = findfirst(x->x[2][1]<=plot_fdr_level, si_fdr)
+    fdr_p = isnothing(fdr_p_index) ? 1.0 : si_fdr[fdr_p_index][2][2]
+    genome_model_fdr_score = findfirst(x->((1-genome_model_ecdf(x))<fdr_p), 1:(max_score+1)) - 1
+    add_shape!(p, line(x0=genome_model_fdr_score, y0=0, x1=genome_model_fdr_score, y1=ymax, line=attr(color="RoyalBlue", width=3), name="FDR=$plot_fdr_level"))
 
     return p
 end
@@ -386,19 +365,23 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=200)
+function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
-    # width of position numbers
     posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos))) + 2
-    outstring = ""
+
     i = 0
     seqpos = offset1 + anchors[1].seqpos
     refpos = offset2 - anchors[1].refpos + 2
     seqbuf = IOBuffer()
     refbuf = IOBuffer()
     matbuf = IOBuffer()
+
+    print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
+    print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
+    print(matbuf, " "^(posw + 6))
+
     next_xy = iterate(aln)
     while next_xy !== nothing
         (x, y), s = next_xy
@@ -412,53 +395,31 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; 
             refpos -= 1
         end
 
-        if i % width == 1
-            print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
-            print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
-            print(matbuf, " "^(posw + 6))
-        end
-
         print(seqbuf, RNA(x))
         print(refbuf, RNA(y))
         print(matbuf, alnchar(x, y))
-
-        if i % width == 0
-            print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
-            print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
-            print(matbuf)
-
-            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n⋅⋅⋅\n"
-
-            if next_xy !== nothing
-                seek(seqbuf, 0)
-                seek(matbuf, 0)
-                seek(refbuf, 0)
-            end
-        end
     end
 
-    if i % width != 0
-        print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
-        print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
-        print(matbuf)
 
-        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf))
-    end
-    outstring
+    print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
+    print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
+    print(matbuf)
+
+    String(take!(seqbuf)) * "<br>" * String(take!(matbuf)) * "<br>" * String(take!(refbuf))
 end
-function alignment_ascii_plot(i1::Int, i2::Int, interact::Interactions, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
 
     ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:ref, :strand, :left, :right, :cds]]
     ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:ref, :strand, :left, :right, :cds]]
 
     s1 = strand1=='+' ?
-        genome[ref1][(i1-check_interaction_distances[1]):(i1-check_interaction_distances[2])] :
-        BioSequences.reverse_complement(genome[ref1][(i1+check_interaction_distances[2]):(i1+check_interaction_distances[1])])
+        genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
+        BioSequences.reverse_complement(genome[ref1][(p1+check_interaction_distances[2]):(p1+check_interaction_distances[1])])
     s2 = strand2=='-' ?
-        BioSequences.complement(genome[ref2][(i2-check_interaction_distances[1]):(i2-check_interaction_distances[2])]) :
-        BioSequences.reverse(genome[ref2][(i2+check_interaction_distances[2]):(i2+check_interaction_distances[1])])
+        BioSequences.complement(genome[ref2][(p2-check_interaction_distances[1]):(p2-check_interaction_distances[2])]) :
+        BioSequences.reverse(genome[ref2][(p2+check_interaction_distances[2]):(p2+check_interaction_distances[1])])
     p = pairalign(LocalAlignment(), s1, s2, model)
     basepairing_string(alignment(p),
-        (strand1=='+' ? ((i1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(i1+check_interaction_distances[1]))),
-        (strand2=='-' ? ((c2>0 ? c2 : r2)-(i2-check_interaction_distances[1])) : ((i2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
+        (strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1]))),
+        (strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
 end

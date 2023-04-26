@@ -42,8 +42,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, is_paired_end=true, check_interaction_distances=(45,-10),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
-                            include_read_identity=true, include_singles=true, allow_self_chimeras=true, position_distribution_bins=50,
-                            bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, plot_fdr_levels=[0.1,0.2,0.5], shift_weight=0.1)
+                            include_read_identity=true, include_singles=true, allow_self_chimeras=true, bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, shift_weight=0.1)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)

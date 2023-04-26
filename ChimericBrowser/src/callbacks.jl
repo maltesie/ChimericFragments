@@ -39,15 +39,9 @@ const update_dataset_outputs = [
     Output("gene-multi-select", "options"),
     Output("plot2", "figure"),
 ]
-update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int) =
+update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int, randseq_model_ecdf::ECDF, genome_model_ecdf::ECDF) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
-    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)], plot(
-        [
-            bar(x = [1, 2, 3], y = [4, 1, 2]),
-            scatter(x = [1, 2, 3], y = [2, 4, 5]),
-        ],
-        Layout(title = "Initializing...",)
-    )
+    return min_reads, [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)], bp_score_dist_plot(interactions[dataset], randseq_model_ecdf, genome_model_ecdf, 0.1)
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
@@ -59,35 +53,44 @@ function cdsframestring(p::Int, idx::Int, interact::Interactions)
     return tp > 0 ? "+$tp" : "$tp"
 end
 
-function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions)
+function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
-    ref1, ref2 = interact.nodes[src, :ref], interact.nodes[dst, :ref]
-    left1, left2 = interact.nodes[src, :left], interact.nodes[dst, :left]
-    right1, right2 = interact.nodes[src, :right], interact.nodes[dst, :right]
-    label1, label2 = "$name1 on $ref1\n$left1 to $right1", "$name2 on $ref2\n$left2 to $right2"
-    points1, points2 = [first(p) for (p,_) in interact.edgestats[(src,dst)][3]], [last(p) for (p,_) in interact.edgestats[(src,dst)][3]]
-    ticks1, ticks2 = [cdsframestring(p, src, interact) for p in points1], [cdsframestring(p, src, interact) for p in points2]
+    points1, points2 = [first(p) for p in keys(interact.edgestats[(src,dst)][3])], [last(p) for p in keys(interact.edgestats[(src,dst)][3])]
+    tickpos1, tickpos2 = [minimum(points1), maximum(points1)], [minimum(points2), maximum(points2)]
+    ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
     sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
+    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) for (p1,p2) in zip(points1, points2)]
     colors = [interact.bpstats[p] for p in zip(points1, points2)]
     return plot(scatter(x=points1, y=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orinetation="h"),
-            colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0, showscale=false), name = "ligation points"),
-        Layout(title = "test", xlabel = label1, ylabel = label2, xticks = ticks1, yticks = ticks2))
+            colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0, showscale=false), name = "ligation points", 
+            text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),
+        Layout(title = "$(edge_data["interactions"]) interactions", 
+            xaxis=attr(title="RNA1: $name1", tickmode="array", tickvals=tickpos1, ticktext=ticks1),
+            yaxis=attr(title="RNA2: $name2", tickmode="array", tickvals=tickpos2, ticktext=ticks2)))
 end
 
 function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
     idx = parse(Int, node_data["id"])
-    name, ref, strand, left, right, ints = interact.nodes[idx, [:name, :ref, :strand, :left, :right, :nb_ints]]
+    name = interact.nodes.name[idx]
+    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key]) for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key]) for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    tickpos = [minpos, maxpos]
+    ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
     return plot([
             begin
                 ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
-                scatter(x = Int[t[1] for t in kv], y = Int[t[2] for t in kv], fill="tozeroy", name = legend)
+                positions, counts = Int[t[1] for t in kv], Int[t[2] for t in kv]
+
+                ticks = [cdsframestring(p, idx, interact) for p in tickpos]
+                scatter(x = positions, y = counts, fill="tozeroy", name = legend)
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],
-        Layout(title = "$name on $ref ($strand)", xaxis_label = "position", yaxis_label = "count", showlegend=false)
+        Layout(title = "$name ($(node_data["nb_partners"]) partners)", xaxis_title = "position", yaxis_title = "count", 
+            xaxis=attr(tickmode="array", tickvals=tickpos, ticktext=ticktext), showlegend=false)
     )
 end
 
@@ -109,14 +112,14 @@ const update_selected_element_states = [
     State("dropdown-update-dataset", "value")
 ]
 update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, interactions::Dict{String, Interactions},
-        check_interaction_distances::Tuple{Int,Int}, bp_parameters::NTuple{6,Int}) =
+        check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel) =
 callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, dataset
 
     no_node_data = isnothing(node_data) || isempty(node_data)
     no_edge_data = isnothing(edge_data) || isempty(edge_data)
     no_node_data && no_edge_data && return [empty_figure]
     no_edge_data && return [node_figure(node_data[1], interactions[dataset])]
-    return [edge_figure(edge_data[1], interactions[dataset])]
+    return [edge_figure(edge_data[1], interactions[dataset], genome, check_interaction_distances, model)]
 end
 
 click_cyto_button_callback!(app::Dash.DashApp) =

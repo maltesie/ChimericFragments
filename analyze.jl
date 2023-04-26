@@ -58,6 +58,5 @@ results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))
 chimeric_analysis(features, bams, results_path, conditions, genome; filter_types=filter_types, min_distance=min_distance, prioritize_type=prioritize_srna ? srna_type : nothing,
     overwrite_type=igr_type, is_reverse_complement=is_reverse_complement, is_paired_end=is_paired_end, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr, max_ligation_distance=max_ligation_distance,
-    check_interaction_distances=bp_distance, include_read_identity=include_orientation, include_singles=include_singles,
-    fisher_exact_tail=fisher_exact_tail, allow_self_chimeras=allow_self_chimeras, position_distribution_bins=position_distribution_bins,
-    bp_parameters=bp_parameters, n_genome_samples=n_genome_samples, plot_fdr_levels=plot_fdr_levels, shift_weight=bp_shift_weight)
+    check_interaction_distances=bp_distance, include_read_identity=include_orientation, include_singles=include_singles, allow_self_chimeras=allow_self_chimeras, 
+    bp_parameters=bp_parameters, n_genome_samples=n_genome_samples, shift_weight=bp_shift_weight)

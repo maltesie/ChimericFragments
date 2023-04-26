@@ -144,6 +144,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_val
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
     pos = layout_value == "clustered" ? clustered_positions(df) : grid_positions(df)
+    
     edges = [Dict(
         "data"=>Dict(
             "id"=>hash(row.src, hash(row.dst)),

@@ -21,10 +21,10 @@ Interactions(alignments::AlignedReads; replicate_id=:first, min_distance=1000, m
     append!(Interactions(), alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                 filter_types=filter_types, allow_self_chimeras=allow_self_chimeras)
 
-"""
-Load Interactions struct from jld2 file.
-"""
-Interactions(filepath::String) = load(filepath, "interactions")
+#"""
+#Load Interactions struct from jld2 file.
+#"""
+#Interactions(filepath::String) = load(filepath, "interactions")
 
 Base.length(interactions::Interactions) = nrow(interactions.edges)
 function Base.empty!(interactions::Interactions)
@@ -182,76 +182,6 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     )
     @info "Classification of reads:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
     return interactions
-end
-
-alnchar(x::DNA, y::DNA) =
-    if (x == DNA_A && y == DNA_T) || (x == DNA_T && y == DNA_A) || (x == DNA_C && y == DNA_G) || (x == DNA_G && y == DNA_C)
-        '|'
-    elseif (x == DNA_G && y == DNA_T) || (x == DNA_T && y == DNA_G)
-        '⋅'
-    else
-        ' '
-    end
-
-function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int; width::Integer=200)
-    seq = aln.a.seq
-    ref = aln.b
-    anchors = aln.a.aln.anchors
-    # width of position numbers
-    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos))) + 2
-    outstring = ""
-    i = 0
-    seqpos = anchors[1].seqpos
-    refpos = anchors[1].refpos
-    seqbuf = IOBuffer()
-    refbuf = IOBuffer()
-    matbuf = IOBuffer()
-    next_xy = iterate(aln)
-    while next_xy !== nothing
-        (x, y), s = next_xy
-        next_xy = iterate(aln ,s)
-
-        i += 1
-        if x != gap(eltype(seq))
-            seqpos += 1
-        end
-        if y != gap(eltype(ref))
-            refpos += 1
-        end
-
-        if i % width == 1
-            print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
-            print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
-            print(matbuf, " "^(posw + 6))
-        end
-
-        print(seqbuf, RNA(x))
-        print(refbuf, RNA(y))
-        print(matbuf, alnchar(x, y))
-
-        if i % width == 0
-            print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
-            print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
-            print(matbuf)
-
-            outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf)) * "\n⋅⋅⋅\n"
-
-            if next_xy !== nothing
-                seek(seqbuf, 0)
-                seek(matbuf, 0)
-                seek(refbuf, 0)
-            end
-        end
-    end
-
-    if i % width != 0
-        print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
-        print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
-        print(matbuf)
-
-        outstring *= String(take!(seqbuf)) * "\n" * String(take!(matbuf)) * "\n" * String(take!(refbuf))
-    end
-    outstring
 end
 
 function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true,
