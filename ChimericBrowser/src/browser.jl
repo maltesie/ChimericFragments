@@ -35,7 +35,8 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     app.layout = browser_layout(sort([k for k in keys(interactions)]), genome_info, stylesheet(types), min_reads, max_fdr, max_bp_fdr)
 
     update_selection_callback!(app, interactions, types["srna"], param_dict)
-    update_dataset_callback!(app, interactions, min_reads, check_interaction_distances, randseq_model_ecdf, genome_model_ecdf)
+    update_dataset_callback!(app, interactions, min_reads)
+    update_plots_callback!(app, interactions, randseq_model_ecdf, genome_model_ecdf)
     update_selected_element_callback!(app, genome, interactions, check_interaction_distances, model)
     click_cyto_button_callback!(app)
     click_table_button_callback!(app, interactions)

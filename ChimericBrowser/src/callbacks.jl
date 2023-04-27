@@ -41,16 +41,30 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options"),
     Output("type-multi-select", "options"),
-    Output("plot2", "figure"),
 ]
-update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int,
-        bp_distance::Tuple{Int,Int}, randseq_model_ecdf::ECDF, genome_model_ecdf::ECDF) =
+update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int) =
 callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
     return min_reads,
     [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)],
-    [Dict("label"=>k, "value"=>k) for k in unique(interactions[dataset].nodes.type)],
-    bp_score_dist_plot(interactions[dataset], randseq_model_ecdf, genome_model_ecdf, 0.1),
-    bp_clipping_dist_plots(interactions[dataset], bp_distance, 0.1)
+    [Dict("label"=>k, "value"=>k) for k in unique(interactions[dataset].nodes.type)]
+end
+
+const update_plots_inputs = [
+    Input("fdr-source", "value"),
+    Input("fdr-value", "value"),
+]
+const update_plots_outputs = [
+    Output("plot2", "figure"),
+    Output("plot1", "figure"),
+    Output("plot3", "figure"),
+]
+const update_plots_states = [
+    State("dropdown-update-dataset", "value"),
+]
+update_plots_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, randseq_model_ecdf::ECDF, genome_model_ecdf::ECDF) =
+callback!(app, update_plots_outputs, update_plots_inputs, update_plots_states; prevent_initial_call=false) do plot_type, plot_fdr, dataset
+    p1, p2 = plot_pair(interactions[dataset], plot_type, Float64(plot_fdr))
+    return bp_score_dist_plot(interactions[dataset], randseq_model_ecdf, genome_model_ecdf, Float64(plot_fdr)), p1, p2
 end
 
 normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)

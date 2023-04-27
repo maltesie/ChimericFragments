@@ -215,9 +215,11 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
 
         html_div(className="plot", children=[
             dcc_dropdown(id="fdr-source", options=[
-                (label = "Fishers exact", value = "fisher"),
-                (label = "basepairing test", value = "bp"),
-            ]),
+                (label = "node degree distribution", value = "degree"),
+                (label = "Annotation interaction heatmap", value = "annotation"),
+                (label = "Odds ratio distribution", value = "odds"),
+                (label = "Basepairing alignments clipping distribution", value = "bp"),
+            ], value="bp", clearable=false, multi=false),
             dcc_graph(id="plot1"),
         ]),
 
