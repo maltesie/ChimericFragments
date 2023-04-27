@@ -20,7 +20,7 @@ const update_selection_states = [
     State("dropdown-update-dataset", "value"),
     State("data-tabs", "value")
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, sRNA_type::String, param_dict::Vector{Pair{String, String}}) =
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, bp_len::Int, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads,
         max_interactions, max_fdr, max_bp_fdr, search_strings, type_strings, layout_value, ligation, exclusive, dataset, tab_value
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
@@ -28,7 +28,7 @@ callback!(app, update_selection_outputs, update_selection_inputs, update_selecti
     any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
     df = filtered_dfview(interactions[dataset], my_search_strings, my_type_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df, interactions[dataset])
-    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value)
+    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value, bp_len)
     circos_output = circos_data(df, interactions[dataset])
     summary_output = summary_statistics(df, interactions[dataset], param_dict)
     return table_output, cytoscape_output, circos_output, summary_output, tab_value
@@ -105,7 +105,7 @@ function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
             begin
                 ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
-                positions, counts = Int[t[1] for t in kv], Int[t[2] for t in kv]
+                positions, counts = Int[t[1] for t in kv], Float64[t[2] for t in kv]
 
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
                 scatter(x = positions, y = counts, fill="tozeroy", name = legend)

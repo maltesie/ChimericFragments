@@ -1,6 +1,6 @@
 function bp_score_dist_plot(interact::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_level::Float64)
 
-    interact_ecdf = ecdf(interact.edges.pred_score[.!isnan.(interact.edges.pred_score)])
+    interact_ecdf = ecdf([t[6] for t in values(interact.bpstats)])
 
     max_score = Int(floor(max(
         maximum(interact_ecdf.sorted_values),

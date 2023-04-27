@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64}}
+    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
@@ -184,6 +184,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     return interactions
 end
 
+score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
 function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true,
                         include_singles=true, check_interaction_distances=(30,0), bp_parameters=(4,5,0,7,8,3), shift_weight=0.5)
 
@@ -218,7 +219,6 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
     interactions.edges[:, :pred_pvalue] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_score] = fill(NaN, nrow(interactions.edges))
 
     scores = Dict((DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
                     (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
@@ -239,7 +239,6 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
     for (c, edge_row) in enumerate(eachrow(interactions.edges))
         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
-            edge_row.pred_pvalue = 1.0
 
             for (i1::Int, i2::Int) in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
 
@@ -263,15 +262,14 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                     view(reverse_genome[ref2], c2:c1)
                 end
                 paln = pairalign(LocalAlignment(), s1, s2, model)
-                sco = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
+                sco = score_bp(paln, shift_weight)
                 thisp = 1-random_model_ecdf(sco)
                 interactions.bpstats[(i1,i2)] = (thisp, paln.aln.a.aln.anchors[1].seqpos + 1, paln.aln.a.aln.anchors[end].seqpos,
-                                                        paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos)
+                                                        paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos, sco)
 
-                if i1 == interactions.edges.modelig1[c] && i2 == interactions.edges.modelig2[c]
-                    edge_row.pred_pvalue, edge_row.pred_score = thisp, sco
-                end
             end
+            pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+            edge_row.pred_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : 1.0
         end
     end
 
@@ -368,7 +366,7 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
         out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs, :pvalue, :fdr, :odds_ratio,
-        :pred_pvalue, :pred_fdr, :pred_score, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+        :pred_pvalue, :pred_fdr, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
         return sort!(out_df[!, out_columns], :nb_ints; rev=true)
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)

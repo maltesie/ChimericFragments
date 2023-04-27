@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64}}
+    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
@@ -129,35 +129,45 @@ function grid_positions(df::SubDataFrame; mean_distance=100.0)
 end
 node_index(df::SubDataFrame, node_id::Int) = (df.src .=== node_id) .| (df.dst .=== node_id)
 node_sum(df::SubDataFrame, node_id::Int) = sum(df.nb_ints[node_index(df, node_id)])
-function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Interactions)
-    counts = Dict{Int, Int}()
+function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int)
+    counts = Dict{Int, Float64}()
+    isnegative = interact.nodes.strand[node_id] == '-' 
     for partner in df[df.src .== node_id, :dst]
         ligation_points = interact.edgestats[(node_id, partner)][3]
-        for ((p1, _), c) in ligation_points
-            if p1 in keys(counts)
-                counts[p1] += c
-            else
-                counts[p1] = c
+        for (p, c) in ligation_points
+            for pl in interact.bpstats[p][2]:interact.bpstats[p][3]
+                p1 = p[1] + (isnegative ? 1 : -1) * (bp_len - pl)
+                wc = c * (1-interact.bpstats[p][1])
+                if p1 in keys(counts)
+                    counts[p1] += wc
+                else
+                    counts[p1] = wc
+                end
             end
         end
     end
     return counts
 end
-function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions)
-    counts = Dict{Int, Int}()
+function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int)
+    counts = Dict{Int, Float64}()
+    isnegative = interact.nodes.strand[node_id] == '-' 
     for partner in df[df.dst .== node_id, :src]
         ligation_points = interact.edgestats[(partner, node_id)][3]
-        for ((_, p2), c) in ligation_points
-            if p2 in keys(counts)
-                counts[p2] += c
-            else
-                counts[p2] = c
+        for (p, c) in ligation_points
+            for pl in interact.bpstats[p][4]:interact.bpstats[p][5]
+                p2 = p[2] + (isnegative ? -1 : 1) * (bp_len - pl)
+                wc = c * (1-interact.bpstats[p][1])
+                if p2 in keys(counts)
+                    counts[p2] += wc
+                else
+                    counts[p2] = wc
+                end
             end
         end
     end
     return counts
 end
-function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_value::String)
+function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_value::String, bp_len::Int)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
@@ -183,8 +193,8 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_val
             "interactions"=>node_sum(df, n),
             "current_ratio"=>round(node_sum(df, n)/total_ints; digits=2),
             "nb_partners"=>length(union!(Set(df.src[df.dst .=== n]), Set(df.dst[df.src .=== n]))),
-            "lig_as_rna1"=>count_ligation_sites_as1(df, n, interact),
-            "lig_as_rna2"=>count_ligation_sites_as2(df, n, interact),
+            "lig_as_rna1"=>count_ligation_sites_as1(df, n, interact, bp_len),
+            "lig_as_rna2"=>count_ligation_sites_as2(df, n, interact, bp_len),
         ),
         "classes"=>interact.nodes.type[n],
         "position"=>pos[n]
