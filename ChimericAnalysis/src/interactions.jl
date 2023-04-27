@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Float64}
+    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
@@ -207,8 +207,6 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     total_other = sum(interactions.edges[!, :nb_ints]) .- ints_between .- other_source .- other_target .+
         (include_singles ? sum(interactions.nodes[!, :nb_single] .+ interactions.nodes[!, :nb_selfchimeric]) : 0)
 
-
-
     tests = FisherExactTest.(ints_between, other_target, other_source, total_other)
     odds_ratio = [t.ω for t in tests]
     pvalues_fisher = pvalue.(tests; tail=Symbol(fisher_exact_tail))
@@ -221,10 +219,6 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     interactions.edges[:, :pred_pvalue] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
     interactions.edges[:, :pred_score] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_cl1] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_cr1] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_cl2] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_cr2] = fill(NaN, nrow(interactions.edges))
 
     scores = Dict((DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
                     (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
@@ -246,10 +240,9 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     for (c, edge_row) in enumerate(eachrow(interactions.edges))
         if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
             edge_row.pred_pvalue = 1.0
-            edge_row.modeintrange1 = 0.0
-            edge_row.modeintrange2 = 0.0
+
             for (i1::Int, i2::Int) in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
-                #i1, i2 = Int(edge_row.modelig1), Int(edge_row.modelig2)
+
                 strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
                 ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
                 (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
@@ -272,16 +265,10 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                 paln = pairalign(LocalAlignment(), s1, s2, model)
                 sco = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
                 thisp = 1-random_model_ecdf(sco)
-                interactions.bpstats[(i1,i2)] = thisp
-                edge_row.modeintrange2 += 1.0
-                edge_row.modeintrange1 += (thisp <= 0.05)
-                if thisp < edge_row.pred_pvalue
-                    interactions.edges.modelig1[c] = Float64(i1)
-                    interactions.edges.modelig2[c] = Float64(i2)
-                    interactions.edges.pred_cl1[c] = paln.aln.a.aln.anchors[1].seqpos + 1
-                    interactions.edges.pred_cr1[c] = paln.aln.a.aln.anchors[end].seqpos
-                    interactions.edges.pred_cl2[c] = paln.aln.a.aln.anchors[1].refpos + 1
-                    interactions.edges.pred_cr2[c] = paln.aln.a.aln.anchors[end].refpos
+                interactions.bpstats[(i1,i2)] = (thisp, paln.aln.a.aln.anchors[1].seqpos + 1, paln.aln.a.aln.anchors[end].seqpos,
+                                                        paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos)
+
+                if i1 == interactions.edges.modelig1[c] && i2 == interactions.edges.modelig2[c]
                     edge_row.pred_pvalue, edge_row.pred_score = thisp, sco
                 end
             end

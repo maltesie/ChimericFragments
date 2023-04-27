@@ -92,22 +92,30 @@ search_layout() = html_div(
         html_div(
             className="horizontal",
             children=[
-                html_p("Search:"),
                 dcc_checklist(
                     id="exclusive-search",
                     options=[Dict("label"=>"exclusive search", "value"=>"exclusive")],
-                    style=Dict("padding-left"=>"100px"),
+                    style=Dict("width"=>"100%"),
                     value=["exclusive"]
+                ),
+                dcc_dropdown(
+                    id="type-multi-select",
+                    options=[],
+                    style=Dict("padding-left"=>"10px", "width"=>"100%"),
+                    multi=true,
+                    placeholder="Select type(s)",
                 )
             ]
         ),
         html_div(
             className="horizontal",
+            style=Dict("padding-top"=>"10px"),
             children=[
                 dcc_dropdown(
                     id="gene-multi-select",
                     options=[],
-                    multi=true
+                    multi=true,
+                    placeholder="Select annotation(s)",
                 ),
                 html_div(style=Dict("width"=>"10px")),
                 html_button(
@@ -117,7 +125,6 @@ search_layout() = html_div(
                     style=Dict("position"=>"relative", "padding"=>"0px", "width"=>"50px", "height"=>"36px", "line-height"=>"0px", "color"=>"#7fafdf"))
             ]
         ),
-
     ]
 )
 
@@ -206,39 +213,54 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     className="container",
     children=[
 
+        html_div(className="plot", children=[
+            dcc_dropdown(id="fdr-source", options=[
+                (label = "Fishers exact", value = "fisher"),
+                (label = "basepairing test", value = "bp"),
+            ]),
+            dcc_graph(id="plot1"),
+        ]),
+
+        html_div(className="plot", children=[
+            dcc_graph(id="plot2"),
+        ]),
+
+        html_div(className="plot", children=[
+            dcc_slider(id="fdr-value", min=0.0, max=1.0, step=0.01, value=0.1),
+            dcc_graph(id="plot3"),
+        ]),
+
         html_div(
-            className="plot",
-            circos(
-                id="my-dashbio-circos",
-                enableZoomPan=false,
-                enableDownloadSVG=true,
-                size=290,
-                config = Dict(
-                    "gap"=>0.003,
-                    "cornerRadius"=>5,
-                    "innerRadius"=>120,
-                    "outerRadius"=>125,
-                    "labelRadius"=>140,
-                    "ticks"=> Dict(
-                        "display"=>true,
-                        "spacing"=>100000,
-                        "color"=>"#000",
-                        "labelDenominator"=>1000000,
-                        "labelSuffix"=>" Mb",
-                        "labelFont"=>"Arial",
-                        "majorSpacing"=>5,
-                        "minorSpacing"=>1,
-                        "labelSpacing"=>5
-                    )
+            className="plot", children=[
+                circos(
+                    id="my-dashbio-circos",
+                    enableZoomPan=false,
+                    enableDownloadSVG=true,
+                    size=350,
+                    config = Dict(
+                        "gap"=>0.003,
+                        "cornerRadius"=>5,
+                        "innerRadius"=>120,
+                        "outerRadius"=>125,
+                        "labelRadius"=>140,
+                        "ticks"=> Dict(
+                            "display"=>true,
+                            "spacing"=>100000,
+                            "color"=>"#000",
+                            "labelDenominator"=>1000000,
+                            "labelSuffix"=>" Mb",
+                            "labelFont"=>"Arial",
+                            "majorSpacing"=>5,
+                            "minorSpacing"=>1,
+                            "labelSpacing"=>5
+                        )
+                    ),
+                    layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
+                    tracks=[chords_track(Dict{String,Any}[])]
                 ),
-                layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
-                tracks=[chords_track(Dict{String,Any}[])]
-            )
+            ]
+
         ),
-        dcc_graph(id="plot1", className="plot"),
-        dcc_graph(id="plot2", className="plot"),
-        dcc_graph(id="plot3", className="plot"),
-        #dcc_graph(id="plot4", className="plot"),
     ]
 )
 

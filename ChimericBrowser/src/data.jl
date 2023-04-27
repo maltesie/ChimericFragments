@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Float64}
+    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
 end
@@ -41,8 +41,8 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
 end
 
 nthindex(a::BitVector, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
-function filtered_dfview(interactions::Interactions, search_strings::Vector{String}, min_reads::Int, max_interactions::Int,
-                            max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool, exclusive::Bool)
+function filtered_dfview(interactions::Interactions, search_strings::Vector{String}, type_strings::Vector{String}, min_reads::Int,
+                            max_interactions::Int, max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool, exclusive::Bool)
     filtered_index = falses(nrow(interactions.edges))
     first_below_min_reads = findfirst(x->x<min_reads, interactions.edges.nb_ints)
     min_reads_range = 1:(isnothing(first_below_min_reads) ? nrow(interactions.edges) : first_below_min_reads-1)
@@ -58,8 +58,26 @@ function filtered_dfview(interactions::Interactions, search_strings::Vector{Stri
         end
         (exclusive && (length(search_strings) > 1)) ? (s1 .& s2) : (s1 .| s2)
     end
-    search_string_index .&= ((interactions.edges.fdr[min_reads_range] .<= max_fdr) .&
-        ((interactions.edges.pred_fdr[min_reads_range] .<= max_bp_fdr) .| (ligation ? isnan.(interactions.edges.pred_fdr[min_reads_range]) : falses(length(min_reads_range)))))
+    type_string_index = if isempty(type_strings)
+        trues(length(min_reads_range))
+    else
+        s1, s2 = falses(length(min_reads_range)), falses(length(min_reads_range))
+        for type_string in type_strings
+            for type_id in findall(interactions.nodes.type .=== type_string)
+                s1 .|= (interactions.edges.src[min_reads_range] .=== type_id)
+                s2 .|= (interactions.edges.dst[min_reads_range] .=== type_id)
+            end
+        end
+        exclusive ? (s1 .& s2) : (s1 .| s2)
+    end
+    search_string_index .&= type_string_index
+    search_string_index .&= (
+        (interactions.edges.fdr[min_reads_range] .<= max_fdr) .&
+        (
+            (interactions.edges.pred_fdr[min_reads_range] .<= max_bp_fdr) .|
+            (ligation ? isnan.(interactions.edges.pred_fdr[min_reads_range]) : falses(length(min_reads_range)))
+        )
+    )
     n = nthindex(search_string_index, max_interactions)
     isnothing(n) || (filtered_index[1:n] .= search_string_index[1:n])
     return @view interactions.edges[filtered_index, :]
@@ -144,7 +162,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_val
     total_ints = sum(df.nb_ints)
     max_ints = maximum(df.nb_ints)
     pos = layout_value == "clustered" ? clustered_positions(df) : grid_positions(df)
-    
+
     edges = [Dict(
         "data"=>Dict(
             "id"=>hash(row.src, hash(row.dst)),

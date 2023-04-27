@@ -1,6 +1,6 @@
 score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
 function chimeric_browser(results_folder::String, genome_file::String, types::Dict{String,String}, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64,
-        address::String, port::Int, check_interaction_distances::Tuple{Int,Int}, param_dict::Vector{Pair{String,String}}, bp_parameters::NTuple{6,Int}, 
+        address::String, port::Int, check_interaction_distances::Tuple{Int,Int}, param_dict::Vector{Pair{String,String}}, bp_parameters::NTuple{6,Int},
         n_genome_samples::Int, shift_weight::Float64)
 
     interactions, genome_info, genome = load_data(results_folder, genome_file, min_reads, max_fdr, max_bp_fdr)
@@ -35,7 +35,7 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     app.layout = browser_layout(sort([k for k in keys(interactions)]), genome_info, stylesheet(types), min_reads, max_fdr, max_bp_fdr)
 
     update_selection_callback!(app, interactions, types["srna"], param_dict)
-    update_dataset_callback!(app, interactions, min_reads, randseq_model_ecdf, genome_model_ecdf)
+    update_dataset_callback!(app, interactions, min_reads, check_interaction_distances, randseq_model_ecdf, genome_model_ecdf)
     update_selected_element_callback!(app, genome, interactions, check_interaction_distances, model)
     click_cyto_button_callback!(app)
     click_table_button_callback!(app, interactions)

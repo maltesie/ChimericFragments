@@ -81,7 +81,7 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
     p_random_genome = scatter(x=1:max_score, y=genome_model_pdf, fill="tozeroy", name="random, from genome")
     p_interactions = scatter(x=1:max_score, y=interactions_pdf, fill="tozeroy", name="around ligation points")
     p = plot([p_random, p_random_genome, p_interactions], Layout(title="basepairing predictions score distribution"))
-    
+
     ymax = max(maximum(randseq_model_pdf), maximum(genome_model_pdf), maximum(interactions_pdf))
     fdr_p_index = findfirst(x->x[2][1]<=plot_fdr_level, si_fdr)
     fdr_p = isnothing(fdr_p_index) ? 1.0 : si_fdr[fdr_p_index][2][2]
@@ -92,115 +92,22 @@ function bp_score_dist_plot(interactions::Interactions, genome_model_ecdf::ECDF,
 end
 
 function alignment_histogram(l1::Vector{Float64}, r1::Vector{Float64}, l2::Vector{Float64}, r2::Vector{Float64},
-            bins::AbstractRange, max_fdrs::Vector{Float64}, fdrs::Vector{Float64})
-
-    h1 = histogram(l1; bins=bins, label="all", legend=:topright)
-    title!(h1, "RNA1, left end")
-    ylabel!(h1, "count")
-    h2 = histogram(r1; bins=bins, label="all", legend=:topleft)
-    title!(h2, "RNA1, right end")
-    h3 = histogram(l2; bins=bins, label="all", legend=:topright)
-    ylabel!(h3, "count")
-    xlabel!(h3, "position in alignment")
-    title!(h3, "RNA2, left end")
-    h4 = histogram(r2; bins=bins, label="all", legend=:topleft)
-    xlabel!(h4, "position in alignment")
-    title!(h4, "RNA2, right end")
-    h5 = histogram(r1 .- l1 .+ 1; bins=bins, label="all", legend=:topright)
-    title!(h5, "RNA1, length")
-    h6 = histogram(r2 .- l2 .+ 1; bins=bins, label="all", legend=:topright)
-    xlabel!(h6, "position in alignment")
-    title!(h6, "RNA2, length")
-
-    hn1 = histogram(l1; bins=bins, label="all", legend=:topright)
-    title!(hn1, "RNA1, left end")
-    ylabel!(hn1, "count")
-    hn2 = histogram(r1; bins=bins, label="all", legend=:topleft)
-    title!(hn2, "RNA1, right end")
-    hn3 = histogram(l2; bins=bins, label="all", legend=:topright)
-    ylabel!(hn3, "count")
-    xlabel!(hn3, "position in alignment")
-    title!(hn3, "RNA2, left end")
-    hn4 = histogram(r2; bins=bins, label="all", legend=:topleft)
-    xlabel!(hn4, "position in alignment")
-    title!(hn4, "RNA2, right end")
-    hn5 = histogram(r1 .- l1 .+ 1; bins=bins, label="all", legend=:topright)
-    title!(hn5, "RNA1, length")
-    hn6 = histogram(r2 .- l2 .+ 1; bins=bins, label="all", legend=:topright)
-    xlabel!(hn6, "position in alignment")
-    title!(hn6, "RNA2, length")
-
-    lp1 = plot(ones(length(bins)); label="all", legend=:topright)
-    title!(lp1, "RNA1, left end")
-    ylabel!(lp1, "ratio")
-    w1 = fit(Histogram, l1, bins).weights
-    lp2 = plot(ones(length(bins)); label="all", legend=:topleft)
-    title!(lp2, "RNA1, right end")
-    w2 = fit(Histogram, r1, bins).weights
-    lp3 = plot(ones(length(bins)); label="all", legend=:topright)
-    ylabel!(lp3, "ratio")
-    xlabel!(lp3, "position in alignment")
-    title!(lp3, "RNA1, left end")
-    w3 = fit(Histogram, l2, bins).weights
-    lp4 = plot(ones(length(bins)); label="all", legend=:topleft)
-    xlabel!(lp4, "position in alignment")
-    title!(lp4, "RNA2, right end")
-    w4 = fit(Histogram, r2, bins).weights
-    lp5 = plot(ones(length(bins)); label="all")
-    title!(lp5, "RNA2, length")
-    w5 = fit(Histogram, r1 .- l1 .+ 1, bins).weights
-    lp6 = plot(ones(length(bins)); label="all")
-    xlabel!(lp6, "position in alignment")
-    title!(lp6, "RNA2, length")
-    w6 = fit(Histogram, r2 .- l2 .+ 1, bins).weights
-
-    for max_fdr in reverse(max_fdrs)
-        sig_index = fdrs .<= max_fdr
-        histogram!(h1, l1[sig_index]; bins=bins, label="fdr <= $max_fdr")
-        histogram!(h2, r1[sig_index]; bins=bins, label="fdr <= $max_fdr")
-        histogram!(h3, l2[sig_index]; bins=bins, label="fdr <= $max_fdr")
-        histogram!(h4, r2[sig_index]; bins=bins, label="fdr <= $max_fdr")
-        histogram!(h5, r1[sig_index] .- l1[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
-        histogram!(h6, r2[sig_index] .- l2[sig_index] .+ 1; bins=bins, label="fdr <= $max_fdr")
-
-        plot!(lp1, fit(Histogram, l1[sig_index], bins).weights ./ w1; label="fdr <= $max_fdr")
-        plot!(lp2, fit(Histogram, r1[sig_index], bins).weights ./ w2; label="fdr <= $max_fdr")
-        plot!(lp3, fit(Histogram, l2[sig_index], bins).weights ./ w3; label="fdr <= $max_fdr")
-        plot!(lp4, fit(Histogram, r2[sig_index], bins).weights ./ w4; label="fdr <= $max_fdr")
-        plot!(lp5, fit(Histogram, r1[sig_index] .- l1[sig_index] .+ 1, bins).weights ./ w5; label="fdr <= $max_fdr")
-        plot!(lp6, fit(Histogram, r2[sig_index] .- l2[sig_index] .+ 1, bins).weights ./ w6; label="fdr <= $max_fdr")
-
-        plot!(hn1, w1 .- fit(Histogram, l1[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-        plot!(hn2, w2 .- fit(Histogram, r1[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-        plot!(hn3, w3 .- fit(Histogram, l2[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-        plot!(hn4, w4 .- fit(Histogram, r2[sig_index], bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-        plot!(hn5, w5 .- fit(Histogram, r1[sig_index] .- l1[sig_index] .+ 1, bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-        plot!(hn6, w6 .- fit(Histogram, r2[sig_index] .- l2[sig_index] .+ 1, bins).weights; seriestype=:steps, label="fdr <= $max_fdr", lw=4)
-    end
-
-    p1 = plot(h1, h5, h2, h3, h6, h4; layout=(2,3), size=(1800,800), margin=7mm)
-    p2 = plot(lp1, lp5, lp2, lp3, lp6, lp4; layout=(2,3), size=(1800,800), margin=7mm)
-    p3 = plot(hn1, hn5, hn2, hn3, hn6, hn4; layout=(2,3), size=(1800,800), margin=7mm)
-    return p1, p2, p3
+            bins::AbstractRange, max_fdr::Float64, fdrs::Vector{Float64})
+    return plot(scatter(x=[1,2,3], y=[1,2,3]))
 end
 
-function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, plotting_fdr_levels::Vector{Float64})
+function bp_clipping_dist_plots(interactions::Interactions, bp_distance::Tuple{Int,Int}, plotting_fdr_level::Float64)
 
     bins = 1:(bp_distance[1]-bp_distance[2])
-    nan_index = .!isnan.(interactions.edges.pred_fdr)
 
-    l1 = interactions.edges.pred_cl1[nan_index]
-    r1 = interactions.edges.pred_cr1[nan_index]
-    l2 = interactions.edges.pred_cl2[nan_index]
-    r2 = interactions.edges.pred_cr2[nan_index]
+    l1 = [t[2] for t in values(interactions.bpstats)]
+    r1 = [t[3] for t in values(interactions.bpstats)]
+    l2 = [t[4] for t in values(interactions.bpstats)]
+    r2 = [t[5] for t in values(interactions.bpstats)]
 
-    bp_fdrs = interactions.edges.pred_fdr[nan_index]
-    p1s = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, bp_fdrs)
+    bp_fdrs = adjust(PValues([t[5] for t in values(interactions.bpstats)]), BenjaminiHochberg())
 
-    fisher_fdrs = interactions.edges.fdr[nan_index]
-    p2s = alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_levels, fisher_fdrs)
-
-    return p1s, p2s
+    return alignment_histogram(l1, r1, l2, r2, bins, plotting_fdr_level, bp_fdrs)
 end
 
 function countdata(data::Vector{Int})
