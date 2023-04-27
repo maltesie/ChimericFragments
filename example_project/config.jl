@@ -103,9 +103,6 @@ allow_self_chimeras=false
 # from different reads have a distance of infinity.
 max_ligation_distance=3
 
-# ChimericFragments outputs a position histogram of the ligation points. This sets the number of bins in it.
-position_distribution_bins=50
-
 
 #ANNOTATION PARAMETERS
 
@@ -190,12 +187,6 @@ GU_score=0
 bp_mismatch_penalty=7
 bp_gap_open_penalty=8
 bp_gap_extend_penalty=3
-
-
-#PLOTTING PARAMETERS
-
-# Set the fdr levels for plots
-plot_fdr_levels=[0.1, 0.2, 0.5]
 
 
 #DATA FILTER PARAMETERS

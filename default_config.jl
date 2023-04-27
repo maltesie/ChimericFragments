@@ -104,9 +104,6 @@ allow_self_chimeras=false
 # from different reads have a distance of infinity.
 max_ligation_distance=3
 
-# ChimericFragments outputs a position histogram of the ligation points. This sets the number of bins in it.
-position_distribution_bins=50
-
 
 #ANNOTATION PARAMETERS
 
@@ -193,12 +190,6 @@ bp_gap_open_penalty=8
 bp_gap_extend_penalty=3
 
 
-#PLOTTING PARAMETERS
-
-# Set the fdr levels for plots involving basepairing predictions
-plot_fdr_levels=[0.1, 0.2, 0.5]
-
-
 #DATA FILTER PARAMETERS
 
 # For large datasets, these parameters can be used to limit the results saved to the tables or loaded into
@@ -208,7 +199,7 @@ plot_fdr_levels=[0.1, 0.2, 0.5]
 # min_reads will be excluded from the results.
 max_fdr=1.0
 max_bp_fdr=1.0
-min_reads=1
+min_reads=2
 
 #DASH APP PARAMETERS
 
