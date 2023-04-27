@@ -13,7 +13,7 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
                                                             gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
-    seq_length = check_interaction_distances[1]-check_interaction_distances[2]+1
+    seq_length = check_interaction_distances[1]-check_interaction_distances[2]
     genomeseq = foldl(*, values(genome))
     cgenomeseq = BioSequences.complement(genomeseq)
     rgenomeseq = BioSequences.reverse(genomeseq)
