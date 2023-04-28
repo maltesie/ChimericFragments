@@ -62,13 +62,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
         )
 
-        randseq = randdnaseq(length(genome.seq))
-        randseq_model_ecdf = ecdf([score_bp(pairalign(LocalAlignment(),
-            view(randseq, i1:i1+seq_length-1),
-            view(randseq, i2:i2+seq_length-1),
-            model), shift_weight) for (i1, i2) in eachrow(rand(1:(length(genome.seq)-seq_length), (n_genome_samples,2)))]
-        )
-
         @info "Using $(summarize(features))"
         isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
@@ -104,14 +97,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             end
 
             length(interactions) == 0 && (@warn "No interactions found!"; continue)
-            correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
-            correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
-            for (i,repid) in enumerate(interactions.replicate_ids)
-                correlation_df[:, repid] = correlation_matrix[:, i]
-            end
 
             @info "Found $(length(interactions.multichimeras)) unique multichimeric arrangements."
-            @info "Correlation between interaction counts:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
+
             @info "Running statistical tests..."
             addpositions!(interactions, features)
             addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
@@ -123,25 +111,29 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
+            filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
 
             total_sig_reads = sum(interactions.edges[interactions.edges.fdr .<= max_fdr, :nb_ints])
             total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
-
-            both_reads = sum(interactions.edges[(interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads), :nb_ints])
-            both_ints = sum((interactions.edges.fdr .<= max_fdr) .& (interactions.edges.nb_ints .>= min_reads))
+            filter!(:fdr => x -> x <= max_fdr, interactions.edges)
 
             above_min_bp_reads = sum(interactions.edges[interactions.edges.pred_fdr .<= max_bp_fdr, :nb_ints])
             above_min_bp_ints = sum(interactions.edges.pred_fdr .<= max_bp_fdr)
+            filter!(:pred_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
 
             infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
-                "fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "both"=>[both_reads, both_ints], "bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
+                "& fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
-            @info "Saving..."
 
-            filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
-            filter!(:fdr => x -> x <= max_fdr, interactions.edges)
-            filter!(:pred_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
+            correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
+            correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
+            for (i,repid) in enumerate(interactions.replicate_ids)
+                correlation_df[:, repid] = correlation_matrix[:, i]
+            end
+            @info "Correlation between interaction counts per replicate:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
+
+            @info "Saving..."
 
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
