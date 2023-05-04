@@ -33,7 +33,7 @@ param_dict::Vector{Pair{String,String}} = [
     "max. ligation distance:"=>"$max_ligation_distance",
     "min. reads per interaction:" => "$min_reads",
     "max. basepairing fdr:"=>"$max_bp_fdr",
-    "max. Fisher's exact fdr:"=>"$max_fdr",
+    "max. Fisher's exact fdr:"=>"$max_fisher_fdr",
     "use order on read for Fisher's exact test:" => include_orientation ? "yes" : "no",
     "use single count for Fisher's exact test:" => include_singles ? "yes" : "no",
     "Fisher's test tail:"=>fisher_exact_tail,
@@ -46,5 +46,5 @@ bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_
 
 @info "Initializing visualization for datasets $(join(unique(v[2] for v in samplename_condition), ", "))."
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, max_bp_fdr,
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fisher_fdr, max_bp_fdr,
     address, port, bp_distance, param_dict, bp_parameters, n_genome_samples, bp_shift_weight)

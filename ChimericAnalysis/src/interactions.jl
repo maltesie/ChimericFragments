@@ -214,11 +214,11 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
     adjp_fisher = adjust(PValues(pvalues_fisher), BenjaminiHochberg())
     interactions.edges[:, :odds_ratio] = odds_ratio
-    interactions.edges[:, :pvalue] = pvalues_fisher
-    interactions.edges[:, :fdr] = adjp_fisher
+    interactions.edges[:, :fisher_pvalue] = pvalues_fisher
+    interactions.edges[:, :fisher_fdr] = adjp_fisher
 
-    interactions.edges[:, :pred_pvalue] = fill(NaN, nrow(interactions.edges))
-    interactions.edges[:, :pred_fdr] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :bp_pvalue] = fill(NaN, nrow(interactions.edges))
+    interactions.edges[:, :bp_fdr] = fill(NaN, nrow(interactions.edges))
 
     scores = Dict((DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
                     (DNA_C, DNA_G)=>bp_parameters[2], (DNA_G, DNA_C)=>bp_parameters[2],
@@ -238,7 +238,8 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     end
 
     for (c, edge_row) in enumerate(eachrow(interactions.edges))
-        if !(isnan(edge_row.modelig1) || isnan(edge_row.modelig2))
+
+        if (edge_row.src, edge_row.dst) in keys(interactions.edgestats)
 
             for (i1::Int, i2::Int) in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
 
@@ -269,68 +270,23 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
             end
             pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-            edge_row.pred_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : 1.0
+            edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : 1.0
         end
     end
 
-    nan_index = (!).(isnan.(interactions.edges.pred_pvalue))
-    interactions.edges.pred_fdr[nan_index] = adjust(PValues(interactions.edges.pred_pvalue[nan_index]), BenjaminiHochberg())
+    nan_index = (!).(isnan.(interactions.edges.bp_pvalue))
+    interactions.edges.bp_fdr[nan_index] = adjust(PValues(interactions.edges.bp_pvalue[nan_index]), BenjaminiHochberg())
     return interactions
 end
 
 cdsposition(feature::Interval{Annotation}) = hasparam(feature, "cds") ? param(feature, "cds", Int) : 0
 function addpositions!(interactions::Interactions, features::Features)
     tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature), cdsposition(feature)) for feature in features)
-    for (col_featurepos, col_modes, col_moderanges, col_rels) in zip([:left1, :right1, :left2, :right2], [:modeint1, :modeint2, :modelig1, :modelig2],
-                                                    [:modeintrange1, :modeintrange2, :modeligrange1, :modeligrange2], [:rel_int1, :rel_int2, :rel_lig1, :rel_lig2])
-        interactions.edges[:, col_featurepos] = Vector{Int}(undef, length(interactions))
-        interactions.edges[:, col_modes] = Vector{Float64}(undef, length(interactions))
-        interactions.edges[:, col_moderanges] = Vector{Float64}(undef, length(interactions))
-        interactions.edges[:, col_rels] = Vector{Float64}(undef, length(interactions))
-    end
-    for edge_row in eachrow(interactions.edges)
-        (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
-        (feature2_left, feature2_right) = tus[interactions.nodes[edge_row[:dst], :hash]]
-        isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
-        isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
-        stats = interactions.edgestats[(edge_row[:src], edge_row[:dst])]
-        modeint1, modeint2 = length(stats[2]) > 0 ? argmax(stats[2]) : (NaN64, NaN64)
-        modelig1, modelig2 = length(stats[3]) > 0 ? argmax(stats[3]) : (NaN64, NaN64)
-        modeintrange1 = length(stats[2]) > 0 ? maximum(first(k) for k in keys(stats[2]))-minimum(first(k) for k in keys(stats[2]))+1 : NaN64
-        modeligrange1 = length(stats[3]) > 0 ? maximum(first(k) for k in keys(stats[3]))-minimum(first(k) for k in keys(stats[3]))+1 : NaN64
-        modeintrange2 = length(stats[2]) > 0 ? maximum(last(k) for k in keys(stats[2]))-minimum(last(k) for k in keys(stats[2]))+1 : NaN64
-        modeligrange2 = length(stats[3]) > 0 ? maximum(last(k) for k in keys(stats[3]))-minimum(last(k) for k in keys(stats[3]))+1 : NaN64
-        (rel_int1, rel_lig1) = ((modeint1, modelig1) .- feature1_left) ./ (feature1_right - feature1_left)
-        (rel_int2, rel_lig2) = ((modeint2, modelig2) .- feature2_left) ./ (feature2_right - feature2_left)
-        isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
-        isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
-        edge_row[[:left1, :right1, :left2, :right2, :modeint1, :modeintrange1, :rel_int1, :modeint2, :modeintrange2,
-                    :rel_int2, :modelig1, :modeligrange1, :rel_lig1, :modelig2, :modeligrange2, :rel_lig2]] =
-            round.((feature1_left, feature1_right, feature2_left, feature2_right, modeint1, modeintrange1, rel_int1, modeint2,
-                    modeintrange2, rel_int2, modelig1, modeligrange1, rel_lig1, modelig2, modeligrange2, rel_lig2); digits=4)
-    end
     interactions.nodes[:, :left] = Vector{Int}(undef, nrow(interactions.nodes))
     interactions.nodes[:, :right] = Vector{Int}(undef, nrow(interactions.nodes))
     interactions.nodes[:, :cds] = Vector{Int}(undef, nrow(interactions.nodes))
     for nodes_row in eachrow(interactions.nodes)
         nodes_row[[:left, :right, :cds]] = tus[nodes_row[:hash]]
-    end
-    return interactions
-end
-
-function addrelpositions!(interactions::Interactions, features::Features)
-    tus = Dict(hash(name(feature), hash(type(feature)))=>(leftposition(feature), rightposition(feature), cdsposition(feature)) for feature in features)
-    for edge_row in eachrow(interactions.edges)
-        (feature1_left, feature1_right) = tus[interactions.nodes[edge_row[:src], :hash]]
-        (feature2_left, feature2_right) = tus[interactions.nodes[edge_row[:dst], :hash]]
-        isnegative1 = interactions.nodes[edge_row[:src], :strand] === '-'
-        isnegative2 = interactions.nodes[edge_row[:dst], :strand] === '-'
-        modeint1, modeint2, modelig1, modelig2 = edge_row.modeint1, edge_row.modeint2, edge_row.modelig1, edge_row.modelig2
-        (rel_int1, rel_lig1) = ((modeint1, modelig1) .- feature1_left) ./ (feature1_right - feature1_left)
-        (rel_int2, rel_lig2) = ((modeint2, modelig2) .- feature2_left) ./ (feature2_right - feature2_left)
-        isnegative1 && ((rel_int1, rel_lig1) = (1-rel_int1, 1-rel_lig1))
-        isnegative2 && ((rel_int2, rel_lig2) = (1-rel_int2, 1-rel_lig2))
-        edge_row[[:rel_int1, :rel_int2, :rel_lig1, :rel_lig2]] = round.((rel_int1, rel_int2, rel_lig1, rel_lig2); digits=4)
     end
     return interactions
 end
@@ -347,10 +303,11 @@ function histo(ints::Dict{Tuple{Int,Int},Int}, mi::Int, ma::Int, nbins::Int, l::
     end
     return h
 end
-function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fdr=0.05, max_bp_fdr=0.05, hist_bins=100)
-    filter_index = (interactions.edges[!, :nb_ints] .>= min_reads) .& (interactions.edges[!, :fdr] .<= max_fdr) .&
-                        ((interactions.edges[!, :pred_fdr] .<= max_bp_fdr) .| isnan.(interactions.edges.pred_fdr))
+function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fisher_fdr=0.05, max_bp_fdr=0.05, hist_bins=100)
+    filter_index = (interactions.edges[!, :nb_ints] .>= min_reads) .& (interactions.edges[!, :fisher_fdr] .<= max_fisher_fdr) .&
+                        ((interactions.edges[!, :bp_fdr] .<= max_bp_fdr) .| isnan.(interactions.edges.bp_fdr))
     out_df = interactions.edges[filter_index, :]
+
     if output === :edges
         out_df[!, :meanlen1] = Int.(round.(out_df[!, :meanlen1]))
         out_df[!, :meanlen2] = Int.(round.(out_df[!, :meanlen2]))
@@ -364,10 +321,15 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
         out_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
         out_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
+        out_df[:, :left1] = interactions.nodes[out_df[!,:src], :left]
+        out_df[:, :left2] = interactions.nodes[out_df[!,:dst], :left]
+        out_df[:, :right1] = interactions.nodes[out_df[!,:src], :right]
+        out_df[:, :right2] = interactions.nodes[out_df[!,:dst], :right]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
-        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs, :pvalue, :fdr, :odds_ratio,
-        :pred_pvalue, :pred_fdr, :modeint1, :rel_int1, :modelig1, :rel_lig1, :meanlen1, :nms1, :modeint2, :rel_int2, :modelig2, :rel_lig2, :meanlen2, :nms2]
+        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs,
+        :fisher_pvalue, :fisher_fdr, :odds_ratio, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
         return sort!(out_df[!, out_columns], :nb_ints; rev=true)
+
     elseif output === :nodes
         out_nodes = copy(interactions.nodes)
         for (i,row) in enumerate(eachrow(out_nodes))
@@ -376,9 +338,54 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
             row[:nb_partners] = length(partners)
         end
         return sort!(out_nodes[!, [:name, :type, :ref, :nb_single, :nb_selfchimeric, :nb_unclassified, :nb_ints, :nb_partners]], :nb_single; rev=true)
+
+    elseif output === :multi
+        odf = DataFrame()
+        if length(interactions.multichimeras) > 0
+            sorted_multis = sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+            max_nb_partners = maximum(length(m[1]) for m in sorted_multis)
+
+            for i in 1:max_nb_partners
+                odf[:, "name_$i"] = String[]
+                odf[:, "type_$i"] = String[]
+            end
+            odf[:, :count] = Int[]
+            odf[:, :nb_partners] = Int[]
+            current_multi = Vector{String}(undef, 2*max_nb_partners)
+            for (multichimera, count) in sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
+                i = 0
+                for mc in multichimera
+                    current_multi[i+=1] = interactions.nodes.name[mc]
+                    current_multi[i+=1] = interactions.nodes.type[mc]
+                end
+                current_multi[(i+1):(2*max_nb_partners)] .= ""
+                push!(odf, (current_multi..., count, length(unique(multichimera))))
+            end
+        end
+        return odf
+
     elseif output === :stats
         edgestats = interactions.edgestats
         statsmatrix = zeros(nrow(out_df), 4*hist_bins)
+
+        stats_df = DataFrame(statsmatrix, [
+            ["$(i)_ints1" for i in 1:hist_bins]...,
+            ["$(i)_ints2" for i in 1:hist_bins]...,
+            ["$(i)_lig1" for i in 1:hist_bins]...,
+            ["$(i)_lig2" for i in 1:hist_bins]...
+            ])
+
+        stats_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
+        stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
+        stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
+        stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
+        stats_df[:, :strand1] = interactions.nodes[out_df[!,:src], :strand]
+        stats_df[:, :strand2] = interactions.nodes[out_df[!,:dst], :strand]
+        stats_df[:, :left1] = interactions.nodes[out_df[!,:src], :left]
+        stats_df[:, :left2] = interactions.nodes[out_df[!,:dst], :left]
+        stats_df[:, :right1] = interactions.nodes[out_df[!,:src], :right]
+        stats_df[:, :right2] = interactions.nodes[out_df[!,:dst], :right]
+
         for (i, (a,b, mi1, ma1, mi2, ma2)) in enumerate(zip(out_df[!,:src], out_df[!,:dst], out_df[!, :left1], out_df[!, :right1], out_df[!, :left2], out_df[!, :right2]))
             (_, ints, ligs) = edgestats[(a, b)]
             statsmatrix[i, 1:hist_bins] .= histo(ints, mi1, ma1, hist_bins, true)
@@ -386,21 +393,6 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
             statsmatrix[i, (2*hist_bins+1):(3*hist_bins)] .= histo(ints, mi2, ma2, hist_bins, false)
             statsmatrix[i, (3*hist_bins+1):(4*hist_bins)] .= histo(ligs, mi2, ma2, hist_bins, false)
         end
-        stats_df = DataFrame(statsmatrix, [
-            ["$(i)_ints1" for i in 1:hist_bins]...,
-            ["$(i)_ints2" for i in 1:hist_bins]...,
-            ["$(i)_lig1" for i in 1:hist_bins]...,
-            ["$(i)_lig2" for i in 1:hist_bins]...
-            ])
-        stats_df[:, :name1] = interactions.nodes[out_df[!,:src], :name]
-        stats_df[:, :name2] = interactions.nodes[out_df[!,:dst], :name]
-        stats_df[:, :type1] = interactions.nodes[out_df[!,:src], :type]
-        stats_df[:, :type2] = interactions.nodes[out_df[!,:dst], :type]
-        stats_df[:, :left1] = out_df[!, :left1]
-        stats_df[:, :right1] = out_df[!, :right1]
-        stats_df[:, :left2] = out_df[!, :left2]
-        stats_df[:, :right2] = out_df[!, :right2]
-        stats_df[:, :nb_ints] = out_df[:, :nb_ints]
         return sort!(stats_df, :nb_ints; rev=true)
     else
         throw(AssertionError("output has to be one of :edges, :nodes, :stats"))

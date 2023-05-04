@@ -39,7 +39,7 @@ end
 function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_path::String, conditions::Dict{String, Vector{Int}}, genome::Genome;
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
                             overwrite_type="IGR", max_ligation_distance=5, is_reverse_complement=true, is_paired_end=true, check_interaction_distances=(45,-10),
-                            include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fdr=0.05, fisher_exact_tail="right",
+                            include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fisher_fdr=0.05, fisher_exact_tail="right",
                             include_read_identity=true, include_singles=true, allow_self_chimeras=true, bp_parameters=(4,5,1,5,6,4), n_genome_samples=200000, shift_weight=0.1)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
@@ -65,7 +65,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         @info "Using $(summarize(features))"
         isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
-        isdir(joinpath(results_path, "plots")) || mkpath(joinpath(results_path, "plots"))
         for (condition, r) in conditions
 
             replicate_ids = Vector{Symbol}()
@@ -104,7 +103,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             addpositions!(interactions, features)
             addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
                     fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters)
-            addrelpositions!(interactions, features)
 
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
@@ -113,16 +111,16 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
             filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
 
-            total_sig_reads = sum(interactions.edges[interactions.edges.fdr .<= max_fdr, :nb_ints])
-            total_sig_ints = sum(interactions.edges.fdr .<= max_fdr)
-            filter!(:fdr => x -> x <= max_fdr, interactions.edges)
+            total_sig_reads = sum(interactions.edges[interactions.edges.fisher_fdr .<= max_fisher_fdr, :nb_ints])
+            total_sig_ints = sum(interactions.edges.fisher_fdr .<= max_fisher_fdr)
+            filter!(:fisher_fdr => x -> x <= max_fisher_fdr, interactions.edges)
 
-            above_min_bp_reads = sum(interactions.edges[interactions.edges.pred_fdr .<= max_bp_fdr, :nb_ints])
-            above_min_bp_ints = sum(interactions.edges.pred_fdr .<= max_bp_fdr)
-            filter!(:pred_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
+            above_min_bp_reads = sum(interactions.edges[interactions.edges.bp_fdr .<= max_bp_fdr, :nb_ints])
+            above_min_bp_ints = sum(interactions.edges.bp_fdr .<= max_bp_fdr)
+            filter!(:bp_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
 
             infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
-                "& fdr<=$max_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
+                "& fdr<=$max_fisher_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
 
@@ -135,34 +133,14 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             @info "Saving..."
 
-            odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
+            odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
 
-            odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fdr=max_fdr, max_bp_fdr=max_bp_fdr)
+            odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
 
-            if length(interactions.multichimeras) > 0
-                sorted_multis = sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
-                max_nb_partners = maximum(length(m[1]) for m in sorted_multis)
-                odf = DataFrame()
-                for i in 1:max_nb_partners
-                    odf[:, "name_$i"] = String[]
-                    odf[:, "type_$i"] = String[]
-                end
-                odf[:, :count] = Int[]
-                odf[:, :nb_partners] = Int[]
-                current_multi = Vector{String}(undef, 2*max_nb_partners)
-                for (multichimera, count) in sort(collect(interactions.multichimeras), by=x->x[2], rev=true)
-                    i = 0
-                    for mc in multichimera
-                        current_multi[i+=1] = interactions.nodes.name[mc]
-                        current_multi[i+=1] = interactions.nodes.type[mc]
-                    end
-                    current_multi[(i+1):(2*max_nb_partners)] .= ""
-                    push!(odf, (current_multi..., count, length(unique(multichimera))))
-                end
-                CSV.write(joinpath(results_path, "tables", "multi_$(condition).csv"), odf)
-            end
+            odf = asdataframe(interactions; output=:multi)
+            CSV.write(joinpath(results_path, "tables", "multi_$(condition).csv"), odf)
 
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 

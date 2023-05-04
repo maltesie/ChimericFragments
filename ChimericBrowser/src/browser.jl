@@ -1,9 +1,9 @@
 score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
-function chimeric_browser(results_folder::String, genome_file::String, types::Dict{String,String}, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64,
+function chimeric_browser(results_folder::String, genome_file::String, types::Dict{String,String}, min_reads::Int, max_fisher_fdr::Float64, max_bp_fdr::Float64,
         address::String, port::Int, check_interaction_distances::Tuple{Int,Int}, param_dict::Vector{Pair{String,String}}, bp_parameters::NTuple{6,Int},
         n_genome_samples::Int, shift_weight::Float64)
 
-    interactions, genome_info, genome = load_data(results_folder, genome_file, min_reads, max_fdr, max_bp_fdr)
+    interactions, genome_info, genome = load_data(results_folder, genome_file, min_reads, max_fisher_fdr, max_bp_fdr)
 
     scores = Dict(
         (DNA_A, DNA_T)=>bp_parameters[1], (DNA_T, DNA_A)=>bp_parameters[1],
@@ -32,7 +32,7 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     )
 
     app = dash(assets_folder=assets_path)
-    app.layout = browser_layout(sort([k for k in keys(interactions)]), genome_info, stylesheet(types), min_reads, max_fdr, max_bp_fdr)
+    app.layout = browser_layout(sort([k for k in keys(interactions)]), genome_info, stylesheet(types), min_reads, max_fisher_fdr, max_bp_fdr)
 
     update_selection_callback!(app, interactions, seq_length, param_dict)
     update_dataset_callback!(app, interactions, min_reads)

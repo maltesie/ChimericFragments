@@ -153,7 +153,7 @@ info_area_layout() = html_div(
     ]
 )
 
-control_column_layout(datasets::Vector{String}, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
+control_column_layout(datasets::Vector{String}, min_reads::Int, max_fisher_fdr::Float64, max_bp_fdr::Float64) = html_div(
     id="left-column",
     children=[
         headline_layout(),
@@ -161,7 +161,7 @@ control_column_layout(datasets::Vector{String}, min_reads::Int, max_fdr::Float64
             className="container",
             children=[
                 dataset_and_postioning_layout(datasets),
-                reads_selection_layout(min_reads, max_fdr, max_bp_fdr),
+                reads_selection_layout(min_reads, max_fisher_fdr, max_bp_fdr),
                 search_layout(),
                 info_area_layout()
             ]

@@ -194,10 +194,10 @@ bp_gap_extend_penalty=3
 
 # For large datasets, these parameters can be used to limit the results saved to the tables or loaded into
 # the visualization. The method of Benjamini-Hochberg is applied to compute the false discovery rate.
-# Set the max_fdr to filter the results by fisher's exact test. max_bp_fdr can be used to filter by the
+# Set the max_fisher_fdr to filter the results by fisher's exact test. max_bp_fdr can be used to filter by the
 # significance of the basepairing predictions. And interactions with a read count less than or equal to
 # min_reads will be excluded from the results.
-max_fdr=1.0
+max_fisher_fdr=1.0
 max_bp_fdr=1.0
 min_reads=2
 

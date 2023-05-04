@@ -8,8 +8,8 @@ function bp_score_dist_plot(interact::Interactions, genome_model_ecdf::ECDF, ran
         maximum(genome_model_ecdf.sorted_values)
     )))
 
-    nan_index = .!isnan.(interact.edges.pred_fdr)
-    si_fdr = sort(collect(enumerate(zip(interact.edges.pred_fdr[nan_index], interact.edges.pred_pvalue[nan_index]))), by=x->x[2][2], rev=true)
+    nan_index = .!isnan.(interact.edges.bp_fdr)
+    si_fdr = sort(collect(enumerate(zip(interact.edges.bp_fdr[nan_index], interact.edges.bp_pvalue[nan_index]))), by=x->x[2][2], rev=true)
 
     genome_model_pdf = diff(genome_model_ecdf.(1:(max_score+1)))
     randseq_model_pdf = diff(randseq_model_ecdf.(1:(max_score+1)))
@@ -50,7 +50,7 @@ function bp_clipping_dist_plots(interact::Interactions, plotting_fdr_level::Floa
     ah3 = histogram(x=l2[bp_index], name="RNA2, left")
     ah4 = histogram(x=r2[bp_index], name="RNA2, right")
 
-    return plot([ah1, ah3, ah2, ah4], Layout(title="alignment clipping for fdr <= $plotting_fdr_level")), 
+    return plot([ah1, ah3, ah2, ah4], Layout(title="alignment clipping for fdr <= $plotting_fdr_level")),
             plot([h1, h3, h2, h4], Layout(title="alignment clipping for fdr > $plotting_fdr_level"))
 end
 
@@ -60,12 +60,12 @@ function odds_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
     logodds = log.(interact.edges.odds_ratio[valid_index])
     infindex = isfinite.(logodds)
     h1 = histogram(x=logodds[infindex], name="all")
-    sigfish_index = interact.edges.fdr[valid_index] .<= plotting_fdr_level
+    sigfish_index = interact.edges.fisher_fdr[valid_index] .<= plotting_fdr_level
     h2 = histogram(x=logodds[sigfish_index .& infindex], name="fdr <= $plotting_fdr_level")
 
-    all_index = interact.edges.pred_fdr[valid_index] .<= 1.0
+    all_index = interact.edges.bp_fdr[valid_index] .<= 1.0
     h3 = histogram(x=logodds[all_index], name="all")
-    sigpred_index = interact.edges.pred_fdr[valid_index] .<= plotting_fdr_level
+    sigpred_index = interact.edges.bp_fdr[valid_index] .<= plotting_fdr_level
     h4 = histogram(x=logodds[sigpred_index .& infindex], name="fdr <= $plotting_fdr_level")
 
     plot([h1, h2]), plot([h3, h4])
@@ -92,11 +92,11 @@ end
 
 function degree_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
 
-    sigfish_index = interact.edges.fdr .<= plotting_fdr_level
+    sigfish_index = interact.edges.fisher_fdr .<= plotting_fdr_level
     degs = log.(degrees(interact; index=sigfish_index) .+ 1)
     h2 = histogram(x=degs, name="fdr <= $plotting_fdr_level")
 
-    sigpred_index = interact.edges.pred_fdr .<= plotting_fdr_level
+    sigpred_index = interact.edges.bp_fdr .<= plotting_fdr_level
     degs = log.(degrees(interact; index=sigpred_index) .+ 1)
     h4 = histogram(x=degs, name="fdr <= $plotting_fdr_level")
 
@@ -104,15 +104,15 @@ function degree_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
 end
 
 function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Float64)
-    
+
     type1 = interact.nodes.type[interact.edges.src]
     type2 = interact.nodes.type[interact.edges.dst]
     types = collect(union!(Set(type1), Set(type2)))
     type_trans = Dict{String, Int}(t=>i for (i,t) in enumerate(types))
 
     types_counter = zeros(Float64, (length(types), length(types)))
-    type1 = interact.nodes.type[interact.edges.src[interact.edges.fdr .<= plotting_fdr_level]]
-    type2 = interact.nodes.type[interact.edges.dst[interact.edges.fdr .<= plotting_fdr_level]]
+    type1 = interact.nodes.type[interact.edges.src[interact.edges.fisher_fdr .<= plotting_fdr_level]]
+    type2 = interact.nodes.type[interact.edges.dst[interact.edges.fisher_fdr .<= plotting_fdr_level]]
     for (t1, t2) in zip(type1, type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
@@ -120,8 +120,8 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
     h1 = heatmap(x=types, y=types, z=copy(types_counter))
 
     types_counter = zeros(Float64, (length(types), length(types)))
-    type1 = interact.nodes.type[interact.edges.src[interact.edges.pred_fdr .<= plotting_fdr_level]]
-    type2 = interact.nodes.type[interact.edges.dst[interact.edges.pred_fdr .<= plotting_fdr_level]]
+    type1 = interact.nodes.type[interact.edges.src[interact.edges.bp_fdr .<= plotting_fdr_level]]
+    type2 = interact.nodes.type[interact.edges.dst[interact.edges.bp_fdr .<= plotting_fdr_level]]
     for (t1, t2) in zip(type1, type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end

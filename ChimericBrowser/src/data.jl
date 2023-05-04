@@ -11,7 +11,7 @@ Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAna
     f["interactions"]
 end
 
-function load_data(results_path::String, genome_file::String, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64)
+function load_data(results_path::String, genome_file::String, min_reads::Int, max_fisher_fdr::Float64, max_bp_fdr::Float64)
     interactions_path = realpath(joinpath(results_path, "jld"))
     interactions_files = [joinpath(interactions_path, fname) for fname in readdir(interactions_path) if endswith(fname, ".jld2")]
     interactions = Dict(basename(fname)[1:end-5]=>Interactions(fname) for fname in interactions_files)
@@ -24,7 +24,7 @@ function load_data(results_path::String, genome_file::String, min_reads::Int, ma
         end
     end
     for interact in values(interactions)
-        filter!(row -> (row.nb_ints >= min_reads) & (row.fdr <= max_fdr) & (isnan(row.pred_fdr) || (row.pred_fdr .<= max_bp_fdr)), interact.edges)
+        filter!(row -> (row.nb_ints >= min_reads) & (row.fisher_fdr <= max_fisher_fdr) & (isnan(row.bp_fdr) || (row.bp_fdr .<= max_bp_fdr)), interact.edges)
         interact.edges[!, :meanlen1] = Int.(round.(interact.edges[!, :meanlen1]))
         interact.edges[!, :meanlen2] = Int.(round.(interact.edges[!, :meanlen2]))
         interact.edges[!, :nms1] = round.(interact.edges[!, :nms1], digits=4)
@@ -42,7 +42,7 @@ end
 
 nthindex(a::BitVector, n::Int) = sum(a)>n ? findall(a)[n] : findlast(a)
 function filtered_dfview(interactions::Interactions, search_strings::Vector{String}, type_strings::Vector{String}, min_reads::Int,
-                            max_interactions::Int, max_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool, exclusive::Bool)
+                            max_interactions::Int, max_fisher_fdr::Union{Float64,Int}, max_bp_fdr::Union{Float64,Int}, ligation::Bool, exclusive::Bool)
     filtered_index = falses(nrow(interactions.edges))
     first_below_min_reads = findfirst(x->x<min_reads, interactions.edges.nb_ints)
     min_reads_range = 1:(isnothing(first_below_min_reads) ? nrow(interactions.edges) : first_below_min_reads-1)
@@ -72,10 +72,10 @@ function filtered_dfview(interactions::Interactions, search_strings::Vector{Stri
     end
     search_string_index .&= type_string_index
     search_string_index .&= (
-        (interactions.edges.fdr[min_reads_range] .<= max_fdr) .&
+        (interactions.edges.fisher_fdr[min_reads_range] .<= max_fisher_fdr) .&
         (
-            (interactions.edges.pred_fdr[min_reads_range] .<= max_bp_fdr) .|
-            (ligation ? isnan.(interactions.edges.pred_fdr[min_reads_range]) : falses(length(min_reads_range)))
+            (interactions.edges.bp_fdr[min_reads_range] .<= max_bp_fdr) .|
+            (ligation ? isnan.(interactions.edges.bp_fdr[min_reads_range]) : falses(length(min_reads_range)))
         )
     )
     n = nthindex(search_string_index, max_interactions)
@@ -131,7 +131,7 @@ node_index(df::SubDataFrame, node_id::Int) = (df.src .=== node_id) .| (df.dst .=
 node_sum(df::SubDataFrame, node_id::Int) = sum(df.nb_ints[node_index(df, node_id)])
 function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int)
     counts = Dict{Int, Float64}()
-    isnegative = interact.nodes.strand[node_id] == '-' 
+    isnegative = interact.nodes.strand[node_id] == '-'
     for partner in df[df.src .== node_id, :dst]
         ligation_points = interact.edgestats[(node_id, partner)][3]
         for (p, c) in ligation_points
@@ -150,7 +150,7 @@ function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Inte
 end
 function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int)
     counts = Dict{Int, Float64}()
-    isnegative = interact.nodes.strand[node_id] == '-' 
+    isnegative = interact.nodes.strand[node_id] == '-'
     for partner in df[df.dst .== node_id, :src]
         ligation_points = interact.edgestats[(partner, node_id)][3]
         for (p, c) in ligation_points
@@ -226,14 +226,14 @@ function circos_data(df::SubDataFrame, interact::Interactions; min_thickness=100
 end
 
 function table_data(df::SubDataFrame, interact::Interactions)
-    reduced_df = df[:, ["nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]]
+    reduced_df = df[:, ["nb_ints", "fisher_fdr", "odds_ratio", "bp_fdr", "in_libs"]]
     reduced_df[:, :name1] = interact.nodes[df[!,:src], :name]
     reduced_df[:, :name2] = interact.nodes[df[!,:dst], :name]
     reduced_df[:, :type1] = interact.nodes[df[!,:src], :type]
     reduced_df[:, :type2] = interact.nodes[df[!,:dst], :type]
-    replace!(reduced_df.pred_fdr, NaN => -1.0)
-    reduced_df.fdr = floor.(reduced_df.fdr; sigdigits=5)
-    reduced_df.pred_fdr = floor.(reduced_df.pred_fdr; sigdigits=5)
+    replace!(reduced_df.bp_fdr, NaN => -1.0)
+    reduced_df.fisher_fdr = floor.(reduced_df.fisher_fdr; sigdigits=5)
+    reduced_df.bp_fdr = floor.(reduced_df.bp_fdr; sigdigits=5)
     reduced_df.odds_ratio = floor.(reduced_df.odds_ratio; sigdigits=5)
     Dict.(pairs.(eachrow(reduced_df)))
 end

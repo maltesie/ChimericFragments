@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.0-rc2"
+julia_version = "1.9.0-rc3"
 manifest_format = "2.0"
 project_hash = "8e814ad1f0803f44cf5e0a69c92985ab4f91e994"
 
@@ -175,9 +175,9 @@ version = "1.9.1"
 
 [[deps.Distributions]]
 deps = ["FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
-git-tree-sha1 = "13027f188d26206b9e7b863036f87d2f2e7d013a"
+git-tree-sha1 = "180538ef4e3aa02b01413055a7a9e8b6047663e1"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.87"
+version = "0.25.88"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -212,9 +212,9 @@ version = "1.3.0"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
-git-tree-sha1 = "7be5f99f7d15578798f338f5433b6c432ea8037b"
+git-tree-sha1 = "299dc33549f68299137e51e6d49a13b5b1da9673"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.16.0"
+version = "1.16.1"
 
 [[deps.FilePathsBase]]
 deps = ["Compat", "Dates", "Mmap", "Printf", "Test", "UUIDs"]
@@ -249,9 +249,9 @@ version = "0.2.2"
 
 [[deps.GLM]]
 deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
-git-tree-sha1 = "cd3e314957dc11c4c905d54d1f5a65c979e4748a"
+git-tree-sha1 = "97829cfda0df99ddaeaafb5b370d6cab87b7013e"
 uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
-version = "1.8.2"
+version = "1.8.3"
 
 [[deps.GenomicFeatures]]
 deps = ["BioGenerics", "DataStructures", "IntervalTrees"]
@@ -267,9 +267,9 @@ version = "0.3.15"
 
 [[deps.HypothesisTests]]
 deps = ["Combinatorics", "Distributions", "LinearAlgebra", "Random", "Rmath", "Roots", "Statistics", "StatsBase"]
-git-tree-sha1 = "ae3b6964d58df11984d22644ce5546eaf20fe95d"
+git-tree-sha1 = "3eaee0f574ae7918e0529ed37a2652c6c17d4948"
 uuid = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
-version = "0.10.11"
+version = "0.10.12"
 
 [[deps.Indexes]]
 deps = ["BGZFStreams", "BioGenerics", "GenomicFeatures", "TranscodingStreams"]
@@ -488,9 +488,9 @@ version = "1.3.0"
 
 [[deps.PrettyTables]]
 deps = ["Crayons", "Formatting", "LaTeXStrings", "Markdown", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "548793c7859e28ef026dba514752275ee871169f"
+git-tree-sha1 = "213579618ec1f42dea7dd637a42785a608b1ea9c"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "2.2.3"
+version = "2.2.4"
 
 [[deps.Printf]]
 deps = ["Unicode"]
@@ -543,9 +543,9 @@ version = "0.4.0+0"
 
 [[deps.Roots]]
 deps = ["ChainRulesCore", "CommonSolve", "Printf", "Setfield"]
-git-tree-sha1 = "82362f2a4f756951f21ebb3ac2aed094c46a5109"
+git-tree-sha1 = "e19c09f5cc868785766f86435ba40576cf751257"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.0.12"
+version = "2.0.14"
 
     [deps.Roots.extensions]
     RootsForwardDiffExt = "ForwardDiff"
@@ -638,9 +638,9 @@ version = "1.6.0"
 
 [[deps.StatsBase]]
 deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
-git-tree-sha1 = "9e07a3a1e7373f389c87f8fdb932667cebbfbe23"
+git-tree-sha1 = "d1bf48bfcc554a3761a133fe3a9bb01488e06916"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.33.22"
+version = "0.33.21"
 
 [[deps.StatsFuns]]
 deps = ["HypergeometricFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
@@ -658,9 +658,9 @@ version = "1.3.0"
 
 [[deps.StatsModels]]
 deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsBase", "StatsFuns", "Tables"]
-git-tree-sha1 = "51cdf1afd9d78552e7a08536930d7abc3b288a5c"
+git-tree-sha1 = "8cc7a5385ecaa420f0b3426f9b0135d0df0638ed"
 uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
-version = "0.7.1"
+version = "0.7.2"
 
 [[deps.StringEncodings]]
 deps = ["Libiconv_jll"]
@@ -715,9 +715,9 @@ uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "0b829474fed270a4b0ab07117dce9b9a2fa7581a"
+git-tree-sha1 = "9a6ae7ed916312b41236fcef7e0af564ef934769"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.12"
+version = "0.9.13"
 
 [[deps.Twiddle]]
 git-tree-sha1 = "29509c4862bfb5da9e76eb6937125ab93986270a"
@@ -768,7 +768,7 @@ version = "1.2.13+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.4.0+0"
+version = "5.7.0+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
