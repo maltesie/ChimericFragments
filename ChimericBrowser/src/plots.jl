@@ -71,34 +71,22 @@ function odds_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
     plot([h1, h2]), plot([h3, h4])
 end
 
-function countdata(data::Vector{Int})
-    counts = zeros(Int, maximum(data; init=1))
-    for d in data[data .> 0]
-        counts[d] += 1
-    end
-    counts
-end
-
-function degreecounts(interact::Interactions; index=trues(nrow(interact.edges)))
-    src, dst = interact.edges.src[index], interact.edges.dst[index]
-    degs = [length(union!(Set(dst[src .== i]), Set(src[dst .== i]))) for i in 1:nrow(interact.nodes)]
-    countdata(degs)
-end
-
 function degrees(interact::Interactions; index=trues(nrow(interact.edges)))
     src, dst = interact.edges.src[index], interact.edges.dst[index]
-    [length(union!(Set(dst[src .== i]), Set(src[dst .== i]))) for i in 1:nrow(interact.nodes)]
+    [length(union!(Set(dst[src .== i]), Set(src[dst .== i]))) for i in unique(vcat(src, dst))]
 end
 
 function degree_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
 
     sigfish_index = interact.edges.fisher_fdr .<= plotting_fdr_level
-    degs = log.(degrees(interact; index=sigfish_index) .+ 1)
-    h2 = histogram(x=degs, name="fdr <= $plotting_fdr_level")
+    degs = counter(degrees(interact; index=sigfish_index))
+    h2 = scatter(x=log.(collect(keys(degs))), y=log.(collect(values(degs)./sum(values(degs)))),
+        name="fisher fdr <= $plotting_fdr_level", mode="markers")
 
     sigpred_index = interact.edges.bp_fdr .<= plotting_fdr_level
-    degs = log.(degrees(interact; index=sigpred_index) .+ 1)
-    h4 = histogram(x=degs, name="fdr <= $plotting_fdr_level")
+    degs = counter(degrees(interact; index=sigpred_index))
+    h4 = scatter(x=log.(collect(keys(degs))), y=log.(collect(values(degs)./sum(values(degs)))),
+        name="bp fdr <= $plotting_fdr_level", mode="markers")
 
     plot(h2), plot(h4)
 end
@@ -155,7 +143,7 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
+function basepairing_string(n1::String, n2::String, aln::PairwiseAlignment, offset1::Int, offset2::Int)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
@@ -168,9 +156,9 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     refbuf = IOBuffer()
     matbuf = IOBuffer()
 
-    print(seqbuf, "RNA1:", lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
-    print(refbuf, "RNA2:", lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
-    print(matbuf, " "^(posw + 6))
+    print(seqbuf, lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
+    print(refbuf, lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
+    print(matbuf, " "^(posw + 1))
 
     next_xy = iterate(aln)
     while next_xy !== nothing
@@ -195,12 +183,13 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
     print(matbuf)
 
-    String(take!(seqbuf)) * "<br>" * String(take!(matbuf)) * "<br>" * String(take!(refbuf))
+    n1 * "<br>" * String(take!(seqbuf)) * "<br>" * String(take!(matbuf)) * "<br>" * String(take!(refbuf)) * "<br>" * n2
 end
-function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions, genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions,
+        genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
 
-    ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:ref, :strand, :left, :right, :cds]]
-    ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:ref, :strand, :left, :right, :cds]]
+    n1::String, ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:name, :ref, :strand, :left, :right, :cds]]
+    n2::String, ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:name, :ref, :strand, :left, :right, :cds]]
 
     s1 = strand1=='+' ?
         genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
@@ -209,7 +198,7 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
         BioSequences.complement(genome[ref2][(p2-check_interaction_distances[1]):(p2-check_interaction_distances[2])]) :
         BioSequences.reverse(genome[ref2][(p2+check_interaction_distances[2]):(p2+check_interaction_distances[1])])
     p = pairalign(LocalAlignment(), s1, s2, model)
-    basepairing_string(alignment(p),
+    basepairing_string(n1, n2, alignment(p),
         (strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1]))),
         (strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
 end
