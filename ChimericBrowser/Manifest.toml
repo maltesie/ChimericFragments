@@ -2,7 +2,7 @@
 
 julia_version = "1.9.0-rc3"
 manifest_format = "2.0"
-project_hash = "35ad5d43d06567dcd9e9344d012fd7b81b542c83"
+project_hash = "46c998f06079e67cf93ee5ca9404130a28c5a179"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
@@ -662,9 +662,9 @@ version = "1.4.2"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
-git-tree-sha1 = "0c265aa64283740b9b885348ee52463084de0748"
+git-tree-sha1 = "259e206946c293698122f63e2b513a7c99a244e8"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
-version = "1.0.3"
+version = "1.1.1"
 
 [[deps.Preferences]]
 deps = ["TOML"]

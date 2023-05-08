@@ -47,4 +47,4 @@ bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_
 @info "Initializing visualization for datasets $(join(unique(v[2] for v in samplename_condition), ", "))."
 
 chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fisher_fdr, max_bp_fdr,
-    address, port, bp_distance, param_dict, bp_parameters, n_genome_samples, bp_shift_weight)
+    address, port, bp_interval, param_dict, bp_parameters, n_genome_samples, bp_shift_weight)

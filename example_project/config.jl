@@ -171,7 +171,7 @@ fisher_exact_tail="both"
 # corresponds to the direction that is cut off by the ligation (downstream for RNA1, upstream for RNA2) and
 # should be negative to increase the distance. (45,-10) spans a region of 55 nucleotides around the ligation
 # point.
-bp_distance=(30,0)
+bp_interval=(30,0)
 bp_shift_weight=1.0
 
 # Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
