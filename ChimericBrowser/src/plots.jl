@@ -143,7 +143,7 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function basepairing_string(n1::String, n2::String, aln::PairwiseAlignment, offset1::Int, offset2::Int)
+function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
@@ -183,7 +183,11 @@ function basepairing_string(n1::String, n2::String, aln::PairwiseAlignment, offs
     print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
     print(matbuf)
 
-    n1 * "<br>" * String(take!(seqbuf)) * "<br>" * String(take!(matbuf)) * "<br>" * String(take!(refbuf)) * "<br>" * n2
+    seqs = String(take!(seqbuf))
+    mats = String(take!(matbuf))
+    refs = String(take!(refbuf))
+
+    seqs  * "<br>" * mats  * "<br>" * refs, max(length(seqs), length(mats), length(refs))
 end
 function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions,
         genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
@@ -198,7 +202,8 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
         BioSequences.complement(genome[ref2][(p2-check_interaction_distances[1]):(p2-check_interaction_distances[2])]) :
         BioSequences.reverse(genome[ref2][(p2+check_interaction_distances[2]):(p2+check_interaction_distances[1])])
     p = pairalign(LocalAlignment(), s1, s2, model)
-    basepairing_string(n1, n2, alignment(p),
+    html_bp_string, maxlen = basepairing_string(alignment(p),
         (strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1]))),
         (strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
+
 end
