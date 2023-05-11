@@ -143,11 +143,11 @@ alnchar(x::DNA, y::DNA) =
     else
         ' '
     end
-function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
+function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offset1::Int, offset2::Int, al1::Int, ar1::Int, al2::Int, ar2::Int)
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
-    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos))) + 2
+    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos), al1, ar1)) + 2
 
     i = 0
     seqpos = offset1 + anchors[1].seqpos
@@ -156,9 +156,9 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     refbuf = IOBuffer()
     matbuf = IOBuffer()
 
-    print(seqbuf, lpad(seqpos>0 ? "+$seqpos" : "$(seqpos-1)", posw), ' ')
-    print(refbuf, lpad(refpos>0 ? "+$refpos" : "$(refpos-1)", posw), ' ')
-    print(matbuf, " "^(posw + 1))
+    print(seqbuf, seqpos>0 ? "+$seqpos " : "$(seqpos-1) ")
+    print(refbuf, refpos>0 ? "+$refpos " : "$(refpos-1) ")
+    print(matbuf, " "^posw)
 
     next_xy = iterate(aln)
     while next_xy !== nothing
@@ -178,7 +178,6 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
         print(matbuf, alnchar(x, y))
     end
 
-
     print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
     print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
     print(matbuf)
@@ -187,13 +186,27 @@ function basepairing_string(aln::PairwiseAlignment, offset1::Int, offset2::Int)
     mats = String(take!(matbuf))
     refs = String(take!(refbuf))
 
-    seqs  * "<br>" * mats  * "<br>" * refs, max(length(seqs), length(mats), length(refs))
+    noffset = Int(floor(length(mats)/2))
+    n1pads = noffset-Int(floor(length(n1)))
+    n2pads = noffset-Int(floor(length(n2)))
+
+
+    "$al1" * rpad(lpad(n1, n1pads), length(mats)) * "$ar1" *
+        "<br>" * seqs * "<br>" * mats  * "<br>" * refs * "<br>" *
+        "$al2" * rpad(lpad(n2, n2pads), length(mats)) * "$ar2"
 end
 function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions,
         genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
 
     n1::String, ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:name, :ref, :strand, :left, :right, :cds]]
     n2::String, ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:name, :ref, :strand, :left, :right, :cds]]
+
+    _, al1, ar1, al2, ar2, _ = interact.bpstats[(p1,p2)]
+
+    al1 = strand1=='+' ? p1-check_interaction_distances[1]+al1 : p1+check_interaction_distances[1]-al1
+    ar1 = strand1=='+' ? p1-check_interaction_distances[1]+ar1 : p1+check_interaction_distances[1]-ar1
+    al2 = strand1=='-' ? p2-check_interaction_distances[1]+al2 : p2+check_interaction_distances[1]-al2
+    ar2 = strand1=='-' ? p2-check_interaction_distances[1]+ar2 : p2+check_interaction_distances[1]-ar2
 
     s1 = strand1=='+' ?
         genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
@@ -202,8 +215,9 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
         BioSequences.complement(genome[ref2][(p2-check_interaction_distances[1]):(p2-check_interaction_distances[2])]) :
         BioSequences.reverse(genome[ref2][(p2+check_interaction_distances[2]):(p2+check_interaction_distances[1])])
     p = pairalign(LocalAlignment(), s1, s2, model)
-    html_bp_string, maxlen = basepairing_string(alignment(p),
-        (strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1]))),
-        (strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2))))
 
+    basepairing_string(alignment(p), n1, n2,
+        strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1])),
+        strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2)),
+        al1, ar1, al2, ar2)
 end
