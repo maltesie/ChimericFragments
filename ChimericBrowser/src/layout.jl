@@ -72,7 +72,7 @@ reads_selection_layout(min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = 
                 html_div(
                     style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
                     children=[
-                        html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        html_p(id="max-bp-fdr-text", children=["max. combined bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
                         dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                     ]
                 )

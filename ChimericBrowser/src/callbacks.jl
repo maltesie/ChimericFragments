@@ -26,9 +26,10 @@ callback!(app, update_selection_outputs, update_selection_inputs, update_selecti
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     my_type_strings = isnothing(type_strings) || all(isempty.(type_strings)) ? String[] : string.(type_strings)
     any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
-    df = filtered_dfview(interactions[dataset], my_search_strings, my_type_strings, min_reads, max_interactions, max_fdr, max_bp_fdr, "ligation" in ligation, "exclusive" in exclusive)
+    df = filtered_dfview(interactions[dataset], my_search_strings, my_type_strings, min_reads, max_interactions, Float64(max_fdr),
+        Float64(max_bp_fdr), "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df, interactions[dataset])
-    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value, bp_len)
+    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value, bp_len, Float64(max_bp_fdr))
     circos_output = circos_data(df, interactions[dataset])
     summary_output = summary_statistics(df, interactions[dataset], param_dict)
     return table_output, cytoscape_output, circos_output, summary_output, tab_value
@@ -103,12 +104,12 @@ function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
     ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
     return plot([
             begin
-                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
+                ligationpoints = [parse(Int, String(k))=>v for ((k,v), _) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
-                positions, counts = Int[t[1] for t in kv], Float64[t[2] for t in kv]
-
+                positions, counts = Int[t[1] for t in kv], Int[t[2] for t in kv]
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
-                scatter(x = positions, y = counts, fill="tozeroy", name = legend)
+                hover_texts = ["$(cdsframestring(p, idx, interact)) ($p)<br>count: $c" for (p,c) in zip(positions, counts)]
+                scatter(x = positions, y = counts, fill="tozeroy", name = legend, text=hover_texts, hoverinfo="text")
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],

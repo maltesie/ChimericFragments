@@ -147,18 +147,22 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
-    posw = ndigits(max(abs(offset1 + anchors[end].seqpos), abs(offset2 - anchors[1].refpos), al1, ar1)) + 2
+    posw = max(ndigits(offset1 + anchors[end].seqpos)+1, ndigits(offset2 - anchors[1].refpos)+1, ndigits(al1), ndigits(ar1)) + 1
 
     i = 0
     seqpos = offset1 + anchors[1].seqpos
     refpos = offset2 - anchors[1].refpos + 2
     seqbuf = IOBuffer()
     refbuf = IOBuffer()
+    head1buf = IOBuffer()
+    head2buf = IOBuffer()
     matbuf = IOBuffer()
 
-    print(seqbuf, seqpos>0 ? "+$seqpos " : "$(seqpos-1) ")
-    print(refbuf, refpos>0 ? "+$refpos " : "$(refpos-1) ")
-    print(matbuf, " "^posw)
+    print(seqbuf, lpad(seqpos>0 ? "+$seqpos " : "$(seqpos-1) ", posw))
+    print(refbuf, lpad(refpos>0 ? "+$refpos " : "$(refpos-1) ", posw))
+    print(head1buf, lpad("$al1 ", posw))
+    print(head2buf, lpad("$al2 ", posw))
+    #print(matbuf, " "^posw)
 
     next_xy = iterate(aln)
     while next_xy !== nothing
@@ -180,20 +184,20 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
 
     print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
     print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
-    print(matbuf)
 
     seqs = String(take!(seqbuf))
     mats = String(take!(matbuf))
     refs = String(take!(refbuf))
 
     noffset = Int(floor(length(mats)/2))
-    n1pads = noffset-Int(floor(length(n1)))
-    n2pads = noffset-Int(floor(length(n2)))
+    print(head1buf, rpad(lpad(n1, length(n1)+noffset-Int(floor(length(n1)/2))), length(mats)))
+    print(head2buf, rpad(lpad(n2, length(n2)+noffset-Int(floor(length(n2)/2))), length(mats)))
+    print(head1buf, " $ar1")
+    print(head2buf, " $ar2")
+    head1s = String(take!(head1buf))
+    head2s = String(take!(head2buf))
 
-
-    "$al1" * rpad(lpad(n1, n1pads), length(mats)) * "$ar1" *
-        "<br>" * seqs * "<br>" * mats  * "<br>" * refs * "<br>" *
-        "$al2" * rpad(lpad(n2, n2pads), length(mats)) * "$ar2"
+    head1s * "<br>" * seqs * "<br>" * lpad(mats, length(mats) + posw)  * "<br>" * refs * "<br>" * head2s
 end
 function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Interactions,
         genome::Dict{String, BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
