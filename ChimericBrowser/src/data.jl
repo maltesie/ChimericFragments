@@ -136,7 +136,7 @@ function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Inte
     for partner in df[df.src .== node_id, :dst]
         ligation_points = interact.edgestats[(node_id, partner)][3]
         length(ligation_points) > 0 || continue
-        n = interact.nodes.name[node_id]
+        n = interact.nodes.name[partner]
         fdr = adjust(PValues([interact.bpstats[p][1] for p in keys(ligation_points)]), BenjaminiHochberg())
         for ((p, c), f) in zip(ligation_points, fdr)
             f < max_fdr || continue
@@ -152,7 +152,7 @@ function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Inte
             end
         end
     end
-    return counts, partners
+    return Dict("counts"=>counts, "partners"=>partners)
 end
 function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int, max_fdr::Float64)
     counts = Dict{Int, Float64}()
@@ -161,7 +161,7 @@ function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Inte
     for partner in df[df.dst .== node_id, :src]
         ligation_points = interact.edgestats[(partner, node_id)][3]
         length(ligation_points) > 0 || continue
-        n = interact.nodes.name[node_id]
+        n = interact.nodes.name[partner]
         fdr = adjust(PValues([interact.bpstats[p][1] for p in keys(ligation_points)]), BenjaminiHochberg())
         for ((p, c), f) in zip(ligation_points, fdr)
             f < max_fdr || continue
@@ -178,7 +178,7 @@ function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Inte
             end
         end
     end
-    return counts, partners
+    return Dict("counts"=>counts, "partners"=>partners)
 end
 function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_value::String, bp_len::Int, max_fdr::Float64)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])

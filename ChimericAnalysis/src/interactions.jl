@@ -270,11 +270,11 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
             end
             pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-            edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : 1.0
+            edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : NaN
         end
     end
 
-    nan_index = (!).(isnan.(interactions.edges.bp_pvalue))
+    nan_index = .!isnan.(interactions.edges.bp_pvalue)
     interactions.edges.bp_fdr[nan_index] = adjust(PValues(interactions.edges.bp_pvalue[nan_index]), BenjaminiHochberg())
     return interactions
 end

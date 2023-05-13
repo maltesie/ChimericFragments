@@ -98,17 +98,20 @@ end
 function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
     idx = parse(Int, node_data["id"])
     name = interact.nodes.name[idx]
-    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key]) for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
-    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key]) for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key]["counts"]) 
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key]["counts"])>0)
+    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key]["counts"]) 
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key]["counts"])>0)
     tickpos = [minpos, maxpos]
     ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
     return plot([
             begin
-                ligationpoints = [parse(Int, String(k))=>v for ((k,v), _) in node_data[select_key]]
+                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]["counts"]]
                 kv = sort(ligationpoints, by=x->x[1])
                 positions, counts = Int[t[1] for t in kv], Int[t[2] for t in kv]
+                partners = [join(["$n: $c" for (n, c) in sort(node_data[select_key]["partners"][p], by=x->parse(Int, x[2]), rev=true)], ", ") for p in positions]
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
-                hover_texts = ["$(cdsframestring(p, idx, interact)) ($p)<br>count: $c" for (p,c) in zip(positions, counts)]
+                hover_texts = ["$(cdsframestring(p, idx, interact)) ($p)<br>total count: $c<br>$t" for (p, c, t) in zip(positions, counts, partners)]
                 scatter(x = positions, y = counts, fill="tozeroy", name = legend, text=hover_texts, hoverinfo="text")
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
