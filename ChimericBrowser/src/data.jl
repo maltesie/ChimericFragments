@@ -130,8 +130,7 @@ end
 node_index(df::SubDataFrame, node_id::Int) = (df.src .=== node_id) .| (df.dst .=== node_id)
 node_sum(df::SubDataFrame, node_id::Int) = sum(df.nb_ints[node_index(df, node_id)])
 function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int, max_fdr::Float64)
-    counts = Dict{Int, Float64}()
-    partners = Dict{Int, Vector{Tuple{String,Int}}}()
+    counts = Dict{Int, Dict{String,Int}}()
     isnegative = interact.nodes.strand[node_id] == '-'
     for partner in df[df.src .== node_id, :dst]
         ligation_points = interact.edgestats[(node_id, partner)][3]
@@ -143,20 +142,17 @@ function count_ligation_sites_as1(df::SubDataFrame, node_id::Int, interact::Inte
             for pl in interact.bpstats[p][2]:interact.bpstats[p][3]
                 p1 = p[1] + (isnegative ? 1 : -1) * (bp_len - pl)
                 if p1 in keys(counts)
-                    counts[p1] += c
-                    push!(partners[p1], (n, c))
+                    n in keys(counts[p1]) ? counts[p1][n] += c : counts[p1][n] = c
                 else
-                    counts[p1] = c
-                    partners[p1] = [(n, c)]
+                    counts[p1] = Dict(n=>c)
                 end
             end
         end
     end
-    return Dict("counts"=>counts, "partners"=>partners)
+    return counts
 end
 function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Interactions, bp_len::Int, max_fdr::Float64)
-    counts = Dict{Int, Float64}()
-    partners = Dict{Int, Vector{Tuple{String,Int}}}()
+    counts = Dict{Int, Dict{String,Int}}()
     isnegative = interact.nodes.strand[node_id] == '-'
     for partner in df[df.dst .== node_id, :src]
         ligation_points = interact.edgestats[(partner, node_id)][3]
@@ -168,17 +164,15 @@ function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Inte
             for pl in interact.bpstats[p][4]:interact.bpstats[p][5]
                 p2 = p[2] + (isnegative ? -1 : 1) * (bp_len - pl)
                 if p2 in keys(counts)
-                    counts[p2] += c
-                    push!(partners[p2], (n, c))
+                    n in keys(counts[p2]) ? counts[p2][n] += c : counts[p2][n] = c
                 else
-                    counts[p2] = c
-                    partners[p2] = [(n, c)]
+                    counts[p2] = Dict(n=>c)
                 end
 
             end
         end
     end
-    return Dict("counts"=>counts, "partners"=>partners)
+    return counts
 end
 function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_value::String, bp_len::Int, max_fdr::Float64)
     isempty(df) && return Dict("edges"=>Dict{String,Any}[], "nodes"=>Dict{String,Any}[])

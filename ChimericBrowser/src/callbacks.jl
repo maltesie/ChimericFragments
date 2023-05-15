@@ -95,28 +95,35 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
             xaxis=attr(title="RNA2: $name2", tickmode="array", tickvals=tickpos2, ticktext=ticks2)))
 end
 
+function nested_join(s::Vector{String}, n::Int, max_len::Int, it_minor::String, it_major::String)
+    mys = length(s) > max_len ? [s[1:min(length(s), max_len)]..., "..."] : s
+    join([join(mys[((i-1)*n+1):min((i*n), length(mys))], it_minor) for i in 1:(1+div(length(mys), n))], it_major)
+end
 function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
     idx = parse(Int, node_data["id"])
     name = interact.nodes.name[idx]
-    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key]["counts"]) 
-        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key]["counts"])>0)
-    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key]["counts"]) 
-        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key]["counts"])>0)
+    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key])
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key])
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
     tickpos = [minpos, maxpos]
     ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
     return plot([
             begin
-                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]["counts"]]
+                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
-                positions, counts = Int[t[1] for t in kv], Int[t[2] for t in kv]
-                partners = [join(["$n: $c" for (n, c) in sort(node_data[select_key]["partners"][p], by=x->parse(Int, x[2]), rev=true)], ", ") for p in positions]
+                positions, counts = Int[t[1] for t in kv], Int[sum(values(t[2])) for t in kv]
+                nb_binding = Int[length(t[2]) for t in kv]
+                partners = [nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
+                    by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") for p in positions]
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
-                hover_texts = ["$(cdsframestring(p, idx, interact)) ($p)<br>total count: $c<br>$t" for (p, c, t) in zip(positions, counts, partners)]
+                hover_texts = ["position: $(cdsframestring(p, idx, interact)) ($p)<br># of partners here: $b<br>total reads count: $c<br>$t"
+                    for (p, c, t, b) in zip(positions, counts, partners, nb_binding)]
                 scatter(x = positions, y = counts, fill="tozeroy", name = legend, text=hover_texts, hoverinfo="text")
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],
-        Layout(title = "$name ($(node_data["nb_partners"]) partners)", xaxis_title = "position", yaxis_title = "count",
+        Layout(title = "$name on $(interact.nodes.ref[idx]) ($(interact.nodes.strand[idx]))", xaxis_title = "position", yaxis_title = "count",
             xaxis=attr(tickmode="array", tickvals=tickpos, ticktext=ticktext), showlegend=false)
     )
 end
@@ -207,6 +214,33 @@ callback!(app, click_add_node_outputs, click_add_node_inputs, click_add_node_sta
         my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
         node_data[1]["name"] in my_search_strings && throw(PreventUpdate())
         return push!(my_search_strings, node_data[1]["name"])
+    else
+        throw(PreventUpdate())
+    end
+end
+
+const click_clipboard_inputs = [
+    Input("plotly-graph", "clickData")
+]
+const click_clipboard_outputs = [
+    Output("clip-text", "children"),
+    Output("clip", "content"),
+]
+const click_clipboard_states = [
+    State("graph", "selectedNodeData"),
+    State("graph", "selectedEdgeData"),
+]
+click_clipboard_callback!(app::Dash.DashApp) =
+callback!(app, click_clipboard_outputs, click_clipboard_inputs, click_clipboard_states; prevent_initial_call=true) do click_data, node_data, edge_data
+    if !isnothing(click_data) && !isempty(click_data)
+        if !isnothing(node_data) && !isempty(node_data)
+            p = click_data["points"][1]["x"]
+            select_key = click_data["points"][1]["curveNumber"] == 0 ? "lig_as_rna1" : "lig_as_rna2"
+            partners = join(["$n: $c" for (n,c) in sort(collect(node_data[1][select_key][p]), by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], ", ")
+            "<- copy list of partners at position $p", "$partners"#"$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))"
+        elseif !isnothing(edge_data) && !isempty(edge_data)
+            "<- copy selected basepairing prediction", "$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))"
+        end
     else
         throw(PreventUpdate())
     end
