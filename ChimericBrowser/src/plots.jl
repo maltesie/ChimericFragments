@@ -18,7 +18,7 @@ function bp_score_dist_plot(interact::Interactions, genome_model_ecdf::ECDF, ran
     p_random = scatter(x=1:max_score, y=randseq_model_pdf, fill="tozeroy", name="random")
     p_random_genome = scatter(x=1:max_score, y=genome_model_pdf, fill="tozeroy", name="random, from genome")
     p_interact = scatter(x=1:max_score, y=interact_pdf, fill="tozeroy", name="around ligation points")
-    p = plot([p_random, p_random_genome, p_interact], Layout(title="basepairing predictions score distribution"))
+    p = plot([p_random, p_random_genome, p_interact], Layout(yaxis_title="empirical density", xaxis_title="basepairing predictions score distribution"))
 
     ymax = max(maximum(randseq_model_pdf), maximum(genome_model_pdf), maximum(interact_pdf))
     fdr_p_index = findfirst(x->x[2][1]<=plot_fdr_level, si_fdr)
