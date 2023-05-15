@@ -149,7 +149,15 @@ annotation_control_layout(function_categories::Vector{Dict{String,String}}) = ht
 info_area_layout() = html_div(
     id="plots-block",
     children=[
-        dcc_graph(id="plotly-graph")
+        dcc_graph(id="plotly-graph"),
+        html_div(
+            className="horizontal",
+            children=[
+                html_p(id="clip-text", "click a point in the graph to copy to clipboard ->"),
+                dcc_clipboard(id="clip")
+            ]
+        )
+        
     ]
 )
 
