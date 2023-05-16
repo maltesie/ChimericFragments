@@ -3,7 +3,9 @@ const update_selection_outputs = [
     Output("graph", "elements"),
     Output("my-dashbio-circos", "tracks"),
     Output("summary-container", "children"),
-    Output("data-tabs", "value")
+    Output("data-tabs", "value"),
+    Output("graph", "selectedNodeData"),
+    Output("graph", "selectedEdgeData")
 ]
 const update_selection_inputs = [
     Input("min-reads", "value"),
@@ -18,11 +20,13 @@ const update_selection_inputs = [
 ]
 const update_selection_states = [
     State("dropdown-update-dataset", "value"),
-    State("data-tabs", "value")
+    State("data-tabs", "value"),
+    State("graph", "selectedNodeData"),
+    State("graph", "selectedEdgeData")
 ]
 update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, bp_len::Int, param_dict::Vector{Pair{String, String}}) =
 callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads,
-        max_interactions, max_fdr, max_bp_fdr, search_strings, type_strings, layout_value, ligation, exclusive, dataset, tab_value
+        max_interactions, max_fdr, max_bp_fdr, search_strings, type_strings, layout_value, ligation, exclusive, dataset, tab_value, selected_node, selected_edge
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     my_type_strings = isnothing(type_strings) || all(isempty.(type_strings)) ? String[] : string.(type_strings)
     any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
@@ -32,7 +36,7 @@ callback!(app, update_selection_outputs, update_selection_inputs, update_selecti
     cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value, bp_len, Float64(max_bp_fdr))
     circos_output = circos_data(df, interactions[dataset])
     summary_output = summary_statistics(df, interactions[dataset], param_dict)
-    return table_output, cytoscape_output, circos_output, summary_output, tab_value
+    return table_output, cytoscape_output, circos_output, summary_output, tab_value, selected_node, selected_edge
 end
 
 const update_dataset_inputs = [

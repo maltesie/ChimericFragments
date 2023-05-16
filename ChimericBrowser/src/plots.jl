@@ -250,7 +250,8 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
     sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
-    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) for (p1,p2) in zip(points1, points2)]
+    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) * 
+        "<br><br>#of reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2) in zip(points1, points2)]
     colors = adjust(PValues([interact.bpstats[p][1] for p in zip(points1, points2)]), BenjaminiHochberg())
     return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
             colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
@@ -278,6 +279,7 @@ function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
                 ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
                 positions, counts = Int[t[1] for t in kv], Int[sum(values(t[2])) for t in kv]
+                #partner_counts = [length(node_data[select_key][p]) for p in positions]
                 nb_binding = Int[length(t[2]) for t in kv]
                 partners = [nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
                     by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") for p in positions]

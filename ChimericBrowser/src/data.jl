@@ -295,7 +295,7 @@ function summary_statistics(df::SubDataFrame, interactions::Interactions, param_
         children=[
             html_div([
                 html_h3("selection summary:"),
-                html_p("interactions stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
+                html_p("interaction stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
                 pairs_to_table(selection_info),
                 selection_types_table
             ], style=Dict("padding-right"=>"50px")),
@@ -305,7 +305,7 @@ function summary_statistics(df::SubDataFrame, interactions::Interactions, param_
                 html_p("interaction stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
                 pairs_to_table(dataset_info),
                 dataset_types_table,
-                html_p("singles stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
+                html_p("single stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
                 singles_table(types, interactions),
             ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
 
