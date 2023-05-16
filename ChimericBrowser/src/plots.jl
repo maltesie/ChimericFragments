@@ -152,7 +152,7 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
     posw = max(ndigits(offset1 + anchors[end].seqpos)+1, ndigits(offset2 - anchors[1].refpos)+1, ndigits(al1), ndigits(ar1)) + 1
 
     i = 0
-    seqpos = offset1 + anchors[1].seqpos
+    seqpos = offset1 + anchors[1].seqpos + 1
     refpos = offset2 - anchors[1].refpos + 2
     seqbuf = IOBuffer()
     refbuf = IOBuffer()
