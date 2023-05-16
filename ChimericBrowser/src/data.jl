@@ -289,23 +289,25 @@ function summary_statistics(df::SubDataFrame, interactions::Interactions, param_
     selection_info = [
         "total interactions:" => "$(nrow(df))",
         "unique interactions:" => "$(unique_interactions(df))",
+        "total annotations" => "$(nrow(interactions.nodes))",
+        "interacting annotations" => "$(length(unique(vcat(df.src, df.dst))))",
     ]
     html_div(className="horizontal",
         children=[
             html_div([
                 html_h3("selection summary:"),
+                html_p("interactions stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
                 pairs_to_table(selection_info),
-                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
                 selection_types_table
             ], style=Dict("padding-right"=>"50px")),
 
             html_div([
                 html_h3("dataset summary:"),
-                html_p("singles stats:", style=Dict("padding-top"=>"10px")),
-                singles_table(types, interactions),
-                html_p("interaction stats:", style=Dict("padding-top"=>"10px")),
+                html_p("interaction stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
                 pairs_to_table(dataset_info),
-                dataset_types_table
+                dataset_types_table,
+                html_p("singles stats:", style=Dict("padding-top"=>"10px", "font-weight"=>"bold")),
+                singles_table(types, interactions),
             ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
 
             html_div([
