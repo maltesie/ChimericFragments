@@ -239,7 +239,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             html_div(className="plot", children=[dcc_graph(id="plot3")]),
             circos(
                 id="my-dashbio-circos",
-                enableZoomPan=false,
+                enableZoomPan=true,
                 enableDownloadSVG=true,
                 size=350,
                 config = Dict(
