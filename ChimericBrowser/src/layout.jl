@@ -232,7 +232,8 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             dcc_slider(id="fdr-value", min=0.0, max=1.0, step=0.01, value=0.1, tooltip=Dict("placement"=>"bottom", "always_visible"=>true)),
         ], style=Dict("width"=>"100%", "padding-top"=>"20px")),
 
-        html_div(id="circos-container", children=[
+        html_div(id="circos-container", 
+        children=[
             html_div(className="plot", children=[dcc_graph(id="plot1")]),
             html_div(className="plot", children=[dcc_graph(id="plot2")]),
             html_div(className="plot", children=[dcc_graph(id="plot3")]),
