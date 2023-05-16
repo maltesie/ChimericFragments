@@ -5,6 +5,7 @@ struct Interactions
     bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
+    counts::Dict{Symbol,Vector{Int}}
 end
 
 function Interactions()
@@ -14,7 +15,8 @@ function Interactions()
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}()
     bpstats = Dict{Tuple{Int,Int}, Float64}()
     multichimeras = Dict{Vector{Int}, Int}()
-    Interactions(nodes, edges, edgestats, bpstats, multichimeras, Symbol[])
+    counts = Dict{Symbol,Vector{Int}}()
+    Interactions(nodes, edges, edgestats, bpstats, multichimeras, Symbol[], counts)
 end
 
 Interactions(alignments::AlignedReads; replicate_id=:first, min_distance=1000, max_ligation_distance=5, filter_types=[], allow_self_chimeras=false) =
@@ -31,7 +33,10 @@ function Base.empty!(interactions::Interactions)
     empty!(interactions.nodes)
     empty!(interactions.edges)
     empty!(interactions.edgestats)
+    empty!(interactions.bpstats)
+    empty!(interactions.multichimeras)
     empty!(interactions.replicate_ids)
+    empty!(interactions.counts)
 end
 
 """
@@ -149,6 +154,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             end
         end
     end
+
+    interactions.counts[replicate_id] = counts
 
     resize!(interactions.nodes, length(trans))
     nr = (nb_nodes_start+1):length(trans)

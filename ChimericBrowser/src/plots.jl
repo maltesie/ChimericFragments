@@ -50,8 +50,8 @@ function bp_clipping_dist_plots(interact::Interactions, plotting_fdr_level::Floa
     ah3 = histogram(x=l2[bp_index], name="RNA2, left")
     ah4 = histogram(x=r2[bp_index], name="RNA2, right")
 
-    return plot([ah1, ah3, ah2, ah4], Layout(title="alignment clipping for fdr <= $plotting_fdr_level")),
-            plot([h1, h3, h2, h4], Layout(title="alignment clipping for fdr > $plotting_fdr_level"))
+    return plot([ah1, ah3, ah2, ah4], Layout(title="alignment clipping for fdr <= $plotting_fdr_level", xaxis_title="position in alignment", yaxis_title="count")),
+            plot([h1, h3, h2, h4], Layout(title="alignment clipping for fdr > $plotting_fdr_level", xaxis_title="position in alignment", yaxis_title="count"))
 end
 
 function odds_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
@@ -68,7 +68,8 @@ function odds_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
     sigpred_index = interact.edges.bp_fdr[valid_index] .<= plotting_fdr_level
     h4 = histogram(x=logodds[sigpred_index .& infindex], name="fdr <= $plotting_fdr_level")
 
-    plot([h1, h2]), plot([h3, h4])
+    return plot([h1, h2], Layout(title="Odds ratio distribution for fisher exact test", xaxis_title="log odds ratio", yaxis_title="count")),
+            plot([h3, h4], Layout(title="Odds ratio distribution for bp prediction test", xaxis_title="log odds ratio", yaxis_title="count"))
 end
 
 function degrees(interact::Interactions; index=trues(nrow(interact.edges)))
@@ -105,7 +106,8 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
     types_counter ./= sum(types_counter)
-    h1 = heatmap(x=types, y=types, z=copy(types_counter))
+
+    h1 = heatmap(x=types, y=types, z=round.(types_counter, digits=3))
 
     types_counter = zeros(Float64, (length(types), length(types)))
     type1 = interact.nodes.type[interact.edges.src[interact.edges.bp_fdr .<= plotting_fdr_level]]
@@ -114,9 +116,9 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
     types_counter ./= sum(types_counter)
-    h2 = heatmap(x=types, y=types, z=copy(types_counter))
+    h2 = heatmap(x=types, y=types, z=round.(types_counter, digits=3))
 
-    return plot(h1), plot(h2)
+    return Plot(h1), Plot(h2)
 end
 
 function plot_pair(interact::Interactions, t::String, max_fdr::Float64)
@@ -225,3 +227,70 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
         strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2)),
         al1, ar1, al2, ar2)
 end
+
+normalize(value::Int, mi::Int, ma::Int, rev::Bool) = rev ? 1-(value-mi)/(ma-mi) : (value-mi)/(ma-mi)
+mapvalue(value::Float64; to_min=0, to_max=100) = Int(floor(to_min + value * (to_max-to_min)))
+function cdsframestring(p::Int, idx::Int, interact::Interactions)
+    cds, left, right = interact.nodes[idx, [:cds, :left, :right]]
+    tp = interact.nodes.strand[idx] == '-' ? (cds > 0 ? cds : right)-p+1 : p-(cds > 0 ? cds : left)+1
+    tp <= 0 && (tp -= 1)
+    return tp > 0 ? "+$tp" : "$tp"
+end
+
+function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+    src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
+    name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
+    points1, points2 = [first(p) for p in keys(interact.edgestats[(src,dst)][3])], [last(p) for p in keys(interact.edgestats[(src,dst)][3])]
+    tickpos1, tickpos2 = [minimum(points1), maximum(points1)], [minimum(points2), maximum(points2)]
+    ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
+    maxints = maximum(values(interact.edgestats[(src, dst)][3]))
+    sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
+    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) for (p1,p2) in zip(points1, points2)]
+    colors = adjust(PValues([interact.bpstats[p][1] for p in zip(points1, points2)]), BenjaminiHochberg())
+    return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
+            colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
+            text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),
+        Layout(title = "$(edge_data["interactions"]) interactions, $(sum(interact.edgestats[(src,dst)][3][p] for p in zip(points1, points2))) ligation points",
+            yaxis=attr(title="RNA1: $name1", tickmode="array", tickvals=tickpos1, ticktext=ticks1),
+            xaxis=attr(title="RNA2: $name2", tickmode="array", tickvals=tickpos2, ticktext=ticks2)))
+end
+
+function nested_join(s::Vector{String}, n::Int, max_len::Int, it_minor::String, it_major::String)
+    mys = length(s) > max_len ? [s[1:min(length(s), max_len)]..., "..."] : s
+    join([join(mys[((i-1)*n+1):min((i*n), length(mys))], it_minor) for i in 1:(1+div(length(mys), n))], it_major)
+end
+function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
+    idx = parse(Int, node_data["id"])
+    name = interact.nodes.name[idx]
+    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key])
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key])
+        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    tickpos = [minpos, maxpos]
+    ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
+    return plot([
+            begin
+                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
+                kv = sort(ligationpoints, by=x->x[1])
+                positions, counts = Int[t[1] for t in kv], Int[sum(values(t[2])) for t in kv]
+                nb_binding = Int[length(t[2]) for t in kv]
+                partners = [nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
+                    by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") for p in positions]
+                ticks = [cdsframestring(p, idx, interact) for p in tickpos]
+                hover_texts = ["position: $(cdsframestring(p, idx, interact)) ($p)<br># of partners here: $b<br>total reads count: $c<br>$t"
+                    for (p, c, t, b) in zip(positions, counts, partners, nb_binding)]
+                scatter(x = positions, y = counts, fill="tozeroy", name = legend, text=hover_texts, hoverinfo="text")
+            end
+            for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
+        ],
+        Layout(title = "$name on $(interact.nodes.ref[idx]) ($(interact.nodes.strand[idx]))", xaxis_title = "position", yaxis_title = "count",
+            xaxis=attr(tickmode="array", tickvals=tickpos, ticktext=ticktext), showlegend=false)
+    )
+end
+
+const empty_figure = (
+    data = [
+        (x = [], y = [], type = "scatter", name = ""),
+    ],
+    layout = (title = "Please select an edge<br>or a node in the graph.",)
+)

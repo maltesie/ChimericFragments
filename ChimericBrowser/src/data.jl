@@ -5,6 +5,7 @@ struct Interactions
     bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
+    counts::Dict{Symbol,Vector{Int}}
 end
 
 Interactions(filepath::String) = jldopen(filepath,"r"; typemap=Dict("ChimericAnalysis.Interactions" => Interactions)) do f
@@ -258,6 +259,21 @@ function interaction_table(df::Union{DataFrame, SubDataFrame}, interactions::Int
     return table
 end
 
+singles_table(types::Vector{String}, interactions::Interactions) = html_table(
+    vcat(
+        [html_tr([html_td("type"), html_td("annotations"), html_td("reads")])],
+        [html_tr([html_td(t), html_td(sum(interactions.nodes.type .== t)), html_td(sum(interactions.nodes.nb_single[interactions.nodes.type .== t]))]) for t in types]
+    )
+)
+const row_names = ["single:", "unclassified:", "selfchimera:", "excluded:", "chimeria:", "multichimera:"]
+replicate_table(interactions::Interactions) = html_table(
+    vcat(
+        [html_tr(vcat([html_td("")], [html_td(String(s)) for s in interactions.replicate_ids]))],
+        [
+            html_tr(vcat([row_names[i]], [html_td(v) for v in [interactions.counts[replicate_id][i] for replicate_id in interactions.replicate_ids]])) for i in 1:6
+        ]
+    )
+)
 pairs_to_table(dict::Vector{Pair{String, String}}) = html_table([html_tr([html_td(k), html_td(v)]) for (k,v) in dict])
 unique_interactions(df::Union{DataFrame, SubDataFrame}) = length(Set(Set((row.src, row.dst)) for row in eachrow(df)))
 function summary_statistics(df::SubDataFrame, interactions::Interactions, param_dict::Vector{Pair{String, String}})
@@ -285,8 +301,10 @@ function summary_statistics(df::SubDataFrame, interactions::Interactions, param_
 
             html_div([
                 html_h3("dataset summary:"),
+                html_p("singles stats:", style=Dict("padding-top"=>"10px")),
+                singles_table(types, interactions),
+                html_p("interaction stats:", style=Dict("padding-top"=>"10px")),
                 pairs_to_table(dataset_info),
-                html_p("annotation types stats:", style=Dict("padding-top"=>"10px")),
                 dataset_types_table
             ], style=Dict("border-left"=>"1px solid #000", "padding-left"=>"20px", "padding-right"=>"50px")),
 
