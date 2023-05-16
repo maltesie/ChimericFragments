@@ -236,35 +236,31 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
             html_div(className="plot", children=[dcc_graph(id="plot1")]),
             html_div(className="plot", children=[dcc_graph(id="plot2")]),
             html_div(className="plot", children=[dcc_graph(id="plot3")]),
-            html_div(
-                className="plot", children=[
-                    circos(
-                        id="my-dashbio-circos",
-                        enableZoomPan=false,
-                        enableDownloadSVG=true,
-                        size=350,
-                        config = Dict(
-                            "gap"=>0.003,
-                            "cornerRadius"=>5,
-                            "innerRadius"=>120,
-                            "outerRadius"=>125,
-                            "labelRadius"=>140,
-                            "ticks"=> Dict(
-                                "display"=>true,
-                                "spacing"=>100000,
-                                "color"=>"#000",
-                                "labelDenominator"=>1000000,
-                                "labelSuffix"=>" Mb",
-                                "labelFont"=>"Arial",
-                                "majorSpacing"=>5,
-                                "minorSpacing"=>1,
-                                "labelSpacing"=>5
-                            )
-                        ),
-                        layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
-                        tracks=[chords_track(Dict{String,Any}[])]
-                    ),
-                ]
+            circos(
+                id="my-dashbio-circos",
+                enableZoomPan=false,
+                enableDownloadSVG=true,
+                size=350,
+                config = Dict(
+                    "gap"=>0.003,
+                    "cornerRadius"=>5,
+                    "innerRadius"=>120,
+                    "outerRadius"=>125,
+                    "labelRadius"=>140,
+                    "ticks"=> Dict(
+                        "display"=>true,
+                        "spacing"=>100000,
+                        "color"=>"#000",
+                        "labelDenominator"=>1000000,
+                        "labelSuffix"=>" Mb",
+                        "labelFont"=>"Arial",
+                        "majorSpacing"=>5,
+                        "minorSpacing"=>1,
+                        "labelSpacing"=>5
+                    )
+                ),
+                layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
+                tracks=[chords_track(Dict{String,Any}[])]
             ),
         ]),
     ]
@@ -292,10 +288,10 @@ table_layout() = html_div(
             ],
 
         ),
-        html_div([
+        html_div(children=[
             html_button("DOWNLOAD CSV", id="btn-csv"),
             dcc_download(id="download-dataframe-csv"),
-        ])
+        ], style=Dict("padding-left"=>"20px"))
     ]
 )
 

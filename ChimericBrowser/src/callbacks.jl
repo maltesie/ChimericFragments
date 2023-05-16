@@ -111,16 +111,17 @@ const click_table_button_states = [
     State("ligation", "value"),
     State("exclusive-search", "value"),
 ]
-const table_column_names = [:name1, :type1, :name2, :type2, :nb_ints, :nb_multi, :in_libs, :pvalue, :fdr, :pred_pvalue, :pred_fdr,
-                            :modeint1, :modelig1, :meanlen1, :nms1, :modeint2, :modelig2, :meanlen2, :nms2]
+const table_column_names = [:name1, :type1, :name2, :type2, :nb_ints, :nb_multi, :in_libs, 
+                            :fisher_pvalue, :fisher_fdr, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
 click_table_button_callback!(app::Dash.DashApp, interactions::Dict{String,Interactions}) =
 callback!(app, click_table_button_outputs, click_table_button_inputs, click_table_button_states; prevent_initial_call=true) do clicks, dataset,
-        min_reads, max_interactions, max_fdr, max_bp_fdr, search_strings, type_strings, ligation, exclusive
+        min_reads, max_interactions, max_fisher_fdr, max_bp_fdr, search_strings, type_strings, ligation, exclusive
     if clicks>0
         interact = interactions[dataset]
         my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
         my_type_strings = isnothing(type_strings) || all(isempty.(type_strings)) ? String[] : string.(type_strings)
-        df = DataFrame(filtered_dfview(interact, my_search_strings, my_type_strings, min_reads, max_interactions, max_fdr, max_bp_fdr,"ligation" in ligation, "exclusive" in exclusive))
+        df = DataFrame(filtered_dfview(interact, my_search_strings, my_type_strings, min_reads, max_interactions, 
+            Float64(max_fisher_fdr), Float64(max_bp_fdr),"ligation" in ligation, "exclusive" in exclusive))
         df.name1 = interact.nodes.name[df.src]
         df.name2 = interact.nodes.name[df.dst]
         df.type1 = interact.nodes.type[df.src]
@@ -170,7 +171,7 @@ callback!(app, click_clipboard_outputs, click_clipboard_inputs, click_clipboard_
             p = click_data["points"][1]["x"]
             select_key = click_data["points"][1]["curveNumber"] == 0 ? "lig_as_rna1" : "lig_as_rna2"
             partners = join(["$n: $c" for (n,c) in sort(collect(node_data[1][select_key][p]), by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], ", ")
-            "<- copy list of partners at position $p", "$partners"#"$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))"
+            "<- copy list of partners at position $p", "$partners"
         elseif !isnothing(edge_data) && !isempty(edge_data)
             "<- copy selected basepairing prediction", "$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))"
         end

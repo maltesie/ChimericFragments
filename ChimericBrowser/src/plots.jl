@@ -154,7 +154,7 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
     seq = aln.a.seq
     ref = aln.b
     anchors = aln.a.aln.anchors
-    posw = max(ndigits(offset1 + anchors[end].seqpos)+1, ndigits(offset2 - anchors[1].refpos)+1, ndigits(al1), ndigits(ar1)) + 1
+    posw = max(ndigits(offset1 + anchors[end].seqpos)+1, ndigits(offset2 - anchors[1].refpos)+1, ndigits(al1), ndigits(al2)) + 1
 
     seqpos = offset1 + anchors[1].seqpos + 1
     refpos = offset2 - anchors[1].refpos + 2
