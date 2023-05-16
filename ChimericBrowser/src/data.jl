@@ -163,13 +163,12 @@ function count_ligation_sites_as2(df::SubDataFrame, node_id::Int, interact::Inte
         for ((p, c), f) in zip(ligation_points, fdr)
             f < max_fdr || continue
             for pl in interact.bpstats[p][4]:interact.bpstats[p][5]
-                p2 = p[2] + (isnegative ? -1 : 1) * (bp_len - pl)
+                p2 = p[2] + (isnegative ? -1 : 1) * (bp_len - pl) - 1
                 if p2 in keys(counts)
                     n in keys(counts[p2]) ? counts[p2][n] += c : counts[p2][n] = c
                 else
                     counts[p2] = Dict(n=>c)
                 end
-
             end
         end
     end

@@ -154,7 +154,7 @@ info_area_layout() = html_div(
             className="horizontal",
             children=[
                 dcc_clipboard(id="clip"),
-                html_p(id="clip-text", "(select a data point)", style=Dict("padding-left"=>"10px")),
+                html_p(id="clip-text", "(select data point)", style=Dict("padding-left"=>"10px")),
             ]
         )
 
@@ -224,7 +224,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
         html_div(className="horizontal", children=[
             dcc_dropdown(id="fdr-source", options=[
                 (label = "node degree distribution", value = "degree"),
-                (label = "Annotation interaction heatmap", value = "annotation"),
+                (label = "Annotation stats", value = "annotation"),
                 (label = "Odds ratio distribution", value = "odds"),
                 (label = "Basepairing alignments clipping distribution", value = "bp"),
             ], value="bp", clearable=false, multi=false),

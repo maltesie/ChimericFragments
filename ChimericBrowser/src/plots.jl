@@ -89,7 +89,8 @@ function degree_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
     h4 = scatter(x=log.(collect(keys(degs))), y=log.(collect(values(degs)./sum(values(degs)))),
         name="bp fdr <= $plotting_fdr_level", mode="markers")
 
-    plot(h2), plot(h4)
+    plot(h2, Layout(title="Node degree dristribution for fisher fdr <= $plotting_fdr_level", xaxis_title="log degree", yaxis_title="log ratio")), 
+        plot(h4, Layout(title="Node degree dristribution for bp fdr <= $plotting_fdr_level", xaxis_title="log degree", yaxis_title="log ratio"))
 end
 
 function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Float64)
@@ -105,9 +106,9 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
     for (t1, t2) in zip(type1, type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
-    types_counter ./= sum(types_counter)
-
-    h1 = heatmap(x=types, y=types, z=round.(types_counter, digits=3))
+    cross_types = ["$t1-$t2" for (i,t1) in enumerate(types) for t2 in types[i:end]]
+    cross_values =  [types_counter[type_trans[t1], type_trans[t2]] for (i,t1) in enumerate(types) for t2 in types[i:end] ]
+    b1 = bar(x=cross_types, y=cross_values, name="fisher fdr <= $plotting_fdr_level")
 
     types_counter = zeros(Float64, (length(types), length(types)))
     type1 = interact.nodes.type[interact.edges.src[interact.edges.bp_fdr .<= plotting_fdr_level]]
@@ -115,10 +116,14 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
     for (t1, t2) in zip(type1, type2)
         types_counter[type_trans[t1], type_trans[t2]] += 1
     end
-    types_counter ./= sum(types_counter)
-    h2 = heatmap(x=types, y=types, z=round.(types_counter, digits=3))
+    cross_values =  [types_counter[type_trans[t1], type_trans[t2]] for (i,t1) in enumerate(types) for t2 in types[i:end] ]
+    b2 = bar(x=cross_types, y=cross_values, name="bp fdr <= $plotting_fdr_level")
 
-    return Plot(h1), Plot(h2)
+    singles = [sum(interact.nodes.nb_single[interact.nodes.type .== t]) for t in types]
+    b3 = bar(x=types, y=singles)
+
+    return plot([b1, b2], Layout(title="Interactions between annotation types", yaxis_title="count")), 
+            plot(b3, Layout(title="Single reads per annotation type", yaxis_title="count"))
 end
 
 function plot_pair(interact::Interactions, t::String, max_fdr::Float64)
@@ -151,7 +156,6 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
     anchors = aln.a.aln.anchors
     posw = max(ndigits(offset1 + anchors[end].seqpos)+1, ndigits(offset2 - anchors[1].refpos)+1, ndigits(al1), ndigits(ar1)) + 1
 
-    i = 0
     seqpos = offset1 + anchors[1].seqpos + 1
     refpos = offset2 - anchors[1].refpos + 2
     seqbuf = IOBuffer()
@@ -171,7 +175,6 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
         (x, y), s = next_xy
         next_xy = iterate(aln ,s)
 
-        i += 1
         if x != gap(eltype(seq))
             seqpos += 1
         end
@@ -184,6 +187,8 @@ function basepairing_string(aln::PairwiseAlignment, n1::String, n2::String, offs
         print(matbuf, alnchar(x, y))
     end
 
+    seqpos -= 1
+    refpos += 1
     print(seqbuf, seqpos > 0 ? " +$seqpos" : " $(seqpos-1)")
     print(refbuf, refpos > 0 ? " +$refpos" : " $(refpos-1)")
 
