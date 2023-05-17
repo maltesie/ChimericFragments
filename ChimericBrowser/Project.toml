@@ -1,7 +1,7 @@
 name = "ChimericBrowser"
 uuid = "2c2c5dff-414d-406b-b3da-835b2db0b8cd"
 authors = ["Malte Siemers <malte.siemers@mailbox.org>"]
-version = "0.4.0"
+version = "1.0.0"
 
 [deps]
 BioAlignments = "00701ae9-d1dc-5365-b64a-a3a3ebf5695e"
