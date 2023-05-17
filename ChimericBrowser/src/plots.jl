@@ -252,7 +252,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
     colors = adjust(PValues([interact.bpstats[p][1] for p in zip(points1, points2)]), BenjaminiHochberg())
     bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) *
-        "<br><br># of reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2) in zip(points1, points2)]
+        "<br><br>FDR: $(round(c, digits=4))<br>supporting reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2,c) in zip(points1, points2, colors)]
     return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
             colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
             text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),
@@ -268,6 +268,7 @@ end
 function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
     idx = parse(Int, node_data["id"])
     name = interact.nodes.name[idx]
+    length(node_data["lig_as_rna1"]) == 0 && length(node_data["lig_as_rna2"]) == 0 && return empty_node_figure
     minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key])
         for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
     maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key])
@@ -300,4 +301,11 @@ const empty_figure = (
         (x = [], y = [], type = "scatter", name = ""),
     ],
     layout = (title = "Please select an edge<br>or a node in the graph.",)
+)
+
+const empty_node_figure = (
+    data = [
+        (x = [], y = [], type = "scatter", name = ""),
+    ],
+    layout = (title = "No basepairing predictions found<br>for selected FDR.",)
 )
