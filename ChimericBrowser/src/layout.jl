@@ -38,47 +38,45 @@ dataset_and_postioning_layout(datasets::Vector{String}) = html_div(
     children=[dataset_control_layout(datasets), positioning_control_layout()]
 )
 
-reads_selection_layout(min_reads::Int) = html_div(
+reads_selection_layout(min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
     className="controls-block",
     children=[
-        html_div(className="horizontal", children=[
-            html_div(
-                style=Dict("padding-top"=>"2px"),
-                children=[
-                    html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="min-reads", type="number", value=min_reads, min=min_reads, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-                ]
-            ),
-            html_div(
-                style=Dict("padding-top"=>"2px", "margin-left"=>"15px"),
-                children=[
-                    html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-                ]
-            )
-        ])
-    ]
-)
-
-significance_selection_layout(max_fdr::Float64, max_bp_fdr::Float64) = html_div(
-    className="controls-block",
-    children=[
-        html_div(className="horizontal", children=[
-            html_div(
-                style=Dict("padding-top"=>"2px"),
-                children=[
-                    html_p(id="max-fdr-text", children=["max. fisher fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-fdr", type="number", value=max_fdr, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-                ]
-            ),
-            html_div(
-                style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
-                children=[
-                    html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                    dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
-                ]
-            )
-        ]),
+        html_div(className="horizontal",
+            children=[
+                html_div(
+                    style=Dict("padding-top"=>"2px"),
+                    children=[
+                        html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="min-reads", type="number", value=min_reads, min=min_reads, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    ]
+                ),
+                html_div(
+                    style=Dict("padding-top"=>"2px", "margin-left"=>"15px"),
+                    children=[
+                        html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    ]
+                )
+            ]),
+        html_div(
+            className="horizontal",
+            style=Dict("padding-top"=>"15px"),
+            children=[
+                html_div(
+                    style=Dict("padding-top"=>"2px"),
+                    children=[
+                        html_p(id="max-fdr-text", children=["max. fisher fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-fdr", type="number", value=max_fdr, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    ]
+                ),
+                html_div(
+                    style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
+                    children=[
+                        html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                    ]
+                )
+            ]),
         dcc_checklist(
             id="ligation",
             style=Dict("padding-top"=>"15px"),
@@ -91,14 +89,33 @@ significance_selection_layout(max_fdr::Float64, max_bp_fdr::Float64) = html_div(
 search_layout() = html_div(
     className="controls-block",
     children=[
-        html_p("Search:"),
         html_div(
             className="horizontal",
+            children=[
+                dcc_checklist(
+                    id="exclusive-search",
+                    options=[Dict("label"=>"exclusive search", "value"=>"exclusive")],
+                    style=Dict("width"=>"100%"),
+                    value=["exclusive"]
+                ),
+                dcc_dropdown(
+                    id="type-multi-select",
+                    options=[],
+                    style=Dict("padding-left"=>"10px", "width"=>"100%"),
+                    multi=true,
+                    placeholder="Select type(s)",
+                )
+            ]
+        ),
+        html_div(
+            className="horizontal",
+            style=Dict("padding-top"=>"10px"),
             children=[
                 dcc_dropdown(
                     id="gene-multi-select",
                     options=[],
-                    multi=true
+                    multi=true,
+                    placeholder="Select annotation(s)",
                 ),
                 html_div(style=Dict("width"=>"10px")),
                 html_button(
@@ -108,12 +125,6 @@ search_layout() = html_div(
                     style=Dict("position"=>"relative", "padding"=>"0px", "width"=>"50px", "height"=>"36px", "line-height"=>"0px", "color"=>"#7fafdf"))
             ]
         ),
-        dcc_checklist(
-            id="exclusive-search",
-            options=[Dict("label"=>"exclusive search", "value"=>"exclusive")],
-            style=Dict("padding-top"=>"12px"),
-            value=["exclusive"]
-        )
     ]
 )
 
@@ -136,11 +147,21 @@ annotation_control_layout(function_categories::Vector{Dict{String,String}}) = ht
 )
 
 info_area_layout() = html_div(
-    className="controls-block",
-    children=[html_p(id="info-output", children=["No interaction selected."])]
+    id="plots-block",
+    children=[
+        dcc_graph(id="plotly-graph"),
+        html_div(
+            className="horizontal",
+            children=[
+                dcc_clipboard(id="clip"),
+                html_p(id="clip-text", "(select data point)", style=Dict("padding-left"=>"10px")),
+            ]
+        )
+
+    ]
 )
 
-control_column_layout(datasets::Vector{String}, min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
+control_column_layout(datasets::Vector{String}, min_reads::Int, max_fisher_fdr::Float64, max_bp_fdr::Float64) = html_div(
     id="left-column",
     children=[
         headline_layout(),
@@ -148,8 +169,7 @@ control_column_layout(datasets::Vector{String}, min_reads::Int, max_fdr::Float64
             className="container",
             children=[
                 dataset_and_postioning_layout(datasets),
-                reads_selection_layout(min_reads),
-                significance_selection_layout(max_fdr, max_bp_fdr),
+                reads_selection_layout(min_reads, max_fisher_fdr, max_bp_fdr),
                 search_layout(),
                 info_area_layout()
             ]
@@ -197,33 +217,53 @@ chords_track(data::Vector{Dict{String,Any}}) = Dict(
     )
 )
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
-    id="circos-container",
+    id="plots-container",
     className="container",
     children=[
-        circos(
-            id="my-dashbio-circos",
-            enableZoomPan=true,
-            enableDownloadSVG=true,
-            config = Dict(
-                "gap"=>0.003,
-                "cornerRadius"=>5,
-                "innerRadius"=>290,
-                "ticks"=> Dict(
-                    "display"=>true,
-                    "spacing"=>100000,
-                    "color"=>"#000",
-                    "labelDenominator"=>1000000,
-                    "labelSuffix"=>" Mb",
-                    "labelFont"=>"Arial",
-                    "majorSpacing"=>5,
-                    "minorSpacing"=>1,
-                    "labelSpacing"=>5
-                )
+
+        html_div(className="horizontal", children=[
+            dcc_dropdown(id="fdr-source", options=[
+                (label = "node degree distribution", value = "degree"),
+                (label = "Annotation stats", value = "annotation"),
+                (label = "Odds ratio distribution", value = "odds"),
+                (label = "Basepairing alignments clipping distribution", value = "bp"),
+            ], value="bp", clearable=false, multi=false),
+            html_p("FDR for plots:"),
+            dcc_slider(id="fdr-value", min=0.0, max=1.0, step=0.01, value=0.1, tooltip=Dict("placement"=>"bottom", "always_visible"=>true)),
+        ], style=Dict("width"=>"100%", "padding-top"=>"20px")),
+
+        html_div(id="circos-container", 
+        children=[
+            html_div(className="plot", children=[dcc_graph(id="plot1")]),
+            html_div(className="plot", children=[dcc_graph(id="plot2")]),
+            html_div(className="plot", children=[dcc_graph(id="plot3")]),
+            circos(
+                id="my-dashbio-circos",
+                enableZoomPan=true,
+                enableDownloadSVG=true,
+                size=350,
+                config = Dict(
+                    "gap"=>0.003,
+                    "cornerRadius"=>5,
+                    "innerRadius"=>120,
+                    "outerRadius"=>125,
+                    "labelRadius"=>140,
+                    "ticks"=> Dict(
+                        "display"=>true,
+                        "spacing"=>100000,
+                        "color"=>"#000",
+                        "labelDenominator"=>1000000,
+                        "labelSuffix"=>" Mb",
+                        "labelFont"=>"Arial",
+                        "majorSpacing"=>5,
+                        "minorSpacing"=>1,
+                        "labelSpacing"=>5
+                    )
+                ),
+                layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
+                tracks=[chords_track(Dict{String,Any}[])]
             ),
-            layout=[Dict("id"=> n, "label"=> n, "len"=> l) for (n,l) in genome_info],
-            selectEvent=Dict("0"=> "hover"),
-            tracks=[chords_track(Dict{String,Any}[])]
-        )
+        ]),
     ]
 )
 
@@ -234,7 +274,7 @@ table_layout() = html_div(
         dash_datatable(
             id="table",
             columns=[n == "fdr" ? Dict("name"=>n, "id"=>n, "format"=>Dict("specifier"=>".3f")) : Dict("name"=>n, "id"=>n)
-                for n in ["name1", "type1", "name2", "type2", "nb_ints", "fdr", "odds_ratio", "pred_fdr", "in_libs"]],
+                for n in ["name1", "type1", "name2", "type2", "nb_ints", "fisher_fdr", "odds_ratio", "bp_fdr", "in_libs"]],
             style_cell=Dict(
                 "height"=> "auto",
                 "minWidth"=> "100px", "width"=> "100px", "maxWidth"=> "160px",
@@ -249,18 +289,10 @@ table_layout() = html_div(
             ],
 
         ),
-        html_div([
-            html_div([
-                html_button("DOWNLOAD CSV", id="btn-csv"),
-                dcc_download(id="download-dataframe-csv"),
-            ]),
-            dcc_radioitems(
-                id="radio-options-csv",
-                options=[(label="full", value="full"), (label="selected", value="selected")],
-                style=Dict("align-content"=>"center"),
-                value="selected"
-            )
-        ])
+        html_div(children=[
+            html_button("DOWNLOAD CSV", id="btn-csv"),
+            dcc_download(id="download-dataframe-csv"),
+        ], style=Dict("padding-left"=>"20px"))
     ]
 )
 
@@ -291,8 +323,8 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
             persistence=true,
             children=[
                 astab(cytoscape_layout(stylesheet), "graph"),
-                astab(circos_layout(genome_info), "circos"),
                 astab(table_layout(), "table"),
+                astab(circos_layout(genome_info), "plots"),
                 astab(summary_layout(), "summary"),
             ]
         )

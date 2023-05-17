@@ -103,9 +103,6 @@ allow_self_chimeras=false
 # from different reads have a distance of infinity.
 max_ligation_distance=3
 
-# ChimericFragments outputs a position histogram of the ligation points. This sets the number of bins in it.
-position_distribution_bins=50
-
 
 #ANNOTATION PARAMETERS
 
@@ -174,7 +171,7 @@ fisher_exact_tail="both"
 # corresponds to the direction that is cut off by the ligation (downstream for RNA1, upstream for RNA2) and
 # should be negative to increase the distance. (45,-10) spans a region of 55 nucleotides around the ligation
 # point.
-bp_distance=(30,0)
+bp_interval=(30,0)
 bp_shift_weight=1.0
 
 # Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
@@ -192,20 +189,14 @@ bp_gap_open_penalty=8
 bp_gap_extend_penalty=3
 
 
-#PLOTTING PARAMETERS
-
-# Set the fdr levels for plots
-plot_fdr_levels=[0.1, 0.2, 0.5]
-
-
 #DATA FILTER PARAMETERS
 
 # For large datasets, these parameters can be used to limit the results saved to the tables or loaded into
 # the visualization. The method of Benjamini-Hochberg is applied to compute the false discovery rate.
-# Set the max_fdr to filter the results by fisher's exact test. max_bp_fdr can be used to filter by the
+# Set the max_fisher_fdr to filter the results by fisher's exact test. max_bp_fdr can be used to filter by the
 # significance of the basepairing predictions. And interactions with a read count less than or equal to
 # min_reads will be excluded from the results.
-max_fdr=1.0
+max_fisher_fdr=1.0
 max_bp_fdr=1.0
 min_reads=1
 

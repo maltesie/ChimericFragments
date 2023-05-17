@@ -39,15 +39,8 @@ file_type = ".fastq.gz"
 # ingnoring the suffices (leading to "conditionA_rep1.fastq.gz" beeing assigned to "conditionA"
 # in the default settings)
 samplename_condition = [
-    ("conditionA_rep1", "conditionA"),
-    ("conditionA_rep2", "conditionA"),
-    ("conditionA_rep3", "conditionA"),
-    ("conditionB_rep1", "conditionB"),
-    ("conditionB_rep2", "conditionB"),
-    ("conditionB_rep3", "conditionB"),
-    ("conditionC_rep1", "conditionC"),
-    ("conditionC_rep2", "conditionC"),
-    ("conditionC_rep3", "conditionC"),
+    ("hfq_hcd_1", "hfq_hcd"),
+    ("hfq_hcd_2", "hfq_hcd")
 ]
 
 
@@ -199,7 +192,7 @@ bp_gap_extend_penalty=3
 # min_reads will be excluded from the results.
 max_fisher_fdr=1.0
 max_bp_fdr=1.0
-min_reads=2
+min_reads=1
 
 #DASH APP PARAMETERS
 

@@ -13,8 +13,11 @@ isdir(joinpath(project_path, "results")) || throw(AssertionError("Cannot find re
 
 isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find a valid file with the filename $genome_file. Please edit config.jl."))
 
-using Pkg
+import Pkg
+
 Pkg.activate("ChimericBrowser")
+Pkg.instantiate()
+
 using ChimericBrowser
 
 types = Dict(
@@ -30,7 +33,7 @@ param_dict::Vector{Pair{String,String}} = [
     "max. ligation distance:"=>"$max_ligation_distance",
     "min. reads per interaction:" => "$min_reads",
     "max. basepairing fdr:"=>"$max_bp_fdr",
-    "max. Fisher's exact fdr:"=>"$max_fdr",
+    "max. Fisher's exact fdr:"=>"$max_fisher_fdr",
     "use order on read for Fisher's exact test:" => include_orientation ? "yes" : "no",
     "use single count for Fisher's exact test:" => include_singles ? "yes" : "no",
     "Fisher's test tail:"=>fisher_exact_tail,
@@ -41,5 +44,7 @@ param_dict::Vector{Pair{String,String}} = [
 
 bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_penalty, bp_gap_extend_penalty)
 
-chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fdr, max_bp_fdr,
-    address, port, bp_distance, param_dict, bp_parameters)
+@info "Initializing visualization for datasets $(join(unique(v[2] for v in samplename_condition), ", "))."
+
+chimeric_browser(joinpath(project_path, "results"), joinpath(project_path, genome_file), types, min_reads, max_fisher_fdr, max_bp_fdr,
+    address, port, bp_interval, param_dict, bp_parameters, n_genome_samples, bp_shift_weight)

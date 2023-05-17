@@ -1,10 +1,10 @@
 struct MergedAlignedRead
-    alns::AlignedReads{UInt}
+    alns::AlignedReads
     pindexpairs::Vector{Tuple{Int,Int}}
     merged::Vector{Bool}
 end
 
-MergedAlignedRead(alnreads::AlignedReads{UInt}) = MergedAlignedRead(alnreads, Tuple{Int, Int}[], Bool[])
+MergedAlignedRead(alnreads::AlignedReads) = MergedAlignedRead(alnreads, Tuple{Int, Int}[], Bool[])
 
 Base.length(mergedread::MergedAlignedRead) = length(mergedread.pindexpairs)
 
