@@ -69,7 +69,10 @@ function filtered_dfview(interactions::Interactions, search_strings::Vector{Stri
                 s2 .|= (interactions.edges.dst[min_reads_range] .=== type_id)
             end
         end
-        exclusive ? (s1 .& s2) : (s1 .| s2)
+        different_type = (length(type_strings) > 1) ?
+            interactions.nodes.type[interactions.edges.src[min_reads_range]] .!== interactions.nodes.type[interactions.edges.dst[min_reads_range]] :
+            trues(length(min_reads_range))
+        exclusive ? (s1 .& s2 .& different_type) : (s1 .| s2)
     end
     search_string_index .&= type_string_index
     search_string_index .&= (

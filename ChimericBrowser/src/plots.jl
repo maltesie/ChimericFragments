@@ -89,7 +89,7 @@ function degree_dist_plots(interact::Interactions, plotting_fdr_level::Float64)
     h4 = scatter(x=log.(collect(keys(degs))), y=log.(collect(values(degs)./sum(values(degs)))),
         name="bp fdr <= $plotting_fdr_level", mode="markers")
 
-    plot(h2, Layout(title="Node degree dristribution for fisher fdr <= $plotting_fdr_level", xaxis_title="log degree", yaxis_title="log ratio")), 
+    plot(h2, Layout(title="Node degree dristribution for fisher fdr <= $plotting_fdr_level", xaxis_title="log degree", yaxis_title="log ratio")),
         plot(h4, Layout(title="Node degree dristribution for bp fdr <= $plotting_fdr_level", xaxis_title="log degree", yaxis_title="log ratio"))
 end
 
@@ -122,7 +122,7 @@ function annotation_type_heatmap(interact::Interactions, plotting_fdr_level::Flo
     singles = [sum(interact.nodes.nb_single[interact.nodes.type .== t]) for t in types]
     b3 = bar(x=types, y=singles)
 
-    return plot([b1, b2], Layout(title="Interactions between annotation types", yaxis_title="count")), 
+    return plot([b1, b2], Layout(title="Interactions between annotation types", yaxis_title="count")),
             plot(b3, Layout(title="Single reads per annotation type", yaxis_title="count"))
 end
 
@@ -250,9 +250,9 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
     sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
-    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) * 
-        "<br><br>#of reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2) in zip(points1, points2)]
     colors = adjust(PValues([interact.bpstats[p][1] for p in zip(points1, points2)]), BenjaminiHochberg())
+    bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) *
+        "<br><br># of reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2) in zip(points1, points2)]
     return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
             colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
             text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),

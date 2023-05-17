@@ -252,21 +252,19 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
                 strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
                 ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
-                (((i1 + max_dist) > length(genome.chroms[ref1])) || ((i2 + max_dist) > length(genome.chroms[ref2])) ||
-                    ((i1 - max_dist) < 1) || ((i2 - max_dist) < 1)) && continue
 
                 s1 = if strand1=='+'
-                    view(genome[ref1], (i1-check_interaction_distances[1]+1):(i1-check_interaction_distances[2]))
+                    view(genome[ref1], max(1, i1-check_interaction_distances[1]+1):max(1, i1-check_interaction_distances[2]))
                 else
                     l = length(genome.chroms[ref1])
-                    c1, c2 = l+1-(i1+check_interaction_distances[2]), l+1-(i1+check_interaction_distances[1]-1)
+                    c1, c2 = l+1-min(l, i1+check_interaction_distances[2]), l+1-min(l, i1+check_interaction_distances[1]-1)
                     view(reverse_complement_genome[ref1], c2:c1)
                 end
                 s2 = if strand2=='-'
-                    view(complement_genome[ref2], (i2-check_interaction_distances[1]+1):(i2-check_interaction_distances[2]))
+                    view(complement_genome[ref2], max(1, i2-check_interaction_distances[1]+1):max(1, i2-check_interaction_distances[2]))
                 else
                     l = length(genome.chroms[ref2])
-                    c1, c2 = l+1-(i2+check_interaction_distances[2]), l+1-(i2+check_interaction_distances[1]-1)
+                    c1, c2 = l+1-min(l, i2+check_interaction_distances[2]), l+1-min(l, i2+check_interaction_distances[1]-1)
                     view(reverse_genome[ref2], c2:c1)
                 end
                 paln = pairalign(LocalAlignment(), s1, s2, model)
