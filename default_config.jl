@@ -1,8 +1,9 @@
 # FILE PARAMETERS
 
-# If BWA or samtools are not installed systemwide, please provide full paths to the binaries
-bwa_mem2_bin = "bwa-mem2"
-samtools_bin = "samtools"
+# On linux systems, bwa_mem2 and samtools are packed internally and do not have to be installed.
+# On macOS and Windows, please provide paths to the installed binaries.
+bwa_mem2_bin = nothing
+samtools_bin = nothing
 
 # If the annotation file, the genome file and the data folder containing the sample files are not
 # located next to the config file, please provide full paths.
