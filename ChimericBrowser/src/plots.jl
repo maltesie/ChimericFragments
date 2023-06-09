@@ -214,10 +214,11 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
 
     _, al1, ar1, al2, ar2, _ = interact.bpstats[(p1,p2)]
 
-    al1 = strand1=='+' ? p1-check_interaction_distances[1]+al1 : p1+check_interaction_distances[1]-al1
-    ar1 = strand1=='+' ? p1-check_interaction_distances[1]+ar1 : p1+check_interaction_distances[1]-ar1
-    al2 = strand1=='-' ? p2-check_interaction_distances[1]+al2 : p2+check_interaction_distances[1]-al2
-    ar2 = strand1=='-' ? p2-check_interaction_distances[1]+ar2 : p2+check_interaction_distances[1]-ar2
+    bp_len = check_interaction_distances[1] - check_interaction_distances[2]
+    al1 = p1 + (strand1=='-' ? 1 : -1) * (bp_len - al1)
+    ar1 = p1 + (strand1=='-' ? 1 : -1) * (bp_len - ar1)
+    al2 = p2 + (strand2=='-' ? -1 : 1) * (bp_len - al2)
+    ar2 = p2 + (strand2=='-' ? -1 : 1) * (bp_len - ar2) - 1
 
     s1 = strand1=='+' ?
         genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
@@ -287,7 +288,7 @@ function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
                 hover_texts = ["position: $(cdsframestring(p, idx, interact)) ($p)<br># of partners here: $b<br>total reads count: $c<br>$t"
                     for (p, c, t, b) in zip(positions, counts, partners, nb_binding)]
-                scatter(x = positions, y = counts, fill="tozeroy", name = legend, text=hover_texts, hoverinfo="text")
+                scatter(x = positions, y = counts, fill="tozeroy", name=legend, text=hover_texts, hoverinfo="text")
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],
