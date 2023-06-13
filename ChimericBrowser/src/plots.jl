@@ -214,11 +214,10 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
 
     _, al1, ar1, al2, ar2, _ = interact.bpstats[(p1,p2)]
 
-    bp_len = check_interaction_distances[1] - check_interaction_distances[2]
-    al1 = p1 + (strand1=='-' ? 1 : -1) * (bp_len - al1)
-    ar1 = p1 + (strand1=='-' ? 1 : -1) * (bp_len - ar1)
-    al2 = p2 + (strand2=='-' ? -1 : 1) * (bp_len - al2)
-    ar2 = p2 + (strand2=='-' ? -1 : 1) * (bp_len - ar2) - 1
+    al1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - al1)
+    ar1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - ar1)
+    al2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - al2)
+    ar2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - ar2) - 1
 
     s1 = strand1=='+' ?
         genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :

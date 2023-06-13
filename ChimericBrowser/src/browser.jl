@@ -34,7 +34,7 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     app = dash(assets_folder=assets_path)
     app.layout = browser_layout(sort([k for k in keys(interactions)]), genome_info, stylesheet(types), min_reads, max_fisher_fdr, max_bp_fdr)
 
-    update_selection_callback!(app, interactions, seq_length, param_dict)
+    update_selection_callback!(app, interactions, check_interaction_distances[1], param_dict)
     update_dataset_callback!(app, interactions, min_reads)
     update_plots_callback!(app, interactions, randseq_model_ecdf, genome_model_ecdf)
     update_selected_element_callback!(app, genome, interactions, check_interaction_distances, model)

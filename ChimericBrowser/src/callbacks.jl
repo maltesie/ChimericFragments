@@ -115,8 +115,8 @@ const click_table_button_states = [
     State("ligation", "value"),
     State("exclusive-search", "value"),
 ]
-const table_column_names = [:name1, :type1, :name2, :type2, :nb_ints, :nb_multi, :in_libs, 
-                            :fisher_pvalue, :fisher_fdr, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
+const table_column_names = [:name1, :type1, :name2, :type2, :nb_ints, :nb_multi, :in_libs,
+                            :fisher_pvalue, :fisher_fdr, :odds_ratio, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
 click_table_button_callback!(app::Dash.DashApp, interactions::Dict{String,Interactions}) =
 callback!(app, click_table_button_outputs, click_table_button_inputs, click_table_button_states; prevent_initial_call=true) do clicks, dataset,
         min_reads, max_interactions, max_fisher_fdr, max_bp_fdr, search_strings, type_strings, ligation, exclusive
@@ -124,8 +124,8 @@ callback!(app, click_table_button_outputs, click_table_button_inputs, click_tabl
         interact = interactions[dataset]
         my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
         my_type_strings = isnothing(type_strings) || all(isempty.(type_strings)) ? String[] : string.(type_strings)
-        df = DataFrame(filtered_dfview(interact, my_search_strings, my_type_strings, min_reads, max_interactions, 
-            Float64(max_fisher_fdr), Float64(max_bp_fdr),"ligation" in ligation, "exclusive" in exclusive))
+        df = DataFrame(filtered_dfview(interact, my_search_strings, my_type_strings, min_reads, max_interactions,
+            Float64(max_fisher_fdr), Float64(max_bp_fdr), "ligation" in ligation, "exclusive" in exclusive))
         df.name1 = interact.nodes.name[df.src]
         df.name2 = interact.nodes.name[df.dst]
         df.type1 = interact.nodes.type[df.src]
