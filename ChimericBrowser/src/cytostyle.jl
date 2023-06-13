@@ -44,6 +44,7 @@ const base_edge_style = Dict(
         "target-arrow-shape"=> "triangle",
         "line-color"=> "#aaa",
         "width"=> "mapData(current_ratio, 0, 1, 2, 12)",
+        "line-color"=> "mapData(bp_fdr, 0, 1, DarkRed, Bisque)",
         "z-index"=>"1",
         "overlay-padding"=> "3px"
     )

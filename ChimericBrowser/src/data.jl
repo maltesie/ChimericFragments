@@ -190,6 +190,7 @@ function cytoscape_elements(df::SubDataFrame, interact::Interactions, layout_val
             "target"=>row.dst,
             "current_total"=>total_ints,
             "current_ratio"=>round(row.nb_ints/max_ints; digits=2),
+            "bp_fdr"=>row.bp_fdr,
             "interactions"=>row.nb_ints,
         ),
         "classes"=>"other_edge"
