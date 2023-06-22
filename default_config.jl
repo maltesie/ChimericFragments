@@ -1,9 +1,12 @@
 # FILE PARAMETERS
 
-# On linux systems, bwa_mem2 and samtools are packed internally and do not have to be installed.
-# On macOS and Windows, please provide paths to the installed binaries.
+# On linux systems, fastp, bwa_mem2 and samtools are packed internally and do not have to be installed.
+# On macOS and Windows, please provide paths to the installed binaries or if installed systemwide,
+# the command that executes them in your systems terminal.
+# Paths and commands have to be provided as strings, e.g. samtools_bin = "/path/to/samtools"
 bwa_mem2_bin = nothing
 samtools_bin = nothing
+fastp_bin = nothing
 
 # If the annotation file, the genome file and the data folder containing the sample files are not
 # located next to the config file, please provide full paths.
@@ -51,6 +54,19 @@ samplename_condition = [
     ("conditionC_rep3", "conditionC"),
 ]
 
+
+# FASTP PARAMETERS
+
+# indicate if trimming should be performed
+skip_trimming = false
+
+# fastp filters duplicated reads based on the distribution of exact copies.
+deduplicate = false
+
+# Cutoff for the average quality of a sliding window that decides if reads are trimmed at the front
+# and at the end. Reads shorter than min_length after trimming will be discarded.
+average_window_quality=20
+min_length=20
 
 # BWA-MEM PARAMETERS
 

@@ -50,6 +50,20 @@ samplename_condition = [
 ]
 
 
+# FASTP PARAMETERS
+
+# indicate if trimming should be performed
+skip_trimming = false
+
+# fastp filters duplicated reads based on the distribution of exact copies.
+deduplicate = false
+
+# Cutoff for the average quality of a sliding window that decides if reads are trimmed at the front
+# and at the end. Reads shorter than min_length after trimming will be discarded.
+average_window_quality=20
+min_length=20
+
+
 # BWA-MEM PARAMETERS
 
 # bwa-mem seeding parameter. No alignments shorter than min_seed_length can be found, can effect
