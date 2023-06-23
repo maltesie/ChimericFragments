@@ -82,7 +82,7 @@ function filtered_dfview(interactions::Interactions, search_strings::Vector{Stri
             (ligation ? isnan.(interactions.edges.bp_fdr[min_reads_range]) : falses(length(min_reads_range)))
         )
     )
-    n = nthindex(search_string_index, max_interactions)
+    n = max_interactions > 0 ? nthindex(search_string_index, max_interactions) : nothing
     isnothing(n) || (filtered_index[1:n] .= search_string_index[1:n])
     return @view interactions.edges[filtered_index, :]
 end
