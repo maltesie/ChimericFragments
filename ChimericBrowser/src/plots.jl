@@ -279,15 +279,18 @@ function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
             begin
                 ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
                 kv = sort(ligationpoints, by=x->x[1])
-                positions, counts = Int[t[1] for t in kv], Int[sum(values(t[2])) for t in kv]
-                #partner_counts = [length(node_data[select_key][p]) for p in positions]
-                nb_binding = Int[length(t[2]) for t in kv]
-                partners = [nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
-                    by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") for p in positions]
+                positions, counts = first.(kv), sum.(values.(last.(kv)))
+                allpositions = length(positions) > 0 ? collect(minimum(positions):maximum(positions)) : Int[]
+                pindex = in.(allpositions, Ref(positions))
+                indextrans = [pindex[i] ? sum(view(pindex, 1:i)) : 0 for i in eachindex(allpositions)]
+                allcounts = [pindex[i] ? counts[indextrans[i]] : 0 for i in eachindex(allpositions)]
+                nb_binding = Int[pindex[i] ? length(kv[indextrans[i]][2]) : 0 for i in eachindex(allpositions)]
+                partners = [pindex[i] ? nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
+                    by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") : "" for (i, p) in enumerate(allpositions)]
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
                 hover_texts = ["position: $(cdsframestring(p, idx, interact)) ($p)<br># of partners here: $b<br>total reads count: $c<br>$t"
-                    for (p, c, t, b) in zip(positions, counts, partners, nb_binding)]
-                scatter(x = positions, y = counts, fill="tozeroy", name=legend, text=hover_texts, hoverinfo="text")
+                    for (p, c, t, b) in zip(allpositions, allcounts, partners, nb_binding)]
+                scatter(x = allpositions, y = allcounts, fill="tozeroy", name=legend, text=hover_texts, hoverinfo="text")
             end
             for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
         ],
