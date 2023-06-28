@@ -13,12 +13,12 @@ The following procedure was tested on Ubuntu 22.04 and Arch linux.
 ChimericFragments is written in the Julia programming language and requires Julia (1.9.1) to
 be installed on your system. You can download Julia [here](https://julialang.org/downloads/). It is
 highly recommended to install Julia as described [here](https://julialang.org/downloads/platform/).
-Using a julia installation from your OS repository or a package manager like conda can lead to
+Using a Julia installation from your OS repository or a package manager like conda can lead to
 problems during the installation of ChimericFragments.
 
 ChimericFragments depends on fastp (0.23.3+) for reads trimming and on bwa-mem2 (2.2.1+) and samtools (1.14.0+)
-for sequence alignments and .bam file processing. If you run ChimericFragments on Linux, the binaries are provided
-and do not have to be installed separately. For other operating systems (not tested), you can find the tools on github:
+for sequence alignments and .bam file processing. **If you run ChimericFragments on Linux, the binaries are provided
+and do not have to be installed separately**. For other operating systems (not tested), you can find the tools on github:
 
 https://github.com/bwa-mem2/bwa-mem2/releases
 
