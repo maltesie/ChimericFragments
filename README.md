@@ -18,13 +18,12 @@ problems during the installation of ChimericFragments.
 
 ChimericFragments depends on fastp (0.23.3+) for reads trimming and on bwa-mem2 (2.2.1+) and samtools (1.14.0+)
 for sequence alignments and .bam file processing. **If you run ChimericFragments on Linux, the binaries are provided
-and do not have to be installed separately**. For other operating systems (not tested), you can find the tools on github:
-
-https://github.com/bwa-mem2/bwa-mem2/releases
-
-https://github.com/samtools/samtools/releases
-
-https://github.com/OpenGene/fastp/releases
+and do not have to be installed separately**. For other operating systems (not tested), you can find the tools on 
+github (
+    [bwa-mem2](https://github.com/bwa-mem2/bwa-mem2/releases), 
+    [samtools](https://github.com/samtools/samtools/releases),
+    [fastp](https://github.com/OpenGene/fastp/releases)
+).
 
 ## Install
 
