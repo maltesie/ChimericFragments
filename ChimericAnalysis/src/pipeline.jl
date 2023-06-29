@@ -16,6 +16,7 @@ function mergetypes(features::Features, cds_type::String, five_type::String, thr
             throw(AssertionError("Features with the same name of types $types have to be on the same reference sequence and strand."))
         left = minimum(leftposition(f) for f in fs)
         right = maximum(rightposition(f) for f in fs)
+        any(type(f) == cds_type for f in fs) || continue
         cds = first((s == STRAND_POS ? leftposition : rightposition)(f) for f in fs if type(f) == cds_type)
         ann = Dict("Name"=>n, "cds"=>isnothing(cds) ? "NA" : "$cds")
         push!(merged_features, Interval(ref, left, right, s, Annotation(mergetype, n, ann)))
