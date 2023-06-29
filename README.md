@@ -62,8 +62,8 @@ To rerun the analysis (e.g. with a different set of parameters), remove the resu
 the project folder and rerun the above command.
 
 In the specified data folder, alignments (.bam, .bam.bai) and alignment stats (.bam.log) are saved.
-In the results folder, several subfolder are generated and all relevant results are combined in two
-tables with filenames interactions.xlsx and genes.xlsx
+In the results folder, several subfolder are generated and all relevant results are saved in tabular
+format in the tables folder.
 
 #### Run visualize.jl
 
