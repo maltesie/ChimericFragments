@@ -146,7 +146,7 @@ alnchar(x::DNA, y::DNA) =
     if (x == DNA_A && y == DNA_T) || (x == DNA_T && y == DNA_A) || (x == DNA_C && y == DNA_G) || (x == DNA_G && y == DNA_C)
         '|'
     elseif (x == DNA_G && y == DNA_T) || (x == DNA_T && y == DNA_G)
-        '⋅'
+        '·'
     else
         ' '
     end
@@ -255,7 +255,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
         "<br><br>FDR: $(round(c, digits=4))<br>supporting reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2,c) in zip(points1, points2, colors)]
     return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
             colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
-            text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Sans Typewriter', monospace\">%{text}</span><extra></extra>"),
+            text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),
         Layout(title = "$(edge_data["interactions"]) interactions, $(sum(interact.edgestats[(src,dst)][3][p] for p in zip(points1, points2))) ligation points",
             yaxis=attr(title="RNA1: $name1", tickmode="array", tickvals=tickpos1, ticktext=ticks1),
             xaxis=attr(title="RNA2: $name2", tickmode="array", tickvals=tickpos2, ticktext=ticks2)))
