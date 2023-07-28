@@ -233,7 +233,6 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     model = AffineGapScoreModel(SubstitutionMatrix(scores; default_match=-1*bp_parameters[4], default_mismatch=-1*bp_parameters[4]);
         gap_open=-1*bp_parameters[5], gap_extend=-1*bp_parameters[6])
 
-    max_dist = maximum(abs.(check_interaction_distances))
     complement_genome = Genome(complement(genome.seq), genome.chroms)
     reverse_genome = Genome(copy(genome.seq), genome.chroms)
     for (_, seq) in reverse_genome

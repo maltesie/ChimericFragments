@@ -7,24 +7,29 @@ function bp_score_dist_plot(interact::Interactions, genome_model_ecdf::ECDF, ran
         maximum(randseq_model_ecdf.sorted_values),
         maximum(genome_model_ecdf.sorted_values)
     )))
+    min_score = Int(floor(min(
+        minimum(interact_ecdf.sorted_values),
+        minimum(randseq_model_ecdf.sorted_values),
+        minimum(genome_model_ecdf.sorted_values)
+    )))
 
     nan_index = .!isnan.(interact.edges.bp_fdr)
     si_fdr = sort(collect(enumerate(zip(interact.edges.bp_fdr[nan_index], interact.edges.bp_pvalue[nan_index]))), by=x->x[2][2], rev=true)
 
-    genome_model_pdf = diff(genome_model_ecdf.(1:(max_score+1)))
-    randseq_model_pdf = diff(randseq_model_ecdf.(1:(max_score+1)))
-    interact_pdf = diff(interact_ecdf.(1:(max_score+1)))
+    genome_model_pdf = diff(genome_model_ecdf.(min_score:(max_score+1)))
+    randseq_model_pdf = diff(randseq_model_ecdf.(min_score:(max_score+1)))
+    interact_pdf = diff(interact_ecdf.(min_score:(max_score+1)))
 
-    p_random = scatter(x=1:max_score, y=randseq_model_pdf, fill="tozeroy", name="random")
-    p_random_genome = scatter(x=1:max_score, y=genome_model_pdf, fill="tozeroy", name="random, from genome")
-    p_interact = scatter(x=1:max_score, y=interact_pdf, fill="tozeroy", name="around ligation points")
+    p_random = scatter(x=min_score:max_score, y=randseq_model_pdf, fill="tozeroy", name="random")
+    p_random_genome = scatter(x=min_score:max_score, y=genome_model_pdf, fill="tozeroy", name="random, from genome")
+    p_interact = scatter(x=min_score:max_score, y=interact_pdf, fill="tozeroy", name="around ligation points")
     p = plot([p_random, p_random_genome, p_interact], Layout(yaxis_title="empirical density", xaxis_title="basepairing predictions score distribution"))
 
     ymax = max(maximum(randseq_model_pdf), maximum(genome_model_pdf), maximum(interact_pdf))
     fdr_p_index = findfirst(x->x[2][1]<=plot_fdr_level, si_fdr)
     fdr_p = isnothing(fdr_p_index) ? 1.0 : si_fdr[fdr_p_index][2][2]
-    idx = findfirst(x->((1-genome_model_ecdf(x))<fdr_p), 1:(max_score+1))
-    genome_model_fdr_score = isnothing(idx) ? 0 : idx - 1
+    idx = findfirst(x->((1-genome_model_ecdf(x))<fdr_p), min_score:(max_score+1))
+    genome_model_fdr_score = (isnothing(idx) ? 0 : idx - 1) + min_score
     add_shape!(p, line(x0=genome_model_fdr_score, y0=0, x1=genome_model_fdr_score, y1=ymax, line=attr(color="RoyalBlue", width=3), name="FDR=$plot_fdr_level"))
 
     return p

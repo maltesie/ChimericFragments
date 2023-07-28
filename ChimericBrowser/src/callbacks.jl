@@ -46,12 +46,17 @@ const update_dataset_outputs = [
     Output("min-reads", "value"),
     Output("gene-multi-select", "options"),
     Output("type-multi-select", "options"),
+    Output("fdr-value", "value"),
+]
+const update_dataset_states = [
+    State("fdr-value", "value")
 ]
 update_dataset_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, min_reads::Int) =
-callback!(app, update_dataset_outputs, update_dataset_inputs; prevent_initial_call=false) do dataset
+callback!(app, update_dataset_outputs, update_dataset_inputs, update_dataset_states; prevent_initial_call=false) do dataset, fdr
     return min_reads,
     [Dict("label"=>k, "value"=>k) for k in sort(interactions[dataset].nodes.name)],
-    [Dict("label"=>k, "value"=>k) for k in unique(interactions[dataset].nodes.type)]
+    [Dict("label"=>k, "value"=>k) for k in unique(interactions[dataset].nodes.type)],
+    fdr
 end
 
 const update_plots_inputs = [
