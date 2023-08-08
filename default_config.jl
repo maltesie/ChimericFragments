@@ -216,7 +216,8 @@ bp_gap_extend_penalty=3
 # min_reads will be excluded from the results.
 max_fisher_fdr=1.0
 max_bp_fdr=1.0
-min_reads=2
+keep_ints_without_ligation=true
+min_reads=3
 
 #DASH APP PARAMETERS
 

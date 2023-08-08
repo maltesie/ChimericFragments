@@ -41,7 +41,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             filter_types=["rRNA", "tRNA"], min_distance=1000, prioritize_type="sRNA", min_prioritize_overlap=0.8, max_bp_fdr=0.05,
                             overwrite_type="IGR", max_ligation_distance=3, is_reverse_complement=true, is_paired_end=true, check_interaction_distances=(30,0),
                             include_secondary_alignments=true, include_alternative_alignments=false, min_reads=5, max_fisher_fdr=0.05, fisher_exact_tail="right",
-                            include_read_identity=true, include_singles=true, allow_self_chimeras=true, bp_parameters=(4,5,0,7,8,3), n_genome_samples=500000, shift_weight=0.5)
+                            include_read_identity=true, include_singles=true, allow_self_chimeras=true, bp_parameters=(4,5,0,7,8,3), n_genome_samples=500000,
+                            shift_weight=1.0, keep_ints_without_ligation=true)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -119,7 +120,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             above_min_bp_reads = sum(interactions.edges[interactions.edges.bp_fdr .<= max_bp_fdr, :nb_ints])
             above_min_bp_ints = sum(interactions.edges.bp_fdr .<= max_bp_fdr)
-            filter!(:bp_fdr => x -> (x <= max_bp_fdr) | isnan(x), interactions.edges)
+            filter!(:bp_fdr => x -> (x <= max_bp_fdr) | (isnan(x) & keep_ints_without_ligation), interactions.edges)
 
             infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
                 "& fdr<=$max_fisher_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
