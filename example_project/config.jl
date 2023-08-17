@@ -212,8 +212,18 @@ bp_gap_extend_penalty=3
 # min_reads will be excluded from the results.
 max_fisher_fdr=1.0
 max_bp_fdr=1.0
+min_reads=3
+
+# toggle, if interactions without ligation points are kept in the results. Depending on the read length. With
+# a sufficiently large read length, filtering out interactions without ligation points can increase the quality
+# of the dataset.
 keep_ints_without_ligation=true
-min_reads=1
+
+# filter out interactions of names containing any of the specified filter queries. This option can help to
+# clean mapping artifacts caused by multiple occurences of the same sequence in the genome. E.g. single reads
+# from regions around rRNA or tRNA annotated as IGR can lead to many interactions in the dataset. These can be
+# filtered out by specifying strings contained in the names of those annotations, e.g. ["23S", "tRNA"].
+filter_name_queries = []
 
 #DASH APP PARAMETERS
 

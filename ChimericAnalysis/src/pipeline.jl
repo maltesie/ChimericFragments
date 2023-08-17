@@ -59,7 +59,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             bp_parameters=(4,5,0,7,8,3),
                             n_genome_samples=500000,
                             shift_weight=1.0,
-                            keep_ints_without_ligation=true)
+                            keep_ints_without_ligation=true,
+                            filter_name_queries=[])
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -103,12 +104,15 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                     alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
                                             include_alternative_alignments=include_alternative_alignments,
                                             is_reverse_complement=is_reverse_complement)
+
                     @info "Annotating alignments..."
                     annotate!(alignments, features; prioritize_type=prioritize_type, min_prioritize_overlap=min_prioritize_overlap,
                                                     overwrite_type=overwrite_type)
+
                     @info "Building graph of interactions..."
                     append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                         filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, is_paired_end=is_paired_end)
+
                     empty!(alignments)
                     GC.gc()
                 end
@@ -126,6 +130,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
+
+            filterset = Set(findall(foldl(.|, occursin.(q, interactions.nodes.name) for q in filter_name_queries)))
+            filter!([:src, :dst] => (x, y) -> !((x in filterset) || (y in filterset)), interactions.edges)
 
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
@@ -169,3 +176,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         @info "Done."
     end
 end
+# filter out interactions of names containing any of the specified filter queries. This option can help to
+# clean mapping artifacts caused by multiple occurences of the same sequence in the genome. E.g. single reads
+# from regions around rRNA or tRNA annotated as IGR can lead to many interactions in the dataset. These can be
+# filtered out by specifying strings contained in the names of those annotations, e.g. ["23S", "tRNA"].
+filter_name_queries = []
