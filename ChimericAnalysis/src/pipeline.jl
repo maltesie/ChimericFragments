@@ -151,7 +151,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
 
-            correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
+            correlation_matrix = corspearman(Matrix(interactions.edges[:, interactions.replicate_ids]))
             correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
             for (i,repid) in enumerate(interactions.replicate_ids)
                 correlation_df[:, repid] = correlation_matrix[:, i]
