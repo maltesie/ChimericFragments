@@ -176,8 +176,3 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         @info "Done."
     end
 end
-# filter out interactions of names containing any of the specified filter queries. This option can help to
-# clean mapping artifacts caused by multiple occurences of the same sequence in the genome. E.g. single reads
-# from regions around rRNA or tRNA annotated as IGR can lead to many interactions in the dataset. These can be
-# filtered out by specifying strings contained in the names of those annotations, e.g. ["23S", "tRNA"].
-filter_name_queries = []
