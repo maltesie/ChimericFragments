@@ -131,8 +131,10 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)
 
-            filterset = Set(findall(foldl(.|, occursin.(q, interactions.nodes.name) for q in filter_name_queries)))
-            filter!([:src, :dst] => (x, y) -> !((x in filterset) || (y in filterset)), interactions.edges)
+            if !isempty(filter_name_queries)
+                filterset = Set(findall(foldl(.|, occursin.(q, interactions.nodes.name) for q in filter_name_queries)))
+                filter!([:src, :dst] => (x, y) -> !((x in filterset) || (y in filterset)), interactions.edges)
+            end
 
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)

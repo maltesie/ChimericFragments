@@ -31,7 +31,7 @@ filesexist(fastqs)
 
 genome = Genome(genome_file)
 
-types = vcat([srna_type, cds_type], filter_types, additional_types)
+types = unique(Vector{String}(vcat([srna_type, cds_type, rrna_type, trna_type], filter_types, additional_types)))
 features = Features(annotation_file, types; name_keys=name_keys)
 if autocomplete_utrs
     add5utrs!(features; cds_type=cds_type, utr_type=fiveutr_type, utr_length=autocomplete_utr_length)
@@ -67,7 +67,7 @@ bams = align_mem(trimmed, genome;
     min_seed_len=min_seed_len,
     reseeding_factor=reseeding_factor,
     sort_bam=sort_and_index_bam,
-    threads=threads)
+    threads=threads, output_all_alignments=true)
 
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))

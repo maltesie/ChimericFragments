@@ -259,7 +259,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) *
         "<br><br>ligation point: ($(cdsframestring(p1, src, interact)), $(cdsframestring(p2, dst, interact)))<br>FDR: $(round(c, digits=4))<br>" *
         "supporting reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2,c) in zip(points1, points2, colors)]
-    return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="h"),
+    return plot(scatter(y=points1, x=points2, mode="markers", marker=attr(size=sizes, color=colors, colorbar=attr(title="FDR", orientation="v"),
             colorscale="Reds", reversescale=true, cmin=0.0, cmax=1.0), name = "ligation points",
             text=bp_plots, hoverinfo="text", hovertemplate="<span style=\"font-family:'Lucida Console', monospace\">%{text}</span><extra></extra>"),
         Layout(title = "$(edge_data["interactions"]) interactions, $(sum(interact.edgestats[(src,dst)][3][p] for p in zip(points1, points2))) ligation points",

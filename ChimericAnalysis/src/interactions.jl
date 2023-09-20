@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64}}
+    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
     counts::Dict{Symbol,Vector{Int}}
@@ -247,7 +247,7 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
 
         if (edge_row.src, edge_row.dst) in keys(interactions.edgestats)
 
-            for (i1::Int, i2::Int) in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+            for ((i1::Int, i2::Int), ligation_count::Int) in interactions.edgestats[(edge_row.src, edge_row.dst)][3]
 
                 strand1, strand2 = interactions.nodes[edge_row[:src], :strand], interactions.nodes[edge_row[:dst], :strand]
                 ref1, ref2 = interactions.nodes[edge_row[:src], :ref], interactions.nodes[edge_row[:dst], :ref]
@@ -268,11 +268,26 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                 sco = score_bp(paln, shift_weight)
                 thisp = 1-random_model_ecdf(sco)
                 interactions.bpstats[(i1,i2)] = (thisp, paln.aln.a.aln.anchors[1].seqpos + 1, paln.aln.a.aln.anchors[end].seqpos,
-                                                        paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos, sco)
+                                                        paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos, sco, ligation_count)
 
             end
-            pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-            edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), Fisher()) : NaN
+            pvs = zeros(sum(interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats); init=0))
+            edge_row.bp_pvalue = if length(pvs) > 0
+                current_i = 1
+                for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                    if p in keys(interactions.bpstats)
+                        pvs[current_i:(current_i+interactions.bpstats[p][7]-1)] .= interactions.bpstats[p][1]
+                    end
+                    current_i += interactions.bpstats[p][7]
+                end
+                #MultipleTesting.combine(PValues(pvs), Fisher())
+                minimum(adjust(PValues(pvs), BenjaminiHochberg()))
+            else
+                NaN
+            end
+            #pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+            #ws = Float64[interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+            #edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), ws, Stouffer()) : NaN
         end
     end
 
