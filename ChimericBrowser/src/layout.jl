@@ -81,7 +81,7 @@ reads_selection_layout(min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = 
             id="ligation",
             style=Dict("padding-top"=>"15px"),
             options = [Dict("label" => "include interactions without ligation data", "value" => "ligation")],
-            value = []
+            value = ["ligation"]
         )
     ]
 )

@@ -59,9 +59,9 @@ const selected_edge_style = Dict(
 )
 
 const srna_edge_style = Dict(
-    "selector"=> ".srna_edge",
+    "selector"=> ".no_ligation_edge",
     "style"=> Dict(
-      "line-color"=> "mapData(relpos, 0, 1, red, blue)"
+      "line-color"=> "grey"
     )
 )
 

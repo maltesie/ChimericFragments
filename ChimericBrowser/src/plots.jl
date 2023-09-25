@@ -247,10 +247,12 @@ function cdsframestring(p::Int, idx::Int, interact::Interactions)
     return tp > 0 ? "+$tp" : "$tp"
 end
 
-function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genome::Dict{String,BioSequences.LongDNA{4}}, check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genome::Dict{String,BioSequences.LongDNA{4}},
+        check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
     points1, points2 = [first(p) for p in keys(interact.edgestats[(src,dst)][3])], [last(p) for p in keys(interact.edgestats[(src,dst)][3])]
+    isempty(points1) && return no_ligs_edge_figure(edge_data["interactions"])
     tickpos1, tickpos2 = [minimum(points1), maximum(points1)], [minimum(points2), maximum(points2)]
     ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
@@ -317,4 +319,11 @@ const empty_node_figure = (
         (x = [], y = [], type = "scatter", name = ""),
     ],
     layout = (title = "No basepairing predictions found<br>for selected FDR.",)
+)
+
+no_ligs_edge_figure(nb_ints::Int) = (
+    data = [
+        (x = [], y = [], type = "scatter", name = ""),
+    ],
+    layout = (title = "$nb_ints interactions.<br>No ligation points found.",)
 )
