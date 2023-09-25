@@ -67,7 +67,7 @@ bams = align_mem(trimmed, genome;
     min_seed_len=min_seed_len,
     reseeding_factor=reseeding_factor,
     sort_bam=sort_and_index_bam,
-    threads=threads, output_all_alignments=true)
+    threads=threads)
 
 results_path = mkpath(joinpath(project_path, "results"))
 conditions = Dict(c => [i for (i, info) in enumerate(samplename_condition) if info[2]===c] for c in unique([t[2] for t in samplename_condition]))

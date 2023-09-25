@@ -89,7 +89,7 @@ clipping_penalty=5
 # unpair_penalty and unpair_rescue determine if PE reads get paired or not. If the penalty of the insert
 # between the reads is higher than unpair_penalty, the reads get unpaired. unpair_rescue determines, if
 # pairing should only be attempted, if one read has no hit or always.
-unpair_penalty=15
+unpair_penalty=9
 unpair_rescue=true
 
 # set true, if the alignment files need to be sorted and indexed with a .bai for further processing.
@@ -143,6 +143,8 @@ min_prioritize_overlap=0.9
 # filter_types are also loaded without further processing and interactions with at least one partner
 # belonging to one of the filter_types are excluded from the results.
 cds_type="CDS"
+rrna_type="rRNA"
+trna_type="tRNA"
 additional_types=["MySpecialType"]
 filter_types=["rRNA", "tRNA"]
 

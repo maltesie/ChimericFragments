@@ -39,10 +39,6 @@ file_type = ".fastq.gz"
 # ingnoring the suffices (leading to "conditionA_rep1.fastq.gz" beeing assigned to "conditionA"
 # in the default settings)
 samplename_condition = [
-    ("wt_lcd_1", "wt_lcd"),
-    ("wt_lcd_2", "wt_lcd"),
-    ("wt_hcd_1", "wt_hcd"),
-    ("wt_hcd_2", "wt_hcd"),
     ("hfq_lcd_1", "hfq_lcd"),
     ("hfq_lcd_2", "hfq_lcd"),
     ("hfq_hcd_1", "hfq_hcd"),
@@ -85,7 +81,7 @@ clipping_penalty=5
 # unpair_penalty and unpair_rescue determine if PE reads get paired or not. If the penalty of the insert
 # between the reads is higher than unpair_penalty, the reads get unpaired. unpair_rescue determines, if
 # pairing should only be attempted, if one read has no hit or always.
-unpair_penalty=15
+unpair_penalty=9
 unpair_rescue=true
 
 # set true, if the alignment files need to be sorted and indexed with a .bai for further processing.
@@ -139,6 +135,8 @@ min_prioritize_overlap=0.9
 # filter_types are also loaded without further processing and interactions with at least one partner
 # belonging to one of the filter_types are excluded from the results.
 cds_type="CDS"
+rrna_type="rRNA"
+trna_type="tRNA"
 additional_types=["MySpecialType"]
 filter_types=["rRNA", "tRNA"]
 
@@ -212,7 +210,7 @@ bp_gap_extend_penalty=3
 # min_reads will be excluded from the results.
 max_fisher_fdr=1.0
 max_bp_fdr=1.0
-min_reads=3
+min_reads=2
 
 # toggle, if interactions without ligation points are kept in the results. Depending on the read length. With
 # a sufficiently large read length, filtering out interactions without ligation points can increase the quality

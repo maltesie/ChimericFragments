@@ -153,12 +153,16 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
 
-            correlation_matrix = corspearman(Matrix(interactions.edges[:, interactions.replicate_ids]))
-            correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
-            for (i,repid) in enumerate(interactions.replicate_ids)
-                correlation_df[:, repid] = correlation_matrix[:, i]
+            if nrow(interactions.edges) > 0
+                correlation_matrix = corspearman(Matrix(interactions.edges[:, interactions.replicate_ids]))
+                correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
+                for (i,repid) in enumerate(interactions.replicate_ids)
+                    correlation_df[:, repid] = correlation_matrix[:, i]
+                end
+                @info "Correlation between interaction counts per replicate:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
+            else
+                @info "Could not compute correlation between interaction counts. No interactions left after filtering!"
             end
-            @info "Correlation between interaction counts per replicate:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
 
             @info "Saving..."
 
