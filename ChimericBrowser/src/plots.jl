@@ -251,6 +251,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
         check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
+    ((src,dst) in keys(interact.edgestats)) || return no_ligs_edge_figure(edge_data["interactions"])
     points1, points2 = [first(p) for p in keys(interact.edgestats[(src,dst)][3])], [last(p) for p in keys(interact.edgestats[(src,dst)][3])]
     isempty(points1) && return no_ligs_edge_figure(edge_data["interactions"])
     tickpos1, tickpos2 = [minimum(points1), maximum(points1)], [minimum(points2), maximum(points2)]
