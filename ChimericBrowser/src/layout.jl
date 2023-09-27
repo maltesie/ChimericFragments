@@ -223,7 +223,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
 
         html_div(className="horizontal", children=[
             dcc_dropdown(id="fdr-source", options=[
-                (label = "node degree distribution", value = "degree"),
+                (label = "Node degree distribution", value = "degree"),
                 (label = "Annotation stats", value = "annotation"),
                 (label = "Odds ratio distribution", value = "odds"),
                 (label = "Basepairing alignments clipping distribution", value = "bp"),
