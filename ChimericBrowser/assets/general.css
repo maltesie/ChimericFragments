@@ -437,6 +437,10 @@ input[type="button"]:hover {
     margin-top:10px;
 }
 
+#aggregation-fdr-slider {
+    min-width:60%;
+}
+
 #info-output {
     text-wrap:wrap;
 }

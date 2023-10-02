@@ -90,4 +90,5 @@ chimeric_analysis(features, bams, results_path, conditions, genome;
     n_genome_samples=n_genome_samples,
     shift_weight=bp_shift_weight,
     keep_ints_without_ligation=keep_ints_without_ligation,
-    filter_name_queries=filter_name_queries)
+    filter_name_queries=filter_name_queries,
+    join_pvalues_method=Symbol(combine_pvalues_method))

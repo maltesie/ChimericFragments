@@ -193,7 +193,7 @@ end
 
 score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
 function addpvalues!(interactions::Interactions, genome::Genome, random_model_ecdf::ECDF; fisher_exact_tail="right", include_read_identity=true,
-                        include_singles=true, check_interaction_distances=(30,0), bp_parameters=(4,5,0,7,8,3), shift_weight=0.5)
+                        include_singles=true, check_interaction_distances=(30,0), bp_parameters=(4,5,0,7,8,3), shift_weight=0.5, join_pvalues_method=:stouffer)
 
     if include_read_identity
         ints_between = interactions.edges[!, :nb_ints]
@@ -271,23 +271,25 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                                                         paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos, sco, ligation_count)
 
             end
-            pvs = zeros(sum(interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats); init=0))
-            edge_row.bp_pvalue = if length(pvs) > 0
-                current_i = 1
-                for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
-                    if p in keys(interactions.bpstats)
-                        pvs[current_i:(current_i+interactions.bpstats[p][7]-1)] .= interactions.bpstats[p][1]
+            if join_pvalues_method in (:fisher, :fdr)
+                pvs = zeros(sum(interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats); init=0))
+                edge_row.bp_pvalue = if length(pvs) > 0
+                    current_i = 1
+                    for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                        if p in keys(interactions.bpstats)
+                            pvs[current_i:(current_i+interactions.bpstats[p][7]-1)] .= interactions.bpstats[p][1]
+                        end
+                        current_i += interactions.bpstats[p][7]
                     end
-                    current_i += interactions.bpstats[p][7]
+                    join_pvalues_method == :fisher ? MultipleTesting.combine(PValues(pvs), Fisher()) : minimum(adjust(PValues(pvs), BenjaminiHochberg()))
+                else
+                    NaN
                 end
-                #MultipleTesting.combine(PValues(pvs), Fisher())
-                minimum(adjust(PValues(pvs), BenjaminiHochberg()))
-            else
-                NaN
+            elseif join_pvalues_method == :stouffer
+                pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+                ws = Float64[interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+                edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), ws, Stouffer()) : NaN
             end
-            #pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-            #ws = Float64[interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-            #edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), ws, Stouffer()) : NaN
         end
     end
 

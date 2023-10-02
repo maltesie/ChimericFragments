@@ -60,7 +60,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             n_genome_samples=500000,
                             shift_weight=1.0,
                             keep_ints_without_ligation=true,
-                            filter_name_queries=[])
+                            filter_name_queries=[],
+                            join_pvalues_method=:stouffer)
 
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
         println(io, "[", args.level, "] ", args.message)
@@ -126,7 +127,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             addpositions!(interactions, features)
             addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
                     fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters,
-                    shift_weight=shift_weight)
+                    shift_weight=shift_weight, join_pvalues_method=join_pvalues_method)
 
             total_reads = sum(interactions.edges[!, :nb_ints])
             total_ints = nrow(interactions.edges)

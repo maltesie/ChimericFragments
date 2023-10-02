@@ -248,12 +248,14 @@ function cdsframestring(p::Int, idx::Int, interact::Interactions)
 end
 
 function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genome::Dict{String,BioSequences.LongDNA{4}},
-        check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel)
+        check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel, max_fdr::Float64)
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
     ((src,dst) in keys(interact.edgestats)) || return no_ligs_edge_figure(edge_data["interactions"])
-    points1, points2 = [first(p) for p in keys(interact.edgestats[(src,dst)][3])], [last(p) for p in keys(interact.edgestats[(src,dst)][3])]
-    isempty(points1) && return no_ligs_edge_figure(edge_data["interactions"])
+    fdrs = [interact.bpstats[p][1] for p in keys(interact.edgestats[(src,dst)][3])]
+    fdr_keys = [p for (i, p) in enumerate(keys(interact.edgestats[(src,dst)][3])) if fdrs[i] <= max_fdr]
+    isempty(fdr_keys) && return no_ligs_edge_figure(edge_data["interactions"])
+    points1, points2 = first.(fdr_keys), last.(fdr_keys)
     tickpos1, tickpos2 = [minimum(points1), maximum(points1)], [minimum(points2), maximum(points2)]
     ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
@@ -270,38 +272,83 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
             xaxis=attr(title="RNA2: $name2", tickmode="array", tickvals=tickpos2, ticktext=ticks2)))
 end
 
+function count_ligation_sites_as1(nodeid::Int64, node_data::Dash.JSON3.Object, interact::Interactions, bp_len::Int, max_fdr::Float64)
+    counts = Dict{Int, Dict{Int,Int}}()
+    isnegative = interact.nodes.strand[nodeid] == '-'
+    partners = node_data["lig_as_rna1"]
+    for partner in partners
+        ligation_points = keys(interact.edgestats[(nodeid, partner)][3])
+        fdr = adjust(PValues([interact.bpstats[(p[1], p[2])][1] for p in ligation_points]), BenjaminiHochberg())
+        for ((r1, r2), f) in zip(ligation_points, fdr)
+            f < max_fdr || continue
+            p = (r1, r2)
+            c = interact.bpstats[p][7]
+            for pl in interact.bpstats[p][2]:interact.bpstats[p][3]
+                p1 = p[1] + (isnegative ? 1 : -1) * (bp_len - pl)
+                if p1 in keys(counts)
+                    partner in keys(counts[p1]) ? counts[p1][partner] += c : counts[p1][partner] = c
+                else
+                    counts[p1] = Dict(partner=>c)
+                end
+            end
+        end
+    end
+    return counts
+end
+function count_ligation_sites_as2(nodeid::Int64, node_data::Dash.JSON3.Object, interact::Interactions, bp_len::Int, max_fdr::Float64)
+    counts = Dict{Int, Dict{Int,Int}}()
+    isnegative = interact.nodes.strand[nodeid] == '-'
+    partners = node_data["lig_as_rna2"]
+    for partner in partners
+        ligation_points = keys(interact.edgestats[(partner, nodeid)][3])
+        fdr = adjust(PValues([interact.bpstats[(p[1], p[2])][1] for p in ligation_points]), BenjaminiHochberg())
+        for ((r1, r2), f) in zip(ligation_points, fdr)
+            f < max_fdr || continue
+            p = (r1, r2)
+            c = interact.bpstats[p][7]
+            for pl in interact.bpstats[p][4]:interact.bpstats[p][5]
+                p2 = r2 + (isnegative ? -1 : 1) * (bp_len - pl) - 1
+                if p2 in keys(counts)
+                    partner in keys(counts[p2]) ? counts[p2][partner] += c : counts[p2][partner] = c
+                else
+                    counts[p2] = Dict(partner=>c)
+                end
+            end
+        end
+    end
+    return counts
+end
 function nested_join(s::Vector{String}, n::Int, max_len::Int, it_minor::String, it_major::String)
     mys = length(s) > max_len ? [s[1:min(length(s), max_len)]..., "..."] : s
     join([join(mys[((i-1)*n+1):min((i*n), length(mys))], it_minor) for i in 1:(1+div(length(mys), n))], it_major)
 end
-function node_figure(node_data::Dash.JSON3.Object, interact::Interactions)
+function node_figure(node_data::Dash.JSON3.Object, interact::Interactions, interaction_distances::Tuple{Int64, Int64}, max_fdr::Float64)
     idx = parse(Int, node_data["id"])
     name = interact.nodes.name[idx]
-    length(node_data["lig_as_rna1"]) == 0 && length(node_data["lig_as_rna2"]) == 0 && return empty_node_figure
-    minpos = minimum(minimum(parse(Int, String(k)) for (k,_) in node_data[select_key])
-        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
-    maxpos = maximum(maximum(parse(Int, String(k)) for (k,_) in node_data[select_key])
-        for select_key in ("lig_as_rna1", "lig_as_rna2") if length(node_data[select_key])>0)
+    lp_rna1 = count_ligation_sites_as1(idx, node_data, interact, interaction_distances[1], max_fdr)
+    lp_rna2 = count_ligation_sites_as2(idx, node_data, interact, interaction_distances[1], max_fdr)
+    length(lp_rna1) == 0 && length(lp_rna2) == 0 && return empty_node_figure
+    minpos = minimum(minimum(k for k in keys(lp)) for lp in (lp_rna1, lp_rna2) if length(lp)>0)
+    maxpos = maximum(maximum(k for k in keys(lp)) for lp in (lp_rna1, lp_rna2) if length(lp)>0)
     tickpos = [minpos, maxpos]
     ticktext = [cdsframestring(p, idx, interact) for p in tickpos]
     return plot([
             begin
-                ligationpoints = [parse(Int, String(k))=>v for (k,v) in node_data[select_key]]
-                kv = sort(ligationpoints, by=x->x[1])
+                kv = sort(collect(ligationpoints), by=x->x[1])
                 positions, counts = first.(kv), sum.(values.(last.(kv)))
                 allpositions = length(positions) > 0 ? collect(minimum(positions):maximum(positions)) : Int[]
                 pindex = in.(allpositions, Ref(positions))
                 indextrans = [pindex[i] ? sum(view(pindex, 1:i)) : 0 for i in eachindex(allpositions)]
                 allcounts = [pindex[i] ? counts[indextrans[i]] : 0 for i in eachindex(allpositions)]
                 nb_binding = Int[pindex[i] ? length(kv[indextrans[i]][2]) : 0 for i in eachindex(allpositions)]
-                partners = [pindex[i] ? nested_join(["$n: $c" for (n, c) in sort(collect(node_data[select_key][p]),
-                    by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], 3, 17, ", ", "<br>") : "" for (i, p) in enumerate(allpositions)]
+                partners = [pindex[i] ? nested_join(["$(interact.nodes.name[n]): $c" for (n, c) in sort(collect(ligationpoints[p]),
+                    by=x->x[2], rev=true)], 3, 17, ", ", "<br>") : "" for (i, p) in enumerate(allpositions)]
                 ticks = [cdsframestring(p, idx, interact) for p in tickpos]
                 hover_texts = ["position: $(cdsframestring(p, idx, interact)) ($p)<br># of partners here: $b<br>total reads count: $c<br>$t"
                     for (p, c, t, b) in zip(allpositions, allcounts, partners, nb_binding)]
                 scatter(x = allpositions, y = allcounts, fill="tozeroy", name=legend, text=hover_texts, hoverinfo="text")
             end
-            for (select_key, legend) in zip(("lig_as_rna1", "lig_as_rna2"), ("as RNA1", "as RNA2"))
+            for (ligationpoints, legend) in zip((lp_rna1, lp_rna2), ("as RNA1", "as RNA2"))
         ],
         Layout(title = "$name on $(interact.nodes.ref[idx]) ($(interact.nodes.strand[idx]))", xaxis_title = "position", yaxis_title = "count",
             xaxis=attr(tickmode="array", tickvals=tickpos, ticktext=ticktext), showlegend=false)

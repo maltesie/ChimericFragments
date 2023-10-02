@@ -150,6 +150,13 @@ info_area_layout() = html_div(
     id="plots-block",
     children=[
         dcc_graph(id="plotly-graph"),
+        html_div(style=Dict("background-color"=>"white", "display"=>"flex", "flex-direction"=>"row", "padding-left"=>"20px", "padding-bottom"=>"10px"), children=[
+                html_p("local FDR:"),
+                dcc_slider(id="aggregation-fdr-slider", min=0.0, max=1.0, step=0.01, value=0.1,
+                    marks=Dict(0.0=>Dict("label"=>"0.0"), 1.0=>Dict("label"=>"1.0")),
+                    tooltip=Dict("placement"=>"bottom", "always_visible"=>true)),
+            ]
+        ),
         html_div(
             className="horizontal",
             children=[

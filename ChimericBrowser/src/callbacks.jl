@@ -5,7 +5,7 @@ const update_selection_outputs = [
     Output("summary-container", "children"),
     Output("data-tabs", "value"),
     Output("graph", "selectedNodeData"),
-    Output("graph", "selectedEdgeData")
+    Output("graph", "selectedEdgeData"),
 ]
 const update_selection_inputs = [
     Input("min-reads", "value"),
@@ -22,18 +22,18 @@ const update_selection_states = [
     State("dropdown-update-dataset", "value"),
     State("data-tabs", "value"),
     State("graph", "selectedNodeData"),
-    State("graph", "selectedEdgeData")
+    State("graph", "selectedEdgeData"),
 ]
-update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, bp_len::Int, param_dict::Vector{Pair{String, String}}) =
-callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads,
-        max_interactions, max_fdr, max_bp_fdr, search_strings, type_strings, layout_value, ligation, exclusive, dataset, tab_value, selected_node, selected_edge
+update_selection_callback!(app::Dash.DashApp, interactions::Dict{String, Interactions}, param_dict::Vector{Pair{String, String}}) =
+callback!(app, update_selection_outputs, update_selection_inputs, update_selection_states; prevent_initial_call=true) do min_reads, max_interactions, max_fdr,
+        max_bp_fdr, search_strings, type_strings, layout_value, ligation, exclusive, dataset, tab_value, selected_node, selected_edge
     my_search_strings = isnothing(search_strings) || all(isempty.(search_strings)) ? String[] : string.(search_strings)
     my_type_strings = isnothing(type_strings) || all(isempty.(type_strings)) ? String[] : string.(type_strings)
     any(isnothing(v) for v in (min_reads, max_interactions, max_bp_fdr, max_fdr)) && throw(PreventUpdate())
     df = filtered_dfview(interactions[dataset], my_search_strings, my_type_strings, min_reads, max_interactions, Float64(max_fdr),
         Float64(max_bp_fdr), "ligation" in ligation, "exclusive" in exclusive)
     table_output = table_data(df, interactions[dataset])
-    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value, bp_len, Float64(max_bp_fdr))
+    cytoscape_output = cytoscape_elements(df, interactions[dataset], layout_value)
     circos_output = circos_data(df, interactions[dataset])
     summary_output = summary_statistics(df, interactions[dataset], param_dict)
     return table_output, cytoscape_output, circos_output, summary_output, tab_value, selected_node, selected_edge
@@ -77,25 +77,44 @@ callback!(app, update_plots_outputs, update_plots_inputs, update_plots_states; p
     return bp_score_dist_plot(interactions[dataset], randseq_model_ecdf, genome_model_ecdf, Float64(plot_fdr)), p1, p2
 end
 
-const update_selected_element_inputs = [
-    Input("graph", "selectedNodeData"),
-    Input("graph", "selectedEdgeData")
+const update_aggregation_slider_inputs = [
+    Input("aggregation-fdr-slider", "value")
 ]
-const update_selected_element_outputs = [
-    Output("plotly-graph", "figure"),
+const update_aggregation_slider_outputs = [
+    Output("plotly-graph", "figure")
 ]
-const update_selected_element_states = [
-    State("dropdown-update-dataset", "value")
+const update_aggregation_slider_states = [
+    State("graph", "selectedNodeData"),
+    State("graph", "selectedEdgeData"),
+    State("dropdown-update-dataset", "value"),
 ]
-update_selected_element_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, interactions::Dict{String, Interactions},
+update_aggregation_slider_callback!(app::Dash.DashApp, genome::Dict{String,BioSequences.LongDNA{4}}, interactions::Dict{String, Interactions},
         check_interaction_distances::Tuple{Int,Int}, model::AffineGapScoreModel) =
-callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do node_data, edge_data, dataset
+callback!(app, update_aggregation_slider_outputs, update_aggregation_slider_inputs, update_aggregation_slider_states; prevent_initial_call=true) do aggregation_fdr, node_data, edge_data, dataset
 
     no_node_data = isnothing(node_data) || isempty(node_data)
     no_edge_data = isnothing(edge_data) || isempty(edge_data)
+
     no_node_data && no_edge_data && return [empty_figure]
-    no_edge_data && return [node_figure(node_data[1], interactions[dataset])]
-    return [edge_figure(edge_data[1], interactions[dataset], genome, check_interaction_distances, model)]
+
+    no_edge_data && return [node_figure(node_data[1], interactions[dataset], check_interaction_distances, Float64(aggregation_fdr))]
+
+    return [edge_figure(edge_data[1], interactions[dataset], genome, check_interaction_distances, model, Float64(aggregation_fdr))]
+end
+
+const update_selected_element_inputs = [
+    Input("graph", "selectedNodeData"),
+    Input("graph", "selectedEdgeData"),
+]
+const update_selected_element_outputs = [
+    Output("aggregation-fdr-slider", "value"),
+]
+const update_selected_element_states = [
+    State("aggregation-fdr-slider", "value"),
+]
+update_selected_element_callback!(app::Dash.DashApp) =
+callback!(app, update_selected_element_outputs, update_selected_element_inputs, update_selected_element_states; prevent_initial_call=true) do _, _, aggregation_fdr
+    return [aggregation_fdr]
 end
 
 click_cyto_button_callback!(app::Dash.DashApp) =
