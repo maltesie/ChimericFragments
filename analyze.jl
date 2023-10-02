@@ -19,7 +19,7 @@ isdir(data_folder) || throw(AssertionError("Cannot find a directory called $data
 
 using Pkg
 
-Pkg.activate("ChimericAnalysis")
+Pkg.activate(joinpath(@__DIR__, "ChimericAnalysis"))
 Pkg.instantiate()
 
 using ChimericAnalysis, RNASeqTools

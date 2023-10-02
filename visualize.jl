@@ -15,7 +15,7 @@ isfile(joinpath(project_path, genome_file)) || throw(AssertionError("Cannot find
 
 import Pkg
 
-Pkg.activate("ChimericBrowser")
+Pkg.activate(joinpath(@__DIR__, "ChimericBrowser"))
 Pkg.instantiate()
 
 using ChimericBrowser

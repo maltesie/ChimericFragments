@@ -294,7 +294,7 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
     end
 
     nan_index = .!isnan.(interactions.edges.bp_pvalue)
-    interactions.edges.bp_fdr[nan_index] = adjust(PValues(interactions.edges.bp_pvalue[nan_index]), BenjaminiHochberg())
+    any(nan_index) && (interactions.edges.bp_fdr[nan_index] = adjust(PValues(interactions.edges.bp_pvalue[nan_index]), BenjaminiHochberg()))
     return interactions
 end
 

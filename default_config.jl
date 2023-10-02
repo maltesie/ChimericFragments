@@ -196,7 +196,7 @@ bp_shift_weight=1.0
 
 # choose, which method to use for joining pvalues from all ligation points of a given pair of annotations.
 # Possible options: "stouffer", "fisher" and "fdr". "fdr" takes the minimum FDR of the pvalues.
-join_pvalues_method="stouffer"
+combine_pvalues_method="stouffer"
 
 # Set the number of sample pairs of length bp_distance_behind + bp_distance_before to be used to build the
 # null model of the basepairing test.
