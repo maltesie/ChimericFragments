@@ -16,17 +16,19 @@ problems during the installation of ChimericFragments.
 
 ChimericFragments depends on fastp (0.23.3+) for reads trimming and on bwa-mem2 (2.2.1+) and samtools (1.14.0+)
 for sequence alignments and .bam file processing. **If you run ChimericFragments on Linux, the binaries are provided
-and do not have to be installed separately**. For other operating systems (not tested), you can find the tools on 
-github ([bwa-mem2](https://github.com/bwa-mem2/bwa-mem2/releases), 
+and do not have to be installed separately**. For other operating systems (not tested), you can find the tools on
+github ([bwa-mem2](https://github.com/bwa-mem2/bwa-mem2/releases),
     [samtools](https://github.com/samtools/samtools/releases),
     [fastp](https://github.com/OpenGene/fastp/releases)).
 
 ## Install
 
-ChimericFragments is tested on Linux. The default parameters of ChimericFragments are set for running on Linux and no 
-paths to the binary dependencies have to be provided. For other operating systems, the paths to the binaries have to 
-be set in the configuration file. ChimericFragments depends on a number of Julia packages that have to be installed 
-and precompiled. This is done automatically on the first run of ChimericFragments and can take up to a few minutes.
+You can find the latest release of ChimericFragments [here](https://github.com/maltesie/ChimericFragments/releases/latest).
+To install, download the compressed source code and unzip the archive. It is tested on Linux and the default parameters
+of ChimericFragments are set for running on Linux and no paths to any of the binary dependencies have to be provided.
+For other operating systems, the paths to the binaries have to be set in the configuration file. ChimericFragments
+depends on a number of Julia packages that have to be installed and precompiled. This is done automatically on the
+first run of ChimericFragments and can take up to a few minutes.
 
 #### Update
 

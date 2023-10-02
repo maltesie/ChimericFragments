@@ -3,6 +3,7 @@
 # If BWA or samtools are not installed systemwide, please provide full paths to the binaries
 bwa_mem2_bin = nothing
 samtools_bin = nothing
+fastp_bin = nothing
 
 # If the annotation file, the genome file and the data folder containing the sample files are not
 # located next to the config file, please provide full paths.

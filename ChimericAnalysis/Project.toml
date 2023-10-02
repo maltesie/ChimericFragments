@@ -1,7 +1,7 @@
 name = "ChimericAnalysis"
 uuid = "1e145ea6-5c9c-4372-916a-97a8037fb2b9"
 authors = ["Malte Siemers <malte.siemers@mailbox.org>"]
-version = "1.0.3"
+version = "1.0.4"
 
 [deps]
 BioAlignments = "00701ae9-d1dc-5365-b64a-a3a3ebf5695e"
