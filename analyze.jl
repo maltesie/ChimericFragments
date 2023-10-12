@@ -50,7 +50,7 @@ merge_utrs_and_cds && (features = mergetypes(features, cds_type, threeutr_type, 
 
 bp_parameters = (AU_score, GC_score, GU_score, bp_mismatch_penalty, bp_gap_open_penalty, bp_gap_extend_penalty)
 
-trimmed = skip_trimming ? fastqs : trim_fastp(fastqs; min_length=min_length, average_window_quality=average_window_quality, deduplicate=deduplicate)
+trimmed = skip_trimming ? fastqs : trim_fastp(fastqs; fastp_bin=fastp_bin, min_length=min_length, average_window_quality=average_window_quality, deduplicate=deduplicate)
 
 bams = align_mem(trimmed, genome;
     bwamem_bin=bwa_mem2_bin,

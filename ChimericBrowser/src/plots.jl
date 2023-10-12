@@ -252,7 +252,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
     ((src,dst) in keys(interact.edgestats)) || return no_ligs_edge_figure(edge_data["interactions"])
-    fdrs = [interact.bpstats[p][1] for p in keys(interact.edgestats[(src,dst)][3])]
+    fdrs = adjust(PValues([interact.bpstats[p][1] for p in keys(interact.edgestats[(src,dst)][3])]), BenjaminiHochberg())
     fdr_keys = [p for (i, p) in enumerate(keys(interact.edgestats[(src,dst)][3])) if fdrs[i] <= max_fdr]
     isempty(fdr_keys) && return no_ligs_edge_figure(edge_data["interactions"])
     points1, points2 = first.(fdr_keys), last.(fdr_keys)
@@ -260,7 +260,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     ticks1, ticks2 = [cdsframestring(p, src, interact) for p in tickpos1], [cdsframestring(p, dst, interact) for p in tickpos2]
     maxints = maximum(values(interact.edgestats[(src, dst)][3]))
     sizes = [ceil(interact.edgestats[(src, dst)][3][p]/maxints*4)*5 for p in zip(points1, points2)]
-    colors = adjust(PValues([interact.bpstats[p][1] for p in zip(points1, points2)]), BenjaminiHochberg())
+    colors = [fdr for fdr in fdrs if fdr <= max_fdr]
     bp_plots = [alignment_ascii_plot(src,dst,p1,p2,interact,genome,check_interaction_distances, model) *
         "<br><br>ligation point: ($(cdsframestring(p1, src, interact)), $(cdsframestring(p2, dst, interact)))<br>FDR: $(round(c, digits=4))<br>" *
         "supporting reads: $(interact.edgestats[(src,dst)][3][(p1,p2)])" for (p1,p2,c) in zip(points1, points2, colors)]
