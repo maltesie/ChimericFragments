@@ -154,15 +154,6 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             # Add infromation on relative positions of interactions within their annotations. Defined in interactions.jl
             addpositions!(interactions, features)
 
-            # Do statistical tests. Defined in interactions.jl
-            addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
-                    fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters,
-                    shift_weight=shift_weight, join_pvalues_method=join_pvalues_method)
-
-            # Compute stats on significant interactions and read counts and filter data
-            total_reads = sum(interactions.edges[!, :nb_ints])
-            total_ints = nrow(interactions.edges)
-
             # Filter data according to query strings which are looked up in the annotation names
             if !isempty(filter_name_queries)
                 filterset = Set(findall(foldl(.|, occursin.(q, interactions.nodes.name) for q in filter_name_queries)))
@@ -173,6 +164,15 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             above_min_reads = sum(interactions.edges[interactions.edges.nb_ints .>= min_reads, :nb_ints])
             above_min_ints = sum(interactions.edges.nb_ints .>= min_reads)
             filter!(:nb_ints => x -> x >= min_reads, interactions.edges)
+
+            # Do statistical tests. Defined in interactions.jl
+            addpvalues!(interactions, genome, genome_model_ecdf; include_singles=include_singles, include_read_identity=include_read_identity,
+                    fisher_exact_tail=fisher_exact_tail, check_interaction_distances=check_interaction_distances, bp_parameters=bp_parameters,
+                    shift_weight=shift_weight, join_pvalues_method=join_pvalues_method)
+
+            # Compute stats on significant interactions and read counts and filter data
+            total_reads = sum(interactions.edges[!, :nb_ints])
+            total_ints = nrow(interactions.edges)
 
             # Filter according to fishers exact test FDR cutoff
             total_sig_reads = sum(interactions.edges[interactions.edges.fisher_fdr .<= max_fisher_fdr, :nb_ints])
