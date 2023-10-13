@@ -267,8 +267,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     return interactions
 end
 
-# Compute the complementarity score as a combination between the alignment score from the AffineGapScoreModel and the wightd shift between
-# Complementarity regions towards eachother in the local coordinates of the fixed-length sequences used to compute the complementarity.
+# Compute the complementarity score as a combination between the alignment score from the AffineGapScoreModel and the weighted shift between
+# complementarity regions towards eachother in the local coordinates of the fixed-length sequences used to compute the complementarity.
 score_bp(paln::PairwiseAlignmentResult, shift_weight::Float64) = BioAlignments.score(paln) - (shift_weight * abs(paln.aln.a.aln.anchors[end].seqpos - paln.aln.a.aln.anchors[end].refpos))
 
 # Perform statistical tests (Fisher exact and custom complementarity test)
