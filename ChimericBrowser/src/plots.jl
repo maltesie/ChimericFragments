@@ -217,7 +217,7 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
     n1::String, ref1::String, strand1::Char, l1::Int, r1::Int, c1::Int = interact.nodes[i1, [:name, :ref, :strand, :left, :right, :cds]]
     n2::String, ref2::String, strand2::Char, l2::Int, r2::Int, c2::Int = interact.nodes[i2, [:name, :ref, :strand, :left, :right, :cds]]
 
-    _, al1, ar1, al2, ar2, _ = interact.bpstats[(p1,p2)]
+    _, al1, ar1, al2, ar2, _ = interact.bpstats[(i1, p1, i2, p2)]
 
     al1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - al1)
     ar1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - ar1)
@@ -252,7 +252,7 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     src, dst = parse(Int, edge_data["source"]), parse(Int, edge_data["target"])
     name1, name2 = interact.nodes[src, :name], interact.nodes[dst, :name]
     ((src,dst) in keys(interact.edgestats)) || return no_ligs_edge_figure(edge_data["interactions"])
-    fdrs = adjust(PValues([interact.bpstats[p][1] for p in keys(interact.edgestats[(src,dst)][3])]), BenjaminiHochberg())
+    fdrs = adjust(PValues([interact.bpstats[(src, i1, dst, i2)][1] for (i1, i2) in keys(interact.edgestats[(src,dst)][3])]), BenjaminiHochberg())
     fdr_keys = [p for (i, p) in enumerate(keys(interact.edgestats[(src,dst)][3])) if fdrs[i] <= max_fdr]
     isempty(fdr_keys) && return no_ligs_edge_figure(edge_data["interactions"])
     points1, points2 = first.(fdr_keys), last.(fdr_keys)
@@ -278,13 +278,13 @@ function count_ligation_sites_as1(nodeid::Int64, node_data::Dash.JSON3.Object, i
     partners = node_data["lig_as_rna1"]
     for partner in partners
         ligation_points = keys(interact.edgestats[(nodeid, partner)][3])
-        fdr = adjust(PValues([interact.bpstats[(p[1], p[2])][1] for p in ligation_points]), BenjaminiHochberg())
+        fdr = adjust(PValues([interact.bpstats[(nodeid, p[1], partner, p[2])][1] for p in ligation_points]), BenjaminiHochberg())
         for ((r1, r2), f) in zip(ligation_points, fdr)
             f < max_fdr || continue
-            p = (r1, r2)
+            p = (nodeid, r1, partner, r2)
             c = interact.bpstats[p][7]
             for pl in interact.bpstats[p][2]:interact.bpstats[p][3]
-                p1 = p[1] + (isnegative ? 1 : -1) * (bp_len - pl)
+                p1 = r1 + (isnegative ? 1 : -1) * (bp_len - pl)
                 if p1 in keys(counts)
                     partner in keys(counts[p1]) ? counts[p1][partner] += c : counts[p1][partner] = c
                 else
@@ -301,10 +301,10 @@ function count_ligation_sites_as2(nodeid::Int64, node_data::Dash.JSON3.Object, i
     partners = node_data["lig_as_rna2"]
     for partner in partners
         ligation_points = keys(interact.edgestats[(partner, nodeid)][3])
-        fdr = adjust(PValues([interact.bpstats[(p[1], p[2])][1] for p in ligation_points]), BenjaminiHochberg())
+        fdr = adjust(PValues([interact.bpstats[(partner, p[1], nodeid, p[2])][1] for p in ligation_points]), BenjaminiHochberg())
         for ((r1, r2), f) in zip(ligation_points, fdr)
             f < max_fdr || continue
-            p = (r1, r2)
+            p = (partner, r1, nodeid, r2)
             c = interact.bpstats[p][7]
             for pl in interact.bpstats[p][4]:interact.bpstats[p][5]
                 p2 = r2 + (isnegative ? -1 : 1) * (bp_len - pl) - 1

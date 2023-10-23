@@ -8,7 +8,7 @@ struct Interactions
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
     # Dictionary containing all ligation points as key connected with additional information such as p-value, position of the complementarity region
     # within the sequences and complementarity score.
-    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}
+    bpstats::Dict{Tuple{Int, Int, Int, Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}
     # Dictionary counting all multi-chimeric arrangements
     multichimeras::Dict{Vector{Int}, Int}
     # Replicate IDs from the config get stored here for access of each replicates' counts in the edges table
@@ -23,7 +23,7 @@ function Interactions()
         :nb_ints=>Int[], :nb_ints_src=>Int[], :nb_ints_dst=>Int[], :nb_partners=>Int[], :strand=>Char[], :hash=>UInt[])
     edges = DataFrame(:src=>Int[], :dst=>Int[], :nb_ints=>Int[], :nb_multi=>Int[], :meanlen1=>Float64[], :meanlen2=>Float64[], :nms1=>Float64[], :nms2=>Float64[])
     edgestats = Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}()
-    bpstats = Dict{Tuple{Int,Int}, Float64}()
+    bpstats = Dict{Tuple{Int, Int, Int, Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}()
     multichimeras = Dict{Vector{Int}, Int}()
     counts = Dict{Symbol,Vector{Int}}()
     Interactions(nodes, edges, edgestats, bpstats, multichimeras, Symbol[], counts)
@@ -374,7 +374,7 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                 # Compute score and p-value from empirical cumulative density of random scores and save all into the Interactions struct.
                 sco = score_bp(paln, shift_weight)
                 thisp = 1-random_model_ecdf(sco)
-                interactions.bpstats[(i1,i2)] = (thisp, paln.aln.a.aln.anchors[1].seqpos + 1, paln.aln.a.aln.anchors[end].seqpos,
+                interactions.bpstats[(edge_row.src, i1, edge_row.dst, i2)] = (thisp, paln.aln.a.aln.anchors[1].seqpos + 1, paln.aln.a.aln.anchors[end].seqpos,
                                                         paln.aln.a.aln.anchors[1].refpos + 1, paln.aln.a.aln.anchors[end].refpos, sco, ligation_count)
 
             end
@@ -382,15 +382,17 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
             # Combine p-values for each interaction from all corresponding ligation points. Possible methods are: Fisher, Stouffer and the minimum of FDR values
             if join_pvalues_method in (:fisher, :fdr)
                 # Preallocate memory for p-value collection.
-                pvs = zeros(sum(interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats); init=0))
+                pvs = zeros(sum(interactions.bpstats[(edge_row.src, p[1], edge_row.dst, p[2])][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                    if (edge_row.src, p[1], edge_row.dst, p[2]) in keys(interactions.bpstats); init=0))
                 edge_row.bp_pvalue = if length(pvs) > 0
                     current_i = 1
                     # Populate preallocated p-values array by saving one p-value multiple times if the corresponding ligation point was sampled multiple times.
                     for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
-                        if p in keys(interactions.bpstats)
-                            pvs[current_i:(current_i+interactions.bpstats[p][7]-1)] .= interactions.bpstats[p][1]
+                        bpkey = (edge_row.src, p[1], edge_row.dst, p[2])
+                        if bpkey in keys(interactions.bpstats)
+                            pvs[current_i:(current_i+interactions.bpstats[bpkey][7]-1)] .= interactions.bpstats[bpkey][1]
                         end
-                        current_i += interactions.bpstats[p][7]
+                        current_i += interactions.bpstats[bpkey][7]
                     end
                     # Compute combined p-value with Fishers method or as minimum of FDR values
                     join_pvalues_method == :fisher ? MultipleTesting.combine(PValues(pvs), Fisher()) : minimum(adjust(PValues(pvs), BenjaminiHochberg()))
@@ -400,8 +402,10 @@ function addpvalues!(interactions::Interactions, genome::Genome, random_model_ec
                 end
             elseif join_pvalues_method == :stouffer
                 # Stouffers method can weight the individual p-values by the number, the ligation point was sampled, so they can be collected directly.
-                pvs = [interactions.bpstats[p][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
-                ws = Float64[interactions.bpstats[p][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3]) if p in keys(interactions.bpstats)]
+                pvs = [interactions.bpstats[(edge_row.src, p[1], edge_row.dst, p[2])][1] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                    if (edge_row.src, p[1], edge_row.dst, p[2]) in keys(interactions.bpstats)]
+                ws = Float64[interactions.bpstats[(edge_row.src, p[1], edge_row.dst, p[2])][7] for p in keys(interactions.edgestats[(edge_row.src, edge_row.dst)][3])
+                    if (edge_row.src, p[1], edge_row.dst, p[2]) in keys(interactions.bpstats)]
                 # Compute combined p-value by Stouffers method or return NaN if no ligation point was found.
                 edge_row.bp_pvalue = length(pvs) > 0 ? MultipleTesting.combine(PValues(pvs), ws, Stouffer()) : NaN
             end

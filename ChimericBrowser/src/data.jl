@@ -2,7 +2,7 @@ struct Interactions
     nodes::DataFrame
     edges::DataFrame
     edgestats::Dict{Tuple{Int,Int}, Tuple{Int, Dict{Tuple{Int,Int},Int}, Dict{Tuple{Int,Int},Int}}}
-    bpstats::Dict{Tuple{Int,Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}
+    bpstats::Dict{Tuple{Int, Int, Int, Int}, Tuple{Float64, Int64, Int64, Int64, Int64, Float64, Int64}}
     multichimeras::Dict{Vector{Int}, Int}
     replicate_ids::Vector{Symbol}
     counts::Dict{Symbol,Vector{Int}}
