@@ -219,10 +219,10 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
 
     _, al1, ar1, al2, ar2, _ = interact.bpstats[(i1, p1, i2, p2)]
 
-    al1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - al1)
+    al1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - al1) - Int(strand1=='+')
     ar1 = p1 + (strand1=='-' ? 1 : -1) * (check_interaction_distances[1] - ar1)
-    al2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - al2)
-    ar2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - ar2) - 1
+    al2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - al2) - Int(strand2=='-')
+    ar2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - ar2) 
 
     s1 = strand1=='+' ?
         genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
@@ -234,7 +234,7 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
 
     basepairing_string(alignment(p), n1, n2,
         strand1=='+' ? ((p1-check_interaction_distances[1])-(c1>0 ? c1 : l1)) : ((c1>0 ? c1 : r1)-(p1+check_interaction_distances[1])),
-        strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2)),
+        (strand2=='-' ? ((c2>0 ? c2 : r2)-(p2-check_interaction_distances[1])) : ((p2+check_interaction_distances[1])-(c2>0 ? c2 : l2))) - 1,
         al1, ar1, al2, ar2)
 end
 
