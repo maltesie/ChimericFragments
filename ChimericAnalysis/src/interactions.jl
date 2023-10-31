@@ -119,11 +119,13 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
         is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
         counts[5] += is_chimeric
         is_multi = length(mergedread)>2
-        counts[6] += is_multi
 
         # Loop through all merged alignments to add hashs to the translation dictionary for indexing
         for (i1,_) in mergedread.pindexpairs
 
+            # Skip if type of annotation is in filter_types
+            !isempty(filter_types) && (alignments.antypes[i1] in filter_types) && continue
+            
             # Compute hash based on name and type of the annotation
             h = myhash(alignments, i1)
             if !(h in keys(trans))
@@ -160,11 +162,15 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
         # Add multi-chimeras to dictionary using the indices in the node table in the correct order on the read(s) as a key.
         if is_multi
-            all_together = [trans[myhash(alignments, i1)] for (i1,_) in mergedread.pindexpairs]
-            if all_together in keys(interactions.multichimeras)
-                interactions.multichimeras[all_together] += 1
-            else
-                interactions.multichimeras[all_together] = 1
+            all_together = [trans[myhash(alignments, i1)] 
+                for (i1,_) in mergedread.pindexpairs if myhash(alignments, i1) in keys(trans)]
+            if length(all_together) > 2 
+                counts[6] += 1
+                if all_together in keys(interactions.multichimeras)
+                    interactions.multichimeras[all_together] += 1
+                else
+                    interactions.multichimeras[all_together] = 1
+                end
             end
         end
 
@@ -174,10 +180,11 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
             # Skip if pair is not chimeric. This is used to deal with self-chimeras.
             ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
 
+             # Skip if type of annotation is in filter_types
+            (!isempty(filter_types) && (alignments.antypes[first(pair1)] in filter_types || alignments.antypes[first(pair2)] in filter_types)) && continue
+            
             # Get indices from hashs of the annotations of both alignments
             a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
-
-            (!isempty(filter_types) && (alignments.antypes[first(pair1)] in filter_types || alignments.antypes[first(pair2)] in filter_types)) && continue
 
             # Count summary for each annotation with info on its order in the pair.
             node_ints[a, 4] += 1
