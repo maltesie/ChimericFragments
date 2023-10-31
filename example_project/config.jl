@@ -40,10 +40,8 @@ file_type = ".fastq.gz"
 # ingnoring the suffices (leading to "conditionA_rep1.fastq.gz" beeing assigned to "conditionA"
 # in the default settings)
 samplename_condition = [
-    ("hfq_lcd_1", "hfq_lcd"),
-    ("hfq_lcd_2", "hfq_lcd"),
-    ("hfq_hcd_1", "hfq_hcd"),
-    ("hfq_hcd_2", "hfq_hcd")
+    ("hcd_small_1", "hfq_hcd"),
+    ("hcd_small_2", "hfq_hcd"),
 ]
 
 
