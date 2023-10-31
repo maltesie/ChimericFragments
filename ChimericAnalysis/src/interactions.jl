@@ -99,15 +99,21 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
     # Loop through all reads, the alignment variable is a AlignedRead from RNASeqTools containing all alignments from one read or read pair
     for alignment in alignments
-
-        # Skip read if it contains an alignment annotated with a type defined in filter_types
-        if (!isempty(filter_types) && typein(alignment, filter_types)) || !(hasannotation(alignment))
-            counts[4] += 1
+        
+         # Skip read if it contains no annotated fragments
+        if !(hasannotation(alignment))
+            counts[2] += 1
             continue
         end
 
         # Compute merged alignments, combining overlapping information from reads 1 and 2.
         mergeparts!(mergedread, alignment)
+
+        # Skip read if it contains only alignments annotated with a type defined in filter_types
+        if !isempty(filter_types) && all(alignments.antypes[first(pair)] in filter_types for pair in mergedread.pindexpairs)
+            counts[4] += 1
+            continue
+        end
 
         # Classify read into chimeric and possibly multi-chimeric
         is_chimeric = ischimeric(mergedread; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras)
@@ -170,6 +176,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
             # Get indices from hashs of the annotations of both alignments
             a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
+
+            (!isempty(filter_types) && (alignments.antypes[first(pair1)] in filter_types || alignments.antypes[first(pair2)] in filter_types)) && continue
 
             # Count summary for each annotation with info on its order in the pair.
             node_ints[a, 4] += 1
