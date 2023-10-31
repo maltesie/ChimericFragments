@@ -1,5 +1,12 @@
 function bp_score_dist_plot(interact::Interactions, genome_model_ecdf::ECDF, randseq_model_ecdf::ECDF, plot_fdr_level::Float64)
 
+    length(interact.bpstats) > 0 || return (
+        data = [
+            (x = [], y = [], type = "scatter", name = ""),
+        ],
+        layout = (title = "No ligation points found.",)
+    )
+
     interact_ecdf = ecdf([t[6] for t in values(interact.bpstats)])
 
     max_score = Int(floor(max(
@@ -41,6 +48,13 @@ function bp_clipping_dist_plots(interact::Interactions, plotting_fdr_level::Floa
     r1 = [t[3] for t in values(interact.bpstats)]
     l2 = [t[4] for t in values(interact.bpstats)]
     r2 = [t[5] for t in values(interact.bpstats)]
+
+    length(interact.bpstats) > 0 || return (
+        data = [
+            (x = [], y = [], type = "scatter", name = ""),
+        ],
+        layout = (title = "No ligation points found.",)
+    )
 
     bp_fdrs = adjust(PValues([t[1] for t in values(interact.bpstats)]), BenjaminiHochberg())
     bp_index = bp_fdrs .<= plotting_fdr_level
