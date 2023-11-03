@@ -91,7 +91,7 @@ The visualization can now be accessed in your browser. Under default settings, o
 use the address http://localhost:8050 or remotely access it by replacing localhost with the IP of the
 host running the visualization.
 
-#### Example analysis data
+## Example analysis data
 
 To run the analysis on the supplied example toy data, open a terminal in this folder and run
 
