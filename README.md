@@ -97,7 +97,7 @@ To run the analysis on the supplied example toy data, open a terminal in this fo
 
 >julia analyze.jl example_project/config.jl
 
-The example analysis will take a minute and the resulting tables and plots will be located in the
+The example analysis will take a minute and the resulting tables and data files will be located in the
 folder example_project/results. After the successful analysis part, you can start the visualization:
 
 >julia visualyze.jl example_project/config.jl
