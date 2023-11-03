@@ -87,6 +87,12 @@ After a successful run of the analysis, the visualization can be started by runn
 
 >julia path/to/visualize.jl path/to/project_folder/config.jl
 
+The visualization can now be accessed in your browser. Under default settings, on your own machine use the address
+
+>http://localhost:8050
+
+or remotely access it by replacing localhost with the IP of the host running the visualization.
+
 #### Example analysis data
 
 To run the analysis on the supplied example toy data, open a terminal in this folder and run
