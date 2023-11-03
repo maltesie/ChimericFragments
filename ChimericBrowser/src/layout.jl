@@ -1,14 +1,19 @@
+# layout.jl defines the html structure of the graphical interface. Documentation available at https://dash.plotly.com/julia/layout
+# the style attribute of every html element directly sets the CSS attributes of the component.
+
+# Set the main title on the upper left corner
 headline_layout() = html_div(
     id="headline",
     children=[html_h3("ChimericBrowser")]
 )
 
+# define the dropbox for choosing the current dataset from all available datasets in the jld folder created by analyze.jl
 dataset_control_layout(datasets::Vector{String}) = html_div(
-    className="control-element",
+    className="control-element", # control-element is defined in assets/general.css
     children=[
         html_p("Dataset:"),
         dcc_dropdown(
-            id="dropdown-update-dataset",
+            id="dropdown-update-dataset", # used to access the element in the callbacks
             value=datasets[1],
             clearable=false,
             options=[
@@ -18,12 +23,13 @@ dataset_control_layout(datasets::Vector{String}) = html_div(
     ]
 )
 
+# define the dropbox for choosing the node positioning algorithm
 positioning_control_layout() = html_div(
-    className="control-element",
+    className="control-element", # control-element is defined in assets/general.css
     children=[
         html_p("Positioning:"),
         dcc_dropdown(
-            id="dropdown-update-layout",
+            id="dropdown-update-layout", # used to access the element in the callbacks
             value="clustered",
             clearable=false,
             options=[
@@ -33,50 +39,64 @@ positioning_control_layout() = html_div(
     ]
 )
 
+# combine dataset selection and node positioning next to each other
 dataset_and_postioning_layout(datasets::Vector{String}) = html_div(
-    className="controls-block horizontal",
+    className="controls-block horizontal", # controls-block and horizontal are defined in assets/general.css
     children=[dataset_control_layout(datasets), positioning_control_layout()]
 )
 
 reads_selection_layout(min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
-    className="controls-block",
+    className="controls-block", # controls-block is defined in assets/general.css
     children=[
-        html_div(className="horizontal",
+        html_div(className="horizontal", # horizontal is defined in assets/general.css
             children=[
+                # control element for selecting the minimum number of reads per interaction
                 html_div(
                     style=Dict("padding-top"=>"2px"),
                     children=[
-                        html_p(id="min-reads-text", children=["minimum # of reads:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                        dcc_input(id="min-reads", type="number", value=min_reads, min=min_reads, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                        html_p(id="min-reads-text", children=["minimum # of reads:"],
+                            style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="min-reads", type="number", value=min_reads, min=min_reads,
+                            style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                     ]
                 ),
+                # control element for setting the maximum number of interactions in the selection
                 html_div(
                     style=Dict("padding-top"=>"2px", "margin-left"=>"15px"),
                     children=[
-                        html_p(id="nb-interactions-text", children=["maximum # of interactions:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                        dcc_input(id="max-interactions", type="number", value=500, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                        html_p(id="nb-interactions-text", children=["maximum # of interactions:"],
+                            style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-interactions", type="number", value=500,
+                            style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                     ]
                 )
             ]),
         html_div(
-            className="horizontal",
+            className="horizontal", # horizontal is defined in assets/general.css
             style=Dict("padding-top"=>"15px"),
             children=[
+                # control element for setting the maximum FDR according to Fishers exact test
                 html_div(
                     style=Dict("padding-top"=>"2px"),
                     children=[
-                        html_p(id="max-fdr-text", children=["max. fisher fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                        dcc_input(id="max-fdr", type="number", value=max_fdr, min=0.0, max=max_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                        html_p(id="max-fdr-text", children=["max. fisher fdr:"],
+                            style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-fdr", type="number", value=max_fdr, min=0.0, max=max_fdr, step=0.01,
+                            style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                     ]
                 ),
+                # control element for setting the maximum FDR according to complementarity around ligation points
                 html_div(
                     style=Dict("padding-top"=>"2px", "margin-left"=>"45px"),
                     children=[
-                        html_p(id="max-bp-fdr-text", children=["max. bp fdr:"], style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
-                        dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01, style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
+                        html_p(id="max-bp-fdr-text", children=["max. bp fdr:"],
+                            style=Dict("padding-right"=>"5px", "padding-top"=>"2px")),
+                        dcc_input(id="max-bp-fdr", type="number", value=max_bp_fdr, min=0.0, max=max_bp_fdr, step=0.01,
+                            style=Dict("max-height"=>"18px", "min-width"=>"70px", "max-width"=>"70px"))
                     ]
                 )
             ]),
+        # control element for including interactions without ligation points
         dcc_checklist(
             id="ligation",
             style=Dict("padding-top"=>"15px"),
@@ -86,18 +106,21 @@ reads_selection_layout(min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = 
     ]
 )
 
+# combine filtering criteria for number of interactions, number of reads per interaction and FDRs
 search_layout() = html_div(
-    className="controls-block",
+    className="controls-block", # controls-block is defined in assets/general.css
     children=[
         html_div(
-            className="horizontal",
+            className="horizontal", # horizontal is defined in assets/general.css
             children=[
+                # control element for toggling AND and OR behavior of combining search terms (genes and annotation types)
                 dcc_checklist(
                     id="exclusive-search",
                     options=[Dict("label"=>"exclusive search", "value"=>"exclusive")],
                     style=Dict("width"=>"100%"),
                     value=["exclusive"]
                 ),
+                # control element for selecting search terms for annotation types
                 dcc_dropdown(
                     id="type-multi-select",
                     options=[],
@@ -108,9 +131,10 @@ search_layout() = html_div(
             ]
         ),
         html_div(
-            className="horizontal",
+            className="horizontal", # horizontal is defined in assets/general.css
             style=Dict("padding-top"=>"10px"),
             children=[
+                # control element for selecting search terms for gene names
                 dcc_dropdown(
                     id="gene-multi-select",
                     options=[],
@@ -118,6 +142,7 @@ search_layout() = html_div(
                     placeholder="Select annotation(s)",
                 ),
                 html_div(style=Dict("width"=>"10px")),
+                # button to add currently selected node to the list of genes to filter for
                 html_button(
                     "<-",
                     id="add-selected-btn",
@@ -128,6 +153,7 @@ search_layout() = html_div(
     ]
 )
 
+# control element for selecting functional annotations, currently not used
 annotation_control_layout(function_categories::Vector{Dict{String,String}}) = html_div(
     className="controls-block",
     children=[
@@ -146,20 +172,24 @@ annotation_control_layout(function_categories::Vector{Dict{String,String}}) = ht
     ]
 )
 
+# html element for displaying ligation points plots and complementarity plots
 info_area_layout() = html_div(
-    id="plots-block",
+    id="plots-block", # plots-block is defined in assets/general.css
     children=[
         dcc_graph(id="plotly-graph"),
         html_div(style=Dict("background-color"=>"white", "display"=>"flex", "flex-direction"=>"row", "padding-left"=>"20px", "padding-bottom"=>"10px"), children=[
                 html_p("local FDR:"),
+                # control element for selecting local FDR in current selection for ligation points plots and complementarity plots
                 dcc_slider(id="aggregation-fdr-slider", min=0.0, max=1.0, step=0.01, value=1.0,
                     marks=Dict(0.0=>Dict("label"=>"0.0"), 1.0=>Dict("label"=>"1.0")),
                     tooltip=Dict("placement"=>"bottom", "always_visible"=>true)),
             ]
         ),
         html_div(
-            className="horizontal",
+            className="horizontal", # horizontal is defined in assets/general.css
             children=[
+                # Dash component to handle copying data for selected points in ligation points plots and complementarity plots to clipboard
+                # this component uses the systems clipboard api, if none is present, it does not work
                 dcc_clipboard(id="clip"),
                 html_p(id="clip-text", "(select data point)", style=Dict("padding-left"=>"10px")),
             ]
@@ -168,12 +198,13 @@ info_area_layout() = html_div(
     ]
 )
 
+# combine all control components and the info area for additional plots into a column on the left side of the page
 control_column_layout(datasets::Vector{String}, min_reads::Int, max_fisher_fdr::Float64, max_bp_fdr::Float64) = html_div(
-    id="left-column",
+    id="left-column", # left-column is defined in assets/general.css
     children=[
         headline_layout(),
         html_div(
-            className="container",
+            className="container", # container is defined in assets/general.css
             children=[
                 dataset_and_postioning_layout(datasets),
                 reads_selection_layout(min_reads, max_fisher_fdr, max_bp_fdr),
@@ -184,15 +215,18 @@ control_column_layout(datasets::Vector{String}, min_reads::Int, max_fisher_fdr::
     ]
 )
 
+# layout for the cytoscape component
 cytoscape_layout(stylesheet::Vector{Dict{String,Any}}) = html_div(
     id="graph-container",
-    className="container",
+    className="container", # container is defined in assets/general.css
     children=[
+        # JavaScript cytoscape component from DashBio loaded as an external Dash component.
+        # Documentation available at https://dash.plotly.com/julia/cytoscape/layout
         cytoscape(
             id="graph",
             elements=[],
             autoRefreshLayout=true,
-            stylesheet=stylesheet,
+            stylesheet=stylesheet, # load the stylesheet defined in cytostyle.jl
             responsive=true,
             layout=Dict("name"=>"preset", "animate"=>false),
             minZoom=0.2,
@@ -201,8 +235,10 @@ cytoscape_layout(stylesheet::Vector{Dict{String,Any}}) = html_div(
         ),
         html_div(
             children=[
+                # button for downloading the current network as a .svg file
                 html_button("DOWNLOAD SVG", id="save-svg", n_clicks=0),
                 html_div(style=Dict("height"=>"8%")),
+                # html div for displaying additional info for the network, currently not in use
                 html_div(id="legend-container"),
                 html_div(style=Dict("height"=>"100%"))
             ]
@@ -210,6 +246,8 @@ cytoscape_layout(stylesheet::Vector{Dict{String,Any}}) = html_div(
     ]
 )
 
+# internal layout for the circos plot component. Documentation available at https://dash.plotly.com/dash-bio/circos (currently only for python,
+# but component properties are the same for julia)
 chords_track(data::Vector{Dict{String,Any}}) = Dict(
     "type"=>"CHORDS",
     "data"=>data,
@@ -223,12 +261,14 @@ chords_track(data::Vector{Dict{String,Any}}) = Dict(
         )
     )
 )
+# layout for the plotting tab view containing additional plots including the circos plot component
 circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     id="plots-container",
-    className="container",
+    className="container", # container is defined in assets/general.css
     children=[
 
         html_div(className="horizontal", children=[
+            # dropdown to choose the plot type
             dcc_dropdown(id="fdr-source", options=[
                 (label = "Node degree distribution", value = "degree"),
                 (label = "Annotation stats", value = "annotation"),
@@ -236,16 +276,19 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
                 (label = "Basepairing alignments clipping distribution", value = "bp"),
             ], value="bp", clearable=false, multi=false),
             html_p("FDR for plots:"),
+            # slider to set the FDR cutoff for the plots
             dcc_slider(id="fdr-value", min=0.0, max=1.0, step=0.01, value=0.1,
                 marks=Dict(0.0=>Dict("label"=>"0.0"), 1.0=>Dict("label"=>"1.0")),
                 tooltip=Dict("placement"=>"bottom", "always_visible"=>true)), #  )
         ], style=Dict("width"=>"100%", "padding-top"=>"20px")),
 
+        # JavaScript circos plot component from DashBio loaded as an external Dash component.
+        # Documentation available at https://dash.plotly.com/dash-bio/circos
         html_div(id="circos-container",
         children=[
-            html_div(className="plot", children=[dcc_graph(id="plot1")]),
-            html_div(className="plot", children=[dcc_graph(id="plot2")]),
-            html_div(className="plot", children=[dcc_graph(id="plot3")]),
+            html_div(className="plot", children=[dcc_graph(id="plot1")]), # area for hosting the first plot of the selected plot type
+            html_div(className="plot", children=[dcc_graph(id="plot2")]), # area for hosting the second plot of the selected plot type
+            html_div(className="plot", children=[dcc_graph(id="plot3")]), # area for hosting the general complementarity score distribution plot
             circos(
                 id="my-dashbio-circos",
                 enableZoomPan=true,
@@ -276,6 +319,7 @@ circos_layout(genome_info::Vector{Pair{String,Int}}) = html_div(
     ]
 )
 
+# layout for the data table component of Dash. Documentation available at https://dash.plotly.com/julia/datatable
 table_layout() = html_div(
     id="table-container",
     className="container",
@@ -298,6 +342,7 @@ table_layout() = html_div(
             ],
 
         ),
+        # control element for downloading the currently selected interactions as a .csv file
         html_div(children=[
             html_button("DOWNLOAD CSV", id="btn-csv"),
             dcc_download(id="download-dataframe-csv"),
@@ -305,14 +350,16 @@ table_layout() = html_div(
     ]
 )
 
+# layout for the summary view.
 summary_layout() = html_div(
     id="summary-container",
     className="container",
     children=[
-        html_h3("loading...")
+        html_h3("loading...")  # Defaults to showing a loading message until it is refreshed with actual data
     ]
 )
 
+# make a tab component from a html div component for integration into a tabs element
 astab(div_component::Component, tab_id::String) = dcc_tab(
     id=lowercasefirst(tab_id) * "-tab",
     className="custom-tab",
@@ -322,6 +369,7 @@ astab(div_component::Component, tab_id::String) = dcc_tab(
     children=[div_component]
 )
 
+# layout of the tabs element hosting the cytoscape graph view, the table view, the additional plots view and the summary view
 tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}}) = html_div(
     id="tabs-container",
     className="container",
@@ -340,6 +388,8 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
     ]
 )
 
+# layout for the complete graphical interface, combining the column with the control elements with the tabs element hosting the
+# different data views.
 browser_layout(datasets::Vector{String}, genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{String,Any}},
                 min_reads::Int, max_fdr::Float64, max_bp_fdr::Float64) = html_div(
     id="root",

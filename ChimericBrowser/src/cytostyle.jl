@@ -1,3 +1,6 @@
+# cytostyle.l defines the layout of the graph visualization.
+
+# set layout for a selected node or edge to paint a highlighting box around the selected node or edge
 const core_style = Dict(
     "selector"=>"core",
     "style"=> Dict(
@@ -7,6 +10,7 @@ const core_style = Dict(
     )
 )
 
+# nodes are colored according to their annotation type and sized according to the number of chimeric reads they occur in
 const base_node_style = Dict(
     "selector"=> "node",
     "style"=> Dict(
@@ -25,6 +29,7 @@ const base_node_style = Dict(
     )
 )
 
+# draw a selected node above other components
 const selected_node_style = Dict(
     "selector"=> "node:selected",
     "style"=> Dict(
@@ -36,6 +41,7 @@ const selected_node_style = Dict(
     )
 )
 
+# Draw edges as bezier curves and set thicknes relative to the number of reads they represent
 const base_edge_style = Dict(
     "selector"=> "edge",
     "style"=> Dict(
@@ -50,6 +56,7 @@ const base_edge_style = Dict(
     )
 )
 
+# draw a selected edge above other components
 const selected_edge_style = Dict(
     "selector"=> "edge:selected",
     "style"=> Dict(
@@ -58,6 +65,7 @@ const selected_edge_style = Dict(
     )
 )
 
+# this edge type is used for interactions without ligation points.
 const srna_edge_style = Dict(
     "selector"=> ".no_ligation_edge",
     "style"=> Dict(
@@ -65,6 +73,7 @@ const srna_edge_style = Dict(
     )
 )
 
+# generator function for all defined layouts
 function stylesheet(types::Dict{String,String})
     srna_node_style = Dict(
         "selector"=> ".$(types["srna"])",
