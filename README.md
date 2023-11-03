@@ -12,14 +12,20 @@ What ChimericFragments can do:
 - Compute significance based on complementarity between ligated fragments.
 - Visualize the network of interactions and host the visualization as a web app.
 - Allow for searching and filtering of the network by various criteria.
-- Provide interactive plots for individual and aggregated ligation events. 
+- Provide interactive plots for individual and aggregated ligation events.
+
+Necessary inputs to the analysis pipeline:
+
+- Sequencing reads (single end or paired end, FASTA or FASTQ, gzipped or not)
+- A genome (FASTA)
+- A corresponding annotation for CDS (and optionally UTRs) and non-coding RNAs (GFF3)
 
 ## Dependencies
 
 ChimericFragments is written in the Julia programming language and requires Julia (1.9.3) to
 be installed on your system. You can download Julia [here](https://julialang.org/downloads/). It is
 highly recommended to install Julia as described [here](https://julialang.org/downloads/platform/).
-**ChimericFragments will not work with a Julia installation from your OS repository or a package manager 
+**ChimericFragments will not work with a Julia installation from your OS repository or a package manager
 like conda**.
 
 ChimericFragments depends on fastp (0.23.3+) for reads trimming and on bwa-mem2 (2.2.1+) and samtools (1.14.0+)
