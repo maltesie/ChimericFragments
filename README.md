@@ -89,7 +89,7 @@ After a successful run of the analysis, the visualization can be started by runn
 
 The visualization can now be accessed in your browser. Under default settings, on your own machine
 use the address http://localhost:8050 or remotely access it by replacing localhost with the IP of the
-host running the visualization.
+host running the visualization. To shutdown the visualization, use Ctrl-C in the terminal.
 
 ## Example analysis data
 
