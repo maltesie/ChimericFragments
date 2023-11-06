@@ -351,6 +351,9 @@ function edge_figure(edge_data::Dash.JSON3.Object, interact::Interactions, genom
     # return an empty figure with error message as title when no ligation points can be found for the pair of genes
     ((src,dst) in keys(interact.edgestats)) || return no_ligs_edge_figure(edge_data["interactions"])
 
+    # return an empty figure with error message as title when no ligation points can be found for the pair of genes
+    length(interact.edgestats[(src,dst)][3]) > 0 || return no_ligs_edge_figure(edge_data["interactions"])
+
     # compute local FDR only on the ligation points between the selected pair of genes
     fdrs = adjust(PValues([interact.bpstats[(src, i1, dst, i2)][1] for (i1, i2) in keys(interact.edgestats[(src,dst)][3])]), BenjaminiHochberg())
 
