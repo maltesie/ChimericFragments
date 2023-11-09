@@ -192,7 +192,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
 
             # Check if interactions are left after filtering, compute correlation between interaction counts in replicates
             if nrow(interactions.edges) > 0
-                correlation_matrix = corspearman(Matrix(interactions.edges[:, interactions.replicate_ids]))
+                correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
                 correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
                 for (i,repid) in enumerate(interactions.replicate_ids)
                     correlation_df[:, repid] = correlation_matrix[:, i]
