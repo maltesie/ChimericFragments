@@ -236,28 +236,55 @@ const click_clipboard_inputs = [
 ]
 const click_clipboard_outputs = [
     Output("clip-text", "children"),
-    Output("clip", "content"),
+    Output("clip", "data"),
 ]
 const click_clipboard_states = [
     State("graph", "selectedNodeData"),
     State("graph", "selectedEdgeData"),
+    State("dropdown-update-dataset", "value"),
+    State("aggregation-fdr-slider", "value")
 ]
 # Callbacks get executed when input variables change their value. clock_clipboard_callback is executed when a data point in a ligation points plot
 # or a basepair aggregation plot is clicked and sends the tooltip text to the clipboard component.
-click_clipboard_callback!(app::Dash.DashApp) =
-callback!(app, click_clipboard_outputs, click_clipboard_inputs, click_clipboard_states; prevent_initial_call=true) do click_data, node_data, edge_data
+click_clipboard_callback!(app::Dash.DashApp, interactions::Dict{String,Interactions}, bp_len::Int) =
+callback!(app, click_clipboard_outputs, click_clipboard_inputs, click_clipboard_states; prevent_initial_call=true) do click_data, node_data, edge_data, dataset, max_fdr
     # check if any datapoint is currently selected
     if !isnothing(click_data) && !isempty(click_data)
         # check if the current plot is a basepairing aggregation plot or a ligation point plot
         if !isnothing(node_data) && !isempty(node_data)
-            # for basepairing aggregation plot, collect all targets in the current network predicted to bind the selected position in the selected gene.
+            # coordinate of clicked data point
             p = click_data["points"][1]["x"]
-            select_key = click_data["points"][1]["curveNumber"] == 0 ? "lig_as_rna1" : "lig_as_rna2"
-            partners = join(["$n: $c" for (n,c) in sort(collect(node_data[1][select_key][p]), by=x->x[2] isa String ? parse(Int, x[2]) : x[2], rev=true)], ", ")
-            "<- copy list of partners at position $p", "$partners"
+
+            #index of currently selected gene
+            idx = parse(Int, node_data[1]["id"])
+            n = interactions[dataset].nodes.name[idx]
+
+            # compute counts for all partners for the orientation given by the clicked data point
+            counts = click_data["points"][1]["curveNumber"] == 0 ?
+                count_ligation_sites_as1(idx, node_data[1], interactions[dataset], bp_len, Float64(max_fdr)) :
+                count_ligation_sites_as2(idx, node_data[1], interactions[dataset], bp_len, Float64(max_fdr))
+
+            p in keys(counts) || throw(PreventUpdate())
+            # select only partners at clicked position
+            names_and_counts = sort(collect(counts[p]), by=x->x[2], rev=true)
+
+            # create DataFrame and csv writer and write content in CSV format into temporary string
+            df = DataFrame("name"=>interactions[dataset].nodes.name[first.(names_and_counts)], "count"=>last.(names_and_counts))
+            csvrowwriteriterator = CSV.RowWriter(df)
+            dfstring = join(collect(csvrowwriteriterator))
+
+            rna_type = click_data["points"][1]["curveNumber"] == 0 ? "RNA1" : "RNA2"
+
+            # return description and initiate download
+            "partners of $n at position $p", Dict("filename"=>"$(dataset)_$(n)_$(rna_type)_$(p)_partners.csv", "content"=>dfstring ,"base64"=>false)
+
         elseif !isnothing(edge_data) && !isempty(edge_data)
-            # for ligation points plot, copy tooltip text containing info and a basepairing prediction for the currently selected ligation point.
-            "<- copy selected basepairing prediction", "$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))"
+            # get indices and names of the interaction
+            src, dst = parse(Int, edge_data[1]["source"]), parse(Int, edge_data[1]["target"])
+            nsrc, ndst = interactions[dataset].nodes.name[src], interactions[dataset].nodes.name[dst]
+
+            # return description and initiate download of tooltip text containing info and a basepairing prediction for the currently selected ligation point.
+            "basepairing between $nsrc and $ndst", Dict("filename"=>"$(dataset)_$(nsrc)_$(ndst)_basepairing.txt", "content"=>"$(replace(click_data["points"][1]["text"], "<br>"=>"\n"))" ,"base64"=>false)
         end
     else
         throw(PreventUpdate())

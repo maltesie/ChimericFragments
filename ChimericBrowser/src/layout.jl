@@ -190,8 +190,8 @@ info_area_layout() = html_div(
             children=[
                 # Dash component to handle copying data for selected points in ligation points plots and complementarity plots to clipboard
                 # this component uses the systems clipboard api, if none is present, it does not work
-                dcc_clipboard(id="clip"),
-                html_p(id="clip-text", "(select data point)", style=Dict("padding-left"=>"10px")),
+                dcc_download(id="clip"),
+                html_p(id="clip-text", "(click in plot to download tooltip data)"),
             ]
         )
 

@@ -53,7 +53,7 @@ function chimeric_browser(results_folder::String, genome_file::String, types::Di
     update_plots_callback!(app, interactions, randseq_model_ecdf, genome_model_ecdf)
     update_aggregation_slider_callback!(app, genome, interactions, check_interaction_distances, model)
     update_selected_element_callback!(app)
-    click_clipboard_callback!(app)
+    click_clipboard_callback!(app, interactions, check_interaction_distances[1])
     click_cyto_button_callback!(app)
     click_table_button_callback!(app, interactions)
     click_add_node_callback!(app)
