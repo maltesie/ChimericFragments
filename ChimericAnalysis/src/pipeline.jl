@@ -185,19 +185,21 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             filter!(:bp_fdr => x -> (x <= max_bp_fdr) | (isnan(x) & keep_ints_without_ligation), interactions.edges)
 
             # Print pretty table
-            infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
-                "& fdr<=$max_fisher_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
+            #infotable = DataFrame(""=>["total interactions:", "annotation pairs:"], "total"=>[total_reads, total_ints], "reads>=$min_reads"=>[above_min_reads, above_min_ints],
+            #    "& fdr<=$max_fisher_fdr"=>[total_sig_reads, total_sig_ints], "& bp_fdr<=$max_bp_fdr"=>[above_min_bp_reads, above_min_bp_ints])
+            infotable = [
+                "total interactions:" total_reads above_min_reads total_sig_reads above_min_bp_reads;
+                "annotation pairs:" total_ints above_min_ints total_sig_ints above_min_bp_ints;
+            ]
 
-            @info "interaction stats for condition $condition:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+            @info "interaction stats for condition $condition:\n" * pretty_table(String, infotable,
+                header=["", "total", "reads>=$min_reads", "& fdr<=$max_fisher_fdr", "& bp_fdr<=$max_bp_fdr"])
 
             # Check if interactions are left after filtering, compute correlation between interaction counts in replicates
             if nrow(interactions.edges) > 0
-                correlation_matrix = cor(Matrix(interactions.edges[:, interactions.replicate_ids]))
-                correlation_df = DataFrame(replicate_ids=interactions.replicate_ids)
-                for (i,repid) in enumerate(interactions.replicate_ids)
-                    correlation_df[:, repid] = correlation_matrix[:, i]
-                end
-                @info "Correlation between interaction counts per replicate:\n" * DataFrames.pretty_table(String, correlation_df, nosubheader=true)
+                correlation_matrix = hcat(String.(interactions.replicate_ids), cor(Matrix(interactions.edges[:, interactions.replicate_ids])))
+                @info "Correlation between interaction counts per replicate:\n" * pretty_table(String, correlation_matrix,
+                    header=vcat(["replicate_ids"], String.(interactions.replicate_ids)))
             else
                 @info "Could not compute correlation between interaction counts. No interactions left after filtering!"
             end

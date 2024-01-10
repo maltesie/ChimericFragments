@@ -99,7 +99,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
     # Loop through all reads, the alignment variable is a AlignedRead from RNASeqTools containing all alignments from one read or read pair
     for alignment in alignments
-        
+
          # Skip read if it contains no annotated fragments
         if !(hasannotation(alignment))
             counts[2] += 1
@@ -125,7 +125,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
             # Skip if type of annotation is in filter_types
             !isempty(filter_types) && (alignments.antypes[i1] in filter_types) && continue
-            
+
             # Compute hash based on name and type of the annotation
             h = myhash(alignments, i1)
             if !(h in keys(trans))
@@ -162,9 +162,9 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
         # Add multi-chimeras to dictionary using the indices in the node table in the correct order on the read(s) as a key.
         if is_multi
-            all_together = [trans[myhash(alignments, i1)] 
+            all_together = [trans[myhash(alignments, i1)]
                 for (i1,_) in mergedread.pindexpairs if myhash(alignments, i1) in keys(trans)]
-            if length(all_together) > 2 
+            if length(all_together) > 2
                 counts[6] += 1
                 if all_together in keys(interactions.multichimeras)
                     interactions.multichimeras[all_together] += 1
@@ -182,7 +182,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
 
              # Skip if type of annotation is in filter_types
             (!isempty(filter_types) && (alignments.antypes[first(pair1)] in filter_types || alignments.antypes[first(pair2)] in filter_types)) && continue
-            
+
             # Get indices from hashs of the annotations of both alignments
             a, b = trans[myhash(alignments, first(pair1))], trans[myhash(alignments, first(pair2))]
 
@@ -274,11 +274,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
     interactions.edges[!, replicate_id] .= view(edge_ints, er, 5)
 
     # Create info table for pretty output to terminal and log file
-    infotable = DataFrame(
-        :total=>[nread(alignments)], :chimeric=>[counts[5]], :multi=>[counts[6]], :self=>[counts[3]],
-        :single=>[counts[1]], :filtered=>[counts[4]], :no_class=>[counts[2]],
-    )
-    @info "Classification of reads:\n" * DataFrames.pretty_table(String, infotable, nosubheader=true)
+    @info "Classification of reads:\n" * pretty_table(String, [nread(alignments) counts[5] counts[6] counts[3] counts[1] counts[4] counts[2]],
+        header=["total", "chimeric", "multi", "self", "single", "filtered", "no_class"])
     return interactions
 end
 
