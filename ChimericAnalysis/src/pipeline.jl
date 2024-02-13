@@ -73,7 +73,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             shift_weight=1.0,
                             keep_ints_without_ligation=true,
                             filter_name_queries=[],
-                            join_pvalues_method=:stouffer)
+                            join_pvalues_method=:stouffer,
+                            min_mapping_quality=0)
 
     # Set up logger. It saves all @info and @warn messages and also outputs them to the terminal.
     filelogger = FormatLogger(joinpath(results_path, "analysis.log"); append=true) do io, args
@@ -128,7 +129,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                     # Use the AlignedReads constructor from RNASeqTools to read alignments and sort them according to their position on the read.
                     alignments = AlignedReads(bam; include_secondary_alignments=include_secondary_alignments,
                                             include_alternative_alignments=include_alternative_alignments,
-                                            is_reverse_complement=is_reverse_complement)
+                                            is_reverse_complement=is_reverse_complement, min_mapping_quality=min_mapping_quality)
 
                     @info "Annotating alignments..."
                     # Use annotate! from RNASeqTools to efficiently and uniquely match the annotation with largest overlap to each alignment.

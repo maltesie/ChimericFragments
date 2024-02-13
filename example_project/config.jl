@@ -104,6 +104,10 @@ min_distance=1000
 # orientation of the first.
 is_reverse_complement=true
 
+# bwa-mem assigns a mapping quality of 0 to reads mapping to repeats or copies in the genome. Raise
+# the value of min_mapping_quality above 0 to exclude these reads from the analysis
+min_mapping_quality=1
+
 # If two alignments are classified as chimeric (see min_distance), but both get assigned to the same
 # annotation, this is considered a self chimera.
 allow_self_chimeras=false
