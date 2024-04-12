@@ -20,6 +20,9 @@ Necessary inputs to the analysis pipeline:
 - A genome (FASTA)
 - A corresponding annotation for CDS (and optionally UTRs) and non-coding RNAs (GFF3)
 
+A running instance of the visualization of a V. cholerae RIL-seq experiment can be found 
+[here](https://vch-interactome.uni-jena.de/).
+
 ## Dependencies
 
 ChimericFragments is written in the Julia programming language and requires Julia (1.10.1) to
