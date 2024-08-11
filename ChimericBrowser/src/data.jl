@@ -120,7 +120,7 @@ end
 function make_graph(df::SubDataFrame)
     names = collect(union(Set(df.src), Set(df.dst)))
     name_trans = Dict(n=>i for (i,n) in enumerate(names))
-    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(df.src, df.dst))
+    edges = Edge.((name_trans[n1], name_trans[n2]) for (n1, n2) in zip(df.src, df.dst) if n1 != n2)
     return Graph(edges), names
 end
 # compute positions for placing nodes for a given graph
