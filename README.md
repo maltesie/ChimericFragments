@@ -115,3 +115,9 @@ GNU General Public License for more details. You should have received a copy of 
 GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
 
 Author: Malte Siemers, Friedrich Schiller University Jena
+
+If you use ChimericFragments or its products for your work, please cite:
+
+Malte Siemers, Anne Lippegaus, Kai Papenfort, ChimericFragments: computation, analysis and 
+visualization of global RNA networks, NAR Genomics and Bioinformatics, Volume 6, Issue 2, 
+June 2024, lqae035, https://doi.org/10.1093/nargab/lqae035
