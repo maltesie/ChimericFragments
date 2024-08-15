@@ -65,7 +65,8 @@ end
 
 # Main function for adding a new replicate into an Interactions struct.
 function Base.append!(interactions::Interactions, alignments::AlignedReads, replicate_id::Symbol;
-    min_distance=1000, max_ligation_distance=5, filter_types=["rRNA", "tRNA"], allow_self_chimeras=false, is_paired_end=true)
+    min_distance=1000, max_ligation_distance=5, filter_types=["rRNA", "tRNA"], allow_self_chimeras=false, 
+    min_self_chimera_distance=50, is_paired_end=true)
 
     # If the supplied replicate_id is not known, instantiate new counter and add replicate_id to list of known ids
     if !(String(replicate_id) in interactions.replicate_ids)
@@ -147,7 +148,7 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
         end
 
         # Classify read into self-chimeric xor single xor leave unclassified and count accordingly
-        if isselfchimeric(mergedread; min_distance=min_distance)
+        if isselfchimeric(mergedread; min_distance=min_distance, min_self_chimera_distance=min_self_chimera_distance)
             node_ints[trans[h], 3] += 1
             counts[3] += 1
         elseif !is_chimeric
@@ -178,7 +179,8 @@ function Base.append!(interactions::Interactions, alignments::AlignedReads, repl
         for (i, pair1) in enumerate(mergedread.pindexpairs), pair2 in (@view mergedread.pindexpairs[i+1:end])
 
             # Skip if pair is not chimeric. This is used to deal with self-chimeras.
-            ischimeric(mergedread, pair1, pair2; min_distance=min_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
+            the_distance = (allow_self_chimeras && (mergedread.alns.reads[pair1[1]]==mergedread.alns.reads[pair2[1]])) ? min_self_chimera_distance : min_distance
+            ischimeric(mergedread, pair1, pair2; min_distance=the_distance, check_annotation=!allow_self_chimeras, check_order=allow_self_chimeras) || continue
 
              # Skip if type of annotation is in filter_types
             (!isempty(filter_types) && (alignments.antypes[first(pair1)] in filter_types || alignments.antypes[first(pair2)] in filter_types)) && continue

@@ -102,11 +102,12 @@ function ischimeric(mergedread::MergedAlignedRead; min_distance=1000, check_anno
 end
 
 # Check if there are self-chimeric interactions on the read (see comments in ischimeric)
-function isselfchimeric(mergedread::MergedAlignedRead; min_distance=1000)
+function isselfchimeric(mergedread::MergedAlignedRead; min_distance=1000, min_self_chimera_distance=50)
     length(mergedread) > 1 || return false
     for (i, p1) in enumerate(mergedread.pindexpairs), p2 in (@view mergedread.pindexpairs[i+1:end])
         if !ischimeric(mergedread, p1, p2; min_distance=min_distance, check_annotation=true, check_order=false)
-            if ischimeric(mergedread, p1, p2; min_distance=min_distance, check_annotation=false, check_order=true)
+            the_distance = (mergedread.alns.reads[p1[1]]==mergedread.alns.reads[p2[1]]) ? min_self_chimera_distance : min_distance
+            if ischimeric(mergedread, p1, p2; min_distance=the_distance, check_annotation=false, check_order=true)
                 mergedread.alns.annames[p1[1]] == mergedread.alns.annames[p2[1]] && return true
             end
         end

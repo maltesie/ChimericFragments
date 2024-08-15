@@ -86,6 +86,7 @@ chimeric_analysis(features, bams, results_path, conditions, genome;
     include_read_identity=include_orientation,
     include_singles=include_singles,
     allow_self_chimeras=allow_self_chimeras,
+    min_self_chimera_distance=min_self_chimera_distance,
     bp_parameters=bp_parameters,
     n_genome_samples=n_genome_samples,
     shift_weight=bp_shift_weight,

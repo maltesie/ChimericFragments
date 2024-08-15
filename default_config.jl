@@ -117,9 +117,13 @@ is_reverse_complement=true
 # the value of min_mapping_quality above 0 to exclude these reads from the analysis
 min_mapping_quality=0
 
-# If two alignments are classified as chimeric (see min_distance), but both get assigned to the same
-# annotation, this is considered a self chimera.
+# If two alignments are classified as chimeric (see min_self_cimera_distance), but both get assigned to 
+# the same annotation, this is considered a self chimera.
 allow_self_chimeras=false
+
+# Use min_self_chimera_distance to classify two alignments as self-chimeric if they originate from the 
+# same read sequence and map to coordinates within the specified number of nucleotides.
+min_self_chimera_distance=50
 
 # Tolerance for the distance between alignments on the same read to be classified as ligated. Alignments
 # from different reads have a distance of infinity.

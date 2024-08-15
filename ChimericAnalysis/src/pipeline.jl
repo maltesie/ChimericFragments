@@ -68,6 +68,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                             include_read_identity=true,
                             include_singles=true,
                             allow_self_chimeras=true,
+                            min_self_chimera_distance=50,
                             bp_parameters=(4,5,0,7,8,3),
                             n_genome_samples=500000,
                             shift_weight=1.0,
@@ -139,7 +140,8 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                     @info "Building graph of interactions..."
                     # Call append! from interactions.jl to collect all interactions with their ligation points from the alignments.
                     append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
-                        filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, is_paired_end=is_paired_end)
+                        filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, min_self_chimera_distance=min_self_chimera_distance,
+                        is_paired_end=is_paired_end)
 
                     # Memory management
                     empty!(alignments)
