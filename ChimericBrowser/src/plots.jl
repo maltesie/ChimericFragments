@@ -310,13 +310,17 @@ function alignment_ascii_plot(i1::Int, i2::Int, p1::Int, p2::Int, interact::Inte
     al2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - al2) - Int(strand2=='-')
     ar2 = p2 + (strand2=='-' ? -1 : 1) * (check_interaction_distances[1] - ar2)
 
+    # get chromosome lengths for clamping alignments close to START or END of the sequence.
+    len_ref1 = length(genome[ref1])
+    len_ref2 = length(genome[ref2])
+
     # take sequences around ligation points from the genome
     s1 = strand1=='+' ?
-        genome[ref1][(p1-check_interaction_distances[1]):(p1-check_interaction_distances[2])] :
-        BioSequences.reverse_complement(genome[ref1][(p1+check_interaction_distances[2]):(p1+check_interaction_distances[1])])
+        genome[ref1][clamp(p1-check_interaction_distances[1]+1, 1, len_ref1):clamp(p1-check_interaction_distances[2], 1, len_ref1)] :
+        BioSequences.reverse_complement(genome[ref1][clamp(p1+check_interaction_distances[2], 1, len_ref1):clamp(p1+check_interaction_distances[1]-1, 1, len_ref1)])
     s2 = strand2=='-' ?
-        BioSequences.complement(genome[ref2][(p2-check_interaction_distances[1]):(p2-check_interaction_distances[2])]) :
-        BioSequences.reverse(genome[ref2][(p2+check_interaction_distances[2]):(p2+check_interaction_distances[1])])
+        BioSequences.complement(genome[ref2][clamp(p2-check_interaction_distances[1]+1, 1, len_ref2):clamp(p2-check_interaction_distances[2], 1, len_ref2)]) :
+        BioSequences.reverse(genome[ref2][clamp(p2+check_interaction_distances[2], 1, len_ref2):clamp(p2+check_interaction_distances[1]-1, 1, len_ref2)])
 
     # compute complementary regions as local alignment with parameterized substitution matrix in model
     p = pairalign(LocalAlignment(), s1, s2, model)

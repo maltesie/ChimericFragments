@@ -77,6 +77,8 @@ end
 
 # A pair of alignments is chimeric.
 function ischimeric(mergedread::MergedAlignedRead, pair1::Tuple{Int,Int}, pair2::Tuple{Int, Int}; min_distance=1000, check_annotation=true, check_order=false)
+    # reads mapping to different reference sequences are chimeric
+    (mergedread.alns.refnames[first(pair1)] != mergedread.alns.refnames[first(pair2)]) && return true
     # if enabled, check annotation names
     check_annotation && (mergedread.alns.annames[first(pair1)] == mergedread.alns.annames[first(pair2)]) && return false
     # if enabled, include order of appearance on the reads. If something upstream of something else in the reference appears in the wrong order,
