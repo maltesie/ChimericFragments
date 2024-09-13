@@ -12,7 +12,7 @@ What ChimericFragments can do:
 - Compute tabular data for interactions, multi-chimeras and single transcripts.
 - Compute significance based on complementarity between ligated fragments.
 - Visualize the network of interactions and host the visualization as a web app.
-- Allow for searching and filtering of the network by various criteria.
+- Search and filter the network of interactions by various criteria.
 - Provide interactive plots for individual and aggregated ligation events.
 
 Necessary inputs to the analysis pipeline:
