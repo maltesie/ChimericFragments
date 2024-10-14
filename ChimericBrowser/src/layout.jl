@@ -359,6 +359,92 @@ summary_layout() = html_div(
     ]
 )
 
+# layout for the how-to view.
+howto_layout() = html_div(
+    id="howto-container",
+    className="container",
+    children=[
+        html_h3("How to use this interface"),
+        html_p("This interactive web application allows you to explore high-throughput RNA-RNA interaction experiments visually. 
+            The interface is split into control elements located in the boxes on the left and three main analysis modes located 
+            in the tabs on the right. The analysis modes are the graph-based network view, the table view and the plots view. 
+            Each of them provides different options to interact with the experimental data."),
+        html_table([
+            html_tr([
+                html_td(className="howto-1", "Control elements"), 
+                html_td(className="howto-2", "dataset and node positioning"), 
+                html_td(className="howto-3", "Here you can choose the dataset you want to analyze and how the nodes in the network view will be positioned.
+                    The clustered positioning employs a stress majorization, which can get slow for selections including more than 500 genes.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "filtering of the data"), 
+                html_td(className="howto-3", "To select a subset of the data, you can set cut-offs for the minimum number of reads an interaction should be found in,
+                    the maximum number of interactions to be displayed (interactions are ordered by their read count), and significance levels for the Fisher test of
+                    association between two genes (max. fisher fdr) and the comparison of complementarity towards randomly sampled sequnce pairs from the genome of the 
+                    studied organism (max. bp fdr). Interactions with no ligation data (paired end reads, where each read maps to a different location but the ligation 
+                    site is not included in any of reads) will be displayed with gray edges in the netowrk view, if selected.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "searching for genes and annotation types"), 
+                html_td(className="howto-3", "The selected data can be reduced to interactions involving a single gene or a set of genes. It is also possible to select
+                annotation types (as defined in the GFF annotation used in the analysis) instead of genes. The option *exclusive search* defines, how multiple genes or
+                annotation types are interpreted. With *exclusive search* enabled, both partners of an interaction have to fit to the selection criteria, while without
+                it, only one partner has to fulfil the selected criteria.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", "Network view"), 
+                html_td(className="howto-2", "The network"), 
+                html_td(className="howto-3", "Here you can adjust the visual representation by moving nodes around and you can select single nodes (genes) or edges
+                (interactions) for further information on and plots of the ligation events which were found for the selected entity. The additional plots will be
+                displayed on the left below the control elements. For each interaction, a global and a local FDR is computed, the former based on the full dataset,
+                the latter on the selected and displayed data.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "All ligation events between two transcripts"), 
+                html_td(className="howto-3", "This plot scatters each ligation point (pair of genomic coordinates of a detected ligation event between two transcripts).
+                The plot is interactive and by hovering over each point, additional information is displayed. By clicking into the plot, the underlying data can be
+                downloaded as a text file.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "Ligation summary for a single gene"), 
+                html_td(className="howto-3", "This plot aggregates all ligation events involving the selected gene and plots them along the relative coordinates of the
+                corresponding genomic region. The plot is interactive and by hovering over it, you can identify the genes ligated to the selected gene at the corresponding
+                position. Clicking into it will download all genes found in chimeras at this specific position.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", "Table view"), 
+                html_td(className="howto-2", "downloading selected data"), 
+                html_td(className="howto-3", "This view summarizes the selected data shown in the graph view as a table. The displayed data can be downloaded using the
+                button on the right.")
+            ]),
+            html_tr([
+                html_td(className="howto-1", "Plots view"), 
+                html_td(className="howto-2", "Selecting a summary plot"), 
+                html_td(className="howto-3", "col3_row2")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "The distribution of complementarity scores"), 
+                html_td(className="howto-3", "col3_row1")
+            ]),
+            html_tr([
+                html_td(className="howto-1", ""),
+                html_td(className="howto-2", "The circos plot"), 
+                html_td(className="howto-3", "col3_row1")
+            ]),
+            html_tr([
+                html_td(className="howto-1", "Summary view"), 
+                html_td(className="howto-2", "Total data and selected data"), 
+                html_td(className="howto-3", "col3_row2")
+            ]),
+        ])
+    ]
+)
+
 # make a tab component from a html div component for integration into a tabs element
 astab(div_component::Component, tab_id::String) = dcc_tab(
     id=lowercasefirst(tab_id) * "-tab",
@@ -383,6 +469,7 @@ tabs_layout(genome_info::Vector{Pair{String,Int}}, stylesheet::Vector{Dict{Strin
                 astab(table_layout(), "table"),
                 astab(circos_layout(genome_info), "plots"),
                 astab(summary_layout(), "summary"),
+                astab(howto_layout(), "howto"),
             ]
         )
     ]
