@@ -406,14 +406,16 @@ howto_layout() = html_div(
                 html_td(className="howto-2", "All ligation events between two transcripts"), 
                 html_td(className="howto-3", "This plot scatters each ligation point (pair of genomic coordinates of a detected ligation event between two transcripts).
                 The plot is interactive and by hovering over each point, additional information is displayed. By clicking into the plot, the underlying data can be
-                downloaded as a text file.")
+                downloaded as a text file. For each interaction, a global and a local FDR is computed, the former based on the full dataset, the latter on the selected 
+                and displayed data. A cutoff for the local FDR can be set using the slider below the plot.")
             ]),
             html_tr([
                 html_td(className="howto-1", ""),
                 html_td(className="howto-2", "Ligation summary for a single gene"), 
                 html_td(className="howto-3", "This plot aggregates all ligation events involving the selected gene and plots them along the relative coordinates of the
                 corresponding genomic region. The plot is interactive and by hovering over it, you can identify the genes ligated to the selected gene at the corresponding
-                position. Clicking into it will download all genes found in chimeras at this specific position.")
+                position. Clicking into it will download all genes found in chimeras at this specific position. For each interaction, a global and a local FDR is computed, 
+                the former based on the full dataset, the latter on the selected and displayed data. A cutoff for the local FDR can be set using the slider below the plot.")
             ]),
             html_tr([
                 html_td(className="howto-1", "Table view"), 
@@ -424,22 +426,31 @@ howto_layout() = html_div(
             html_tr([
                 html_td(className="howto-1", "Plots view"), 
                 html_td(className="howto-2", "Selecting a summary plot"), 
-                html_td(className="howto-3", "col3_row2")
+                html_td(className="howto-3", "This view provides several plots, which you can select in the dropdown menu at the top of the tab. There are plots for the
+                *Node degree distribution* (how often does a gene with a certain number of interaction partners appear in the dataset), the *Annotation stats*
+                (How often do the annotation types defined in your GFF annotation interact with each other and how often do they appear in single reads), the *Odds 
+                ratio distribution* (The ratio of chimeric reads of a pair of interacting transcripts vs. each of their frequencies in single reads) and the
+                *Basepairing alignments clipping distribution* (Where do complementary regions between chimeric fragments start and end within the user-defined interval 
+                around the ligation point between them). All plots can be downloaded using the menu bar which appears when hovering over the plot.")
             ]),
             html_tr([
                 html_td(className="howto-1", ""),
                 html_td(className="howto-2", "The distribution of complementarity scores"), 
-                html_td(className="howto-3", "col3_row1")
+                html_td(className="howto-3", "This plot shows the distribution of complementarity scores in the dataset and in the random model from the genome used to
+                compute p-values for detected chimeras. The plot also shows the distribution of scores computed from a random sequence with uniformly distributed nucleotides.
+                The plot can be downloaded using the menu bar which appears when hovering over the plot.")
             ]),
             html_tr([
                 html_td(className="howto-1", ""),
                 html_td(className="howto-2", "The circos plot"), 
-                html_td(className="howto-3", "col3_row1")
+                html_td(className="howto-3", "This plot shows all interactions in the selected subset of the data. The plot can be downloaded in the SVG format using the button
+                next to it.")
             ]),
             html_tr([
                 html_td(className="howto-1", "Summary view"), 
                 html_td(className="howto-2", "Total data and selected data"), 
-                html_td(className="howto-3", "col3_row2")
+                html_td(className="howto-3", "The summary view displays the most important parameters set for the analysis in the rightmost column and some summary statistics
+                of the total dataset and the selected subset of the data in the columns on the left.")
             ]),
         ])
     ]
