@@ -23,7 +23,7 @@ Necessary inputs to the analysis pipeline:
 
 ## Dependencies
 
-ChimericFragments is written in the Julia programming language and requires Julia (1.11.0) to
+ChimericFragments is written in the Julia programming language and requires Julia (1.11.1) to
 be installed on your system. You can download Julia [here](https://julialang.org/downloads/)
 ([old releases](https://julialang.org/downloads/oldreleases/)). It is highly recommended to install
 Julia as described [here](https://julialang.org/downloads/platform/). **ChimericFragments will not
