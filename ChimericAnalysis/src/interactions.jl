@@ -574,6 +574,34 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
             statsmatrix[i, (3*hist_bins+1):(4*hist_bins)] .= histo(ligs, mi2, ma2, hist_bins, false)
         end
         return sort!(stats_df, :nb_ints; rev=true)
+
+    elseif output === :ligs
+        srcs = Vector{Int}()
+        dsts = Vector{Int}()
+        ls = Vector{Int}()
+        rs = Vector{Int}()
+        cs = Vector{Int}()
+        for (a,b) in zip(out_df[!,:src], out_df[!,:dst])
+            (ii, ints, ligs) = interactions.edgestats[(a,b)]
+            append!(srcs, repeat([a], length(ligs)))
+            append!(dsts, repeat([b], length(ligs)))
+            append!(ls, first.(keys(ligs)))
+            append!(rs, last.(keys(ligs)))
+            append!(cs, values(ligs))
+        end
+        return DataFrame(
+            name1=interactions.nodes[srcs, :name],
+            type1=interactions.nodes[srcs, :type],
+            ref1=interactions.nodes[srcs, :ref],
+            strand1=interactions.nodes[srcs, :strand],
+            pos1=ls,
+            name2=interactions.nodes[dsts, :name],
+            type2=interactions.nodes[dsts, :type],
+            ref2=interactions.nodes[dsts, :ref],
+            strand2=interactions.nodes[dsts, :strand],
+            pos2=rs,
+            count=cs
+        )
     else
         throw(AssertionError("output has to be one of :edges, :nodes, :multi or :stats"))
     end

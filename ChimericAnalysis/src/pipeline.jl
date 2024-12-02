@@ -213,6 +213,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
 
+            odf = asdataframe(interactions; output=:ligs, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
+            CSV.write(joinpath(results_path, "tables", "ligationpoints_$(condition).csv"), odf)
+
             # Save summary data per annotation in table form
             odf = asdataframe(interactions; output=:nodes, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "genes_$(condition).csv"), odf)
