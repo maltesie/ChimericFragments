@@ -487,8 +487,8 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         out_df[:, :right2] = interactions.nodes[out_df[!,:dst], :right]
         out_df[:, :in_libs] = sum(eachcol(out_df[!, interactions.replicate_ids] .!= 0))
         # Set column order
-        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, :nb_ints, :nb_multi, :in_libs,
-        :fisher_pvalue, :fisher_fdr, :odds_ratio, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
+        out_columns = [:name1, :type1, :ref1, :strand1,:left1, :right1, :name2, :type2, :ref2, :strand2, :left2, :right2, interactions.replicate_ids..., 
+        :nb_ints, :nb_multi, :in_libs, :fisher_pvalue, :fisher_fdr, :odds_ratio, :bp_pvalue, :bp_fdr, :meanlen1, :nms1, :meanlen2, :nms2]
         return sort!(out_df[!, out_columns], :nb_ints; rev=true)
 
     # For output of summary information per annotation, compute sum of reads per interaction and number of partners

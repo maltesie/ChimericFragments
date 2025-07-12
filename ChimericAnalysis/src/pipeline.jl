@@ -105,7 +105,9 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
         @info "Using $(summarize(features))"
         isdir(joinpath(results_path, "tables")) || mkpath(joinpath(results_path, "tables"))
         isdir(joinpath(results_path, "jld")) || mkpath(joinpath(results_path, "jld"))
-
+	
+	merged_df = DataFrame("name1"=>String[], "type1"=>String[], "ref1"=>String[], "name2"=>String[], "type2"=>String[], "ref2"=>String[])
+	
         # Cycle through all conditions. The are defined in the config.jl as samplename_condition
         for (condition, r) in conditions
 
@@ -124,6 +126,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 for (i, bam) in enumerate(bams[r])
                     replicate_id = Symbol("$(condition)_$i")
                     push!(replicate_ids, replicate_id)
+                    
                     @info "Replicate $replicate_id:"
 
                     @info "Reading $bam"
@@ -142,7 +145,7 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                     append!(interactions, alignments, replicate_id; min_distance=min_distance, max_ligation_distance=max_ligation_distance,
                         filter_types=filter_types, allow_self_chimeras=allow_self_chimeras, min_self_chimera_distance=min_self_chimera_distance,
                         is_paired_end=is_paired_end)
-
+                    
                     # Memory management
                     empty!(alignments)
                     GC.gc()
@@ -207,11 +210,13 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
                 @info "Could not compute correlation between interaction counts. No interactions left after filtering!"
             end
 
-            @info "Saving..."
+            @info "Writing output tables..."
 
             # Save interaction data in table form
             odf = asdataframe(interactions; output=:edges, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "interactions_$(condition).csv"), odf)
+            
+            merged_df = outerjoin(merged_df, odf[:, [:name1, :type1, :ref1, :name2, :type2, :ref2, interactions.replicate_ids...]], on=[:name1, :type1, :ref1, :name2, :type2, :ref2])
 
             odf = asdataframe(interactions; output=:ligs, min_reads=min_reads, max_fisher_fdr=max_fisher_fdr, max_bp_fdr=max_bp_fdr)
             CSV.write(joinpath(results_path, "tables", "ligationpoints_$(condition).csv"), odf)
@@ -228,7 +233,10 @@ function chimeric_analysis(features::Features, bams::SingleTypeFiles, results_pa
             write(joinpath(results_path, "jld", "$(condition).jld2"), interactions)
 
         end
-
+	
+	merged_df = coalesce.(merged_df, 0)
+	CSV.write(joinpath(results_path, "tables", "all_conditions_interactions.csv"), merged_df)
+	
         @info "Done."
     end
 end
