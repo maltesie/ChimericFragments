@@ -461,7 +461,7 @@ function histo(ints::Dict{Tuple{Int,Int},Int}, mi::Int, ma::Int, nbins::Int, l::
     return h
 end
 # Collect additional information to output interactions or summary information for all annotations.
-function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fisher_fdr=0.05, max_bp_fdr=0.05, hist_bins=100)
+function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max_fisher_fdr=0.05, max_bp_fdr=0.05, hist_bins=100, check_interaction_distances=(30,0))
     # Filter output data by number of reads per interaction or Fisher FDR or complementarity FDR
     filter_index = (interactions.edges[!, :nb_ints] .>= min_reads) .& (interactions.edges[!, :fisher_fdr] .<= max_fisher_fdr) .&
                         ((interactions.edges[!, :bp_fdr] .<= max_bp_fdr) .| isnan.(interactions.edges.bp_fdr))
@@ -581,13 +581,38 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
         ls = Vector{Int}()
         rs = Vector{Int}()
         cs = Vector{Int}()
+        l1 = Vector{Int}()
+        l2 = Vector{Int}()
+        r1 = Vector{Int}()
+        r2 = Vector{Int}()
+        lensl = Vector{Int}()
+        lensr = Vector{Int}()
+        as = Vector{Int}()
+        pv = Vector{Float32}()
         for (a,b) in zip(out_df[!,:src], out_df[!,:dst])
+        
             (ii, ints, ligs) = interactions.edgestats[(a,b)]
             append!(srcs, repeat([a], length(ligs)))
             append!(dsts, repeat([b], length(ligs)))
-            append!(ls, first.(keys(ligs)))
-            append!(rs, last.(keys(ligs)))
+            
+            ks = collect(keys(ligs))
+            append!(ls, first.(ks))
+            append!(rs, last.(ks))
             append!(cs, values(ligs))
+            
+            bp_info = [interactions.bpstats[(a,l,b,r)] for (l,r) in keys(ligs)]
+            this_l1 = [(interactions.nodes[a, :strand] === '+' ? first(ks[iii]) - (first(check_interaction_distances) - bp[2]) : first(ks[iii]) + (first(check_interaction_distances) - bp[3])) for (iii, bp) in enumerate(bp_info)]
+            this_l2 = [(interactions.nodes[a, :strand] === '+' ? first(ks[iii]) - (first(check_interaction_distances) - bp[3]) : first(ks[iii]) + (first(check_interaction_distances) - bp[2])) for (iii, bp) in enumerate(bp_info)]
+            this_r1 = [(interactions.nodes[b, :strand] === '+' ? last(ks[iii]) + (first(check_interaction_distances) - bp[5]) : last(ks[iii]) - (first(check_interaction_distances) - bp[4])) for (iii, bp) in enumerate(bp_info)]
+            this_r2 = [(interactions.nodes[b, :strand] === '+' ? last(ks[iii]) + (first(check_interaction_distances) - bp[4]) : last(ks[iii]) - (first(check_interaction_distances) - bp[5])) for (iii, bp) in enumerate(bp_info)]
+            append!(l1, this_l1)
+            append!(l2, this_l2)
+            append!(r1, this_r1)
+	    append!(r2, this_r2)
+	    append!(lensl, this_l2 .- this_l1 .+ 1)
+	    append!(lensr, this_r2 .- this_r1 .+ 1)
+	    append!(as, [bp[6] for bp in bp_info])
+	    append!(pv, [bp[1] for bp in bp_info])
         end
         return DataFrame(
             name1=interactions.nodes[srcs, :name],
@@ -600,9 +625,17 @@ function asdataframe(interactions::Interactions; output=:edges, min_reads=5, max
             ref2=interactions.nodes[dsts, :ref],
             strand2=interactions.nodes[dsts, :strand],
             pos2=rs,
-            count=cs
+            ligationpoint_count=cs,
+            complementarity_pvalue=pv,
+            complementarity_score=as,
+            complementarity1_left=l1,
+            complementarity1_right=l2,
+            complementarity1_length=lensl,
+            complementarity2_left=r1,
+            complementarity2_right=r2,
+            complementarity2_length=lensr
         )
     else
-        throw(AssertionError("output has to be one of :edges, :nodes, :multi or :stats"))
+        throw(AssertionError("output has to be one of :edges, :nodes, :multi, :ligs or :stats"))
     end
 end
